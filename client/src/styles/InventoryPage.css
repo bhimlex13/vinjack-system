@@ -1,0 +1,108 @@
+.inventory-container {
+  padding: 1rem;
+}
+
+.inventory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.inventory-header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #333;
+}
+
+.add-product-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.7rem 1.2rem;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.add-product-btn:hover {
+  background-color: #0056b3;
+}
+
+.products-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.products-table th, .products-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.products-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+}
+
+.products-table tbody tr:hover {
+  background-color: #f1f3f5;
+}
+
+.status {
+  padding: 0.3rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-ok {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-low {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.actions button {
+  border: none;
+  padding: 0.4rem 0.8rem;
+  margin-right: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-edit {
+  background-color: #ffc107;
+  color: #333;
+}
+
+.btn-delete {
+  background-color: #dc3545;
+  color: white;
+}
+
+.no-products {
+  text-align: center;
+  padding: 3rem;
+  color: #6c757d;
+  font-size: 1.1rem;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 4rem;
+  font-size: 1.2rem;
+  color: #6c757d;
+}
