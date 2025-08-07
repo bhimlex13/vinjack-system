@@ -86,3 +86,44 @@
   font-size: 0.8rem;
   font-weight: bold;
 }
+
+.sidebar {
+  /* Modify this existing class to use flexbox for footer positioning */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* This pushes the footer to the bottom */
+  height: 100%;
+}
+
+.user-info {
+  padding: 0 1.5rem;
+  color: #ccc;
+  font-weight: 500;
+  text-align: center;
+  border-bottom: 1px solid #495057;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sidebar-footer {
+  padding: 1.5rem;
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 0.8rem;
+  background-color: #495057;
+  color: #adb5bd;
+  border: 1px solid #6c757d;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.logout-btn:hover {
+  background-color: #dc3545;
+  color: white;
+  border-color: #dc3545;
+}
