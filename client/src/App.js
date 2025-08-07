@@ -1,4 +1,3 @@
-// client/src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -7,10 +6,9 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/MainLayout';
-import InventoryPage from './pages/InventoryPage'; // <-- ADD THIS IMPORT
+import InventoryPage from './pages/InventoryPage';
+import SalesPage from './pages/SalesPage'; 
 
-// You can keep the other placeholder pages for now
-const SalesPage = () => <h1>Sales Page</h1>;
 const SuppliersPage = () => <h1>Suppliers Page</h1>;
 const ReportsPage = () => <h1>Reports Page</h1>;
 
@@ -24,8 +22,8 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
-              {/* This now uses your real InventoryPage component */}
               <Route path="/inventory" element={<InventoryPage />} />
+              {/* This route now correctly uses your new SalesPage component */}
               <Route path="/sales" element={<SalesPage />} />
               <Route path="/suppliers" element={<SuppliersPage />} />
               <Route path="/reports" element={<ReportsPage />} />
