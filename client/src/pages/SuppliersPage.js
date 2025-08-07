@@ -1,14 +1,16 @@
 // client/src/pages/SuppliersPage.js
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import '../styles/InventoryPage.css'; // We can reuse these styles
+import '../styles/InventoryPage.css';
 import Modal from '../components/Modal';
 import SupplierForm from '../components/SupplierForm';
+import RecordDeliveryForm from '../components/RecordDeliveryForm'; // <-- Import the new form
 
 const SuppliersPage = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false); // <-- New state for delivery modal
   const [editingSupplier, setEditingSupplier] = useState(null);
 
   useEffect(() => {
@@ -28,22 +30,20 @@ const SuppliersPage = () => {
 
   const handleFormSubmit = (newSupplierData) => {
     if (editingSupplier) {
-      // Update existing supplier in the list
       setSuppliers(suppliers.map(s => s._id === newSupplierData._id ? newSupplierData : s));
     } else {
-      // Add new supplier to the list
       setSuppliers([...suppliers, newSupplierData]);
     }
   };
 
-  const openModalForAdd = () => {
+  const openSupplierModalForAdd = () => {
     setEditingSupplier(null);
-    setIsModalOpen(true);
+    setIsSupplierModalOpen(true);
   };
   
-  const openModalForEdit = (supplier) => {
+  const openSupplierModalForEdit = (supplier) => {
     setEditingSupplier(supplier);
-    setIsModalOpen(true);
+    setIsSupplierModalOpen(true);
   };
 
   const handleDelete = async (supplierId) => {
@@ -61,25 +61,39 @@ const SuppliersPage = () => {
 
   return (
     <div className="inventory-container">
+      {/* Modal for adding/editing a supplier */}
       <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        isOpen={isSupplierModalOpen} 
+        onClose={() => setIsSupplierModalOpen(false)} 
         title={editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
       >
         <SupplierForm
           onFormSubmit={handleFormSubmit}
           supplierToEdit={editingSupplier}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => setIsSupplierModalOpen(false)}
         />
+      </Modal>
+
+      {/* New Modal for recording a delivery */}
+      <Modal
+        isOpen={isDeliveryModalOpen}
+        onClose={() => setIsDeliveryModalOpen(false)}
+        title="Record New Delivery"
+      >
+        <RecordDeliveryForm onClose={() => setIsDeliveryModalOpen(false)} />
       </Modal>
 
       <div className="inventory-header">
         <h1>Supplier Management</h1>
         <div>
-          <button className="add-product-btn" onClick={openModalForAdd} style={{ marginRight: '1rem' }}>
+          <button className="add-product-btn" onClick={openSupplierModalForAdd} style={{ marginRight: '1rem' }}>
             Add Supplier
           </button>
-          <button className="add-product-btn" style={{ backgroundColor: '#28a745' }}>
+          <button 
+            className="add-product-btn" 
+            onClick={() => setIsDeliveryModalOpen(true)} // <-- This opens the delivery modal
+            style={{ backgroundColor: '#28a745' }}
+          >
             Record Delivery
           </button>
         </div>
@@ -102,7 +116,7 @@ const SuppliersPage = () => {
                 <td>{supplier.contactPerson || 'N/A'}</td>
                 <td>{supplier.contactNumber || 'N/A'}</td>
                 <td className="actions">
-                  <button className="btn-edit" onClick={() => openModalForEdit(supplier)}>Edit</button>
+                  <button className="btn-edit" onClick={() => openSupplierModalForEdit(supplier)}>Edit</button>
                   <button className="btn-delete" onClick={() => handleDelete(supplier._id)}>Delete</button>
                 </td>
               </tr>
