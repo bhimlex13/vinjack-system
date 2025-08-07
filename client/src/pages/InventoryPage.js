@@ -1,11 +1,13 @@
-// client/src/pages/InventoryPage.js
-import React, { useState, useEffect, useMemo } from 'react';
-import api from '../api/axios'; // Correctly imported, now we'll use it everywhere
+import React, { useState, useEffect, useMemo, useContext } from 'react';
+import api from '../api/axios';
 import '../styles/InventoryPage.css';
 import Modal from '../components/Modal';
 import ProductForm from '../components/ProductForm';
+import AuthContext from '../context/AuthContext';
 
 const InventoryPage = () => {
+  const { user } = useContext(AuthContext); 
+  
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -15,11 +17,9 @@ const InventoryPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
 
-  // Fetch initial data using the 'api' instance
   const fetchInitialData = async () => {
     try {
       setIsLoading(true);
-      // Use 'api' instance for all requests
       const productsResponse = await api.get('/products');
       const categoriesResponse = await api.get('/categories');
       setProducts(productsResponse.data);
@@ -36,7 +36,6 @@ const InventoryPage = () => {
   }, []);
 
   const filteredProducts = useMemo(() => {
-    // ... (This filtering logic is correct and does not need changes)
     return products.filter(product => {
       const searchMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           product.itemCode.toLowerCase().includes(searchTerm.toLowerCase());
@@ -44,10 +43,9 @@ const InventoryPage = () => {
       return searchMatch && categoryMatch;
     });
   }, [products, searchTerm, filterCategory]);
-  
 
   const handleFormSubmit = () => {
-    fetchInitialData(); // Refetch all data to ensure list is up-to-date
+    fetchInitialData();
   };
 
   const openModalForEdit = (product) => {
@@ -63,7 +61,6 @@ const InventoryPage = () => {
   const handleDelete = async (productId) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        // THIS IS THE FIX: Use 'api' instance instead of 'axios' with a hardcoded URL
         await api.delete(`/products/${productId}`);
         setProducts(products.filter(p => p._id !== productId));
       } catch (err) {
@@ -77,10 +74,9 @@ const InventoryPage = () => {
 
   return (
     <div className="inventory-container">
-      {/* The rest of your JSX is correct and does not need changes */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingProduct ? 'Edit Product' : 'Add New Product'}>
         <ProductForm
-          onFormSubmit={handleFormSubmit}
+          onFormSubmit={handleFormSubmit} // <-- This line has been corrected
           productToEdit={editingProduct}
           onClose={() => setIsModalOpen(false)}
         />
@@ -88,27 +84,29 @@ const InventoryPage = () => {
 
       <div className="inventory-header">
         <h1>Inventory Management</h1>
-        <button className="add-product-btn" onClick={openModalForAdd}>Add New Product</button>
+        {user && (user.role === 'Owner' || user.role === 'Clerk') && (
+            <button className="add-product-btn" onClick={openModalForAdd}>Add New Product</button>
+        )}
       </div>
 
       <div className="filter-controls">
-        <input
-          type="text"
-          placeholder="Search by name or item code..."
-          className="search-input"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <select
-          className="filter-select"
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
-          <option value="">All Categories</option>
-          {categories.map(cat => (
-            <option key={cat._id} value={cat._id}>{cat.name}</option>
-          ))}
-        </select>
+          <input
+            type="text"
+            placeholder="Search by name or item code..."
+            className="search-input"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <select
+            className="filter-select"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            {categories.map(cat => (
+              <option key={cat._id} value={cat._id}>{cat.name}</option>
+            ))}
+          </select>
       </div>
 
       <table className="products-table">
@@ -125,8 +123,7 @@ const InventoryPage = () => {
           </tr>
         </thead>
         <tbody>
-          {filteredProducts.length > 0 ? (
-            filteredProducts.map((product) => (
+          {filteredProducts.map((product) => (
               <tr key={product._id}>
                 <td>{product.itemCode}</td>
                 <td>{product.name}</td>
@@ -140,18 +137,15 @@ const InventoryPage = () => {
                   </span>
                 </td>
                 <td className="actions">
-                  <button className="btn-edit" onClick={() => openModalForEdit(product)}>Edit</button>
-                  <button className="btn-delete" onClick={() => handleDelete(product._id)}>Delete</button>
+                  {user && (user.role === 'Owner' || user.role === 'Clerk') && (
+                    <button className="btn-edit" onClick={() => openModalForEdit(product)}>Edit</button>
+                  )}
+                  {user && user.role === 'Owner' && (
+                    <button className="btn-delete" onClick={() => handleDelete(product._id)}>Delete</button>
+                  )}
                 </td>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="8" className="no-products">
-                No products match your search/filter criteria.
-              </td>
-            </tr>
-          )}
+            ))}
         </tbody>
       </table>
     </div>
