@@ -12,6 +12,7 @@ import SalesPage from './pages/SalesPage';
 import AlertsPage from './pages/AlertsPage'; 
 import ReportsPage from './pages/ReportsPage'; 
 import SuppliersPage from './pages/SuppliersPage'; 
+import AuditLogPage from './pages/AuditLogPage';
 
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
               <Route path="/suppliers" element={<SuppliersPage />} />
               <Route path="/alerts" element={<AlertsPage />} /> {/* <-- This now uses your real component */}
               <Route path="/reports" element={<ReportsPage />} />
+               <Route path="/audit-log" element={<AuditLogPage />} /> 
               <Route path="/" element={<Navigate to="/dashboard" />} />
             </Route>
           </Route>

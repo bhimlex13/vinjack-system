@@ -1,0 +1,47 @@
+.audit-log-container { 
+  padding: 1rem; 
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.audit-log-container h1 { 
+  margin-top: 0; 
+  margin-bottom: 0.5rem;
+}
+
+.audit-log-container p {
+  font-size: 1.1rem;
+  color: #6c757d;
+  margin-bottom: 2rem;
+}
+
+.log-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.log-table th, .log-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+.log-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+}
+
+.action-tag {
+  background-color: #e9ecef;
+  color: #495057;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}

@@ -1,5 +1,6 @@
 // server/controllers/productController.js
 const Product = require('../models/productModel');
+const logAction = require('../utils/logger');
 
 // @desc    Get all products
 // @route   GET /api/products
@@ -19,6 +20,10 @@ const createProduct = async (req, res) => {
     const { name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel } = req.body;
     const newProduct = new Product({ name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel });
     const savedProduct = await newProduct.save();
+
+     // Log the action
+    logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`);
+
     res.status(201).json(savedProduct);
   } catch (error) {
     res.status(400).json({ message: 'Error creating product', error: error.message });
@@ -43,6 +48,10 @@ const updateProduct = async (req, res) => {
       //... and so on for other fields
 
       const updatedProduct = await product.save();
+
+       // Log the action
+        logAction(req.user, 'UPDATE_PRODUCT', `Updated product: '${updatedProduct.name}' (Code: ${updatedProduct.itemCode})`);
+
       res.json(updatedProduct);
     } else {
       res.status(404).json({ message: 'Product not found' });
@@ -60,6 +69,10 @@ const deleteProduct = async (req, res) => {
 
     if (product) {
       await product.deleteOne();
+
+       // Log the action
+            logAction(req.user, 'DELETE_PRODUCT', `Deleted product: '${product.name}' (Code: ${product.itemCode})`);
+
       res.json({ message: 'Product removed' });
     } else {
       res.status(404).json({ message: 'Product not found' });

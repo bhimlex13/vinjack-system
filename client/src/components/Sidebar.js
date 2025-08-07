@@ -38,6 +38,9 @@ const Sidebar = () => {
             )}
           </NavLink>
           <NavLink to="/reports">Reports</NavLink>
+          {user && user.role === 'Owner' && (
+  <NavLink to="/audit-log">Audit Log</NavLink>
+)}
         </nav>
       </div>
       

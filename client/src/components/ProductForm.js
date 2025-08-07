@@ -1,6 +1,6 @@
 // client/src/components/ProductForm.js
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios'; // <-- Use our custom api instance
 import '../styles/Form.css';
 
 const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
@@ -37,8 +37,9 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const catRes = await axios.get('http://localhost:5000/api/categories');
-        const brandRes = await axios.get('http://localhost:5000/api/brands');
+        // Use 'api' instance for all requests
+        const catRes = await api.get('/categories');
+        const brandRes = await api.get('/brands');
         setCategories(catRes.data);
         setBrands(brandRes.data);
       } catch (fetchError) {
@@ -58,11 +59,11 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
     try {
       let res;
       if (productToEdit) {
-        // If editing, send a PUT request
-        res = await axios.put(`http://localhost:5000/api/products/${productToEdit._id}`, formData);
+        // If editing, send a PUT request using the 'api' instance
+        res = await api.put(`/products/${productToEdit._id}`, formData);
       } else {
-        // If creating, send a POST request
-        res = await axios.post('http://localhost:5000/api/products', formData);
+        // If creating, send a POST request using the 'api' instance
+        res = await api.post('/products', formData);
       }
       onFormSubmit(res.data);
       onClose();
