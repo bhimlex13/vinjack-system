@@ -69,5 +69,19 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+// @desc    Get all products with low stock
+// @route   GET /api/products/low-stock
+const getLowStockProducts = async (req, res) => {
+  try {
+    // Find products where the quantity is less than or equal to the reorderLevel
+    const lowStockProducts = await Product.find({
+      $expr: { $lte: ['$quantity', '$reorderLevel'] }
+    });
+    res.json(lowStockProducts);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
 // Export the new functions
-module.exports = { getProducts, createProduct, updateProduct, deleteProduct };
+module.exports = { getProducts, createProduct, updateProduct, deleteProduct, getLowStockProducts };

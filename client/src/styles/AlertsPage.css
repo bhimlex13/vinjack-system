@@ -1,0 +1,59 @@
+/* client/src/styles/AlertsPage.css */
+.alerts-container {
+  padding: 1rem;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.alerts-container h1 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.8rem;
+  color: #333;
+}
+
+.alerts-container p {
+  font-size: 1.1rem;
+  color: #6c757d;
+  margin-bottom: 2rem;
+}
+
+.alerts-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.alerts-table th, .alerts-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.alerts-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+}
+
+.alert-item .quantity-low {
+  font-weight: bold;
+  color: #dc3545; /* Red color to highlight the low quantity */
+}
+
+.no-alerts {
+  background-color: #e2f0d9;
+  color: #3a7d1c;
+  border: 1px solid #c7e0ba;
+  padding: 2rem;
+  text-align: center;
+  border-radius: 8px;
+}
+
+.no-alerts p {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 500;
+}
