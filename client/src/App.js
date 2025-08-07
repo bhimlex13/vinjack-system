@@ -10,10 +10,9 @@ import MainLayout from './components/MainLayout';
 import InventoryPage from './pages/InventoryPage';
 import SalesPage from './pages/SalesPage';
 import AlertsPage from './pages/AlertsPage'; 
+import ReportsPage from './pages/ReportsPage'; 
+import SuppliersPage from './pages/SuppliersPage'; 
 
-// You can keep these other placeholders for now
-const SuppliersPage = () => <h1>Suppliers Page</h1>;
-const ReportsPage = () => <h1>Reports Page</h1>;
 
 function App() {
   return (

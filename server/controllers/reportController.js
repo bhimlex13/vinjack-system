@@ -64,4 +64,31 @@ const getDashboardSummary = async (req, res) => {
   }
 };
 
-module.exports = { getDashboardSummary };
+
+// @desc    Get a sales report for a given date range
+// @route   GET /api/reports/sales
+const getSalesReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: 'Please provide a start and end date.' });
+    }
+
+    const sales = await Sale.find({
+      createdAt: {
+        $gte: new Date(startDate), // Greater than or equal to start date
+        $lte: new Date(endDate),   // Less than or equal to end date
+      },
+    })
+    .sort({ createdAt: -1 }) // Show most recent first
+    .populate('recordedBy', 'fullName') // Get the full name of the user who recorded it
+    .populate('items.product', 'name'); // Get the name of each product sold
+
+    res.json(sales);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+module.exports = { getDashboardSummary, getSalesReport };

@@ -8,6 +8,8 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const brandRoutes = require('./routes/brandRoutes');
 const saleRoutes = require('./routes/saleRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const supplierRoutes = require('./routes/supplierRoutes'); 
+const deliveryRoutes = require('./routes/deliveryRoutes'); 
 
 // Connect to Database
 connectDB();
@@ -25,6 +27,8 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/suppliers', supplierRoutes); 
+app.use('/api/deliveries', deliveryRoutes); 
 
 
 const PORT = process.env.PORT || 5000;
