@@ -1,17 +1,17 @@
 // client/src/components/Sidebar.js
 import React, { useContext } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { NavLink, useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import { FaBell } from 'react-icons/fa';
 import '../styles/MainLayout.css';
 
 const Sidebar = () => {
-  const { lowStockItems = [], logout, user } = useContext(AuthContext); // Get logout function and user
-  const navigate = useNavigate(); // Hook for navigation
+  const { lowStockItems = [], logout, user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout(); // Clear user session
-    navigate('/login'); // Redirect to login page
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -38,13 +38,18 @@ const Sidebar = () => {
             )}
           </NavLink>
           <NavLink to="/reports">Reports</NavLink>
+          
+          {/* --- THIS IS THE CHANGE --- */}
+          {/* Now only the Owner can see the Settings and Audit Log links */}
           {user && user.role === 'Owner' && (
-  <NavLink to="/audit-log">Audit Log</NavLink>
-)}
+            <>
+              <NavLink to="/settings">Settings</NavLink>
+              <NavLink to="/audit-log">Audit Log</NavLink>
+            </>
+          )}
         </nav>
       </div>
       
-      {/* Logout Button at the bottom */}
       <div className="sidebar-footer">
         <button onClick={handleLogout} className="logout-btn">
           Logout
