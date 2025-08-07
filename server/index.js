@@ -7,6 +7,7 @@ const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const brandRoutes = require('./routes/brandRoutes');
 const saleRoutes = require('./routes/saleRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 // Connect to Database
 connectDB();
@@ -23,6 +24,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/sales', saleRoutes);
+app.use('/api/reports', reportRoutes);
 
 
 const PORT = process.env.PORT || 5000;

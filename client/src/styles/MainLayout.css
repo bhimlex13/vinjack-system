@@ -61,3 +61,28 @@
   padding: 2rem;
   overflow-y: auto; /* Allows scrolling for content that's too long */
 }
+
+.alerts-link {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.link-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notification-badge {
+  background-color: #dc3545;
+  color: white;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
