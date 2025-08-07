@@ -12,6 +12,7 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes'); 
 const auditLogRoutes = require('./routes/auditLogRoutes');
 const startLowStockCheck = require('./jobs/cronJobs'); 
+const settingsRoutes = require('./routes/settingsRoutes');
 
 // Connect to Database
 connectDB();
@@ -32,6 +33,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/suppliers', supplierRoutes); 
 app.use('/api/deliveries', deliveryRoutes); 
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Start the scheduled jobs
 startLowStockCheck();

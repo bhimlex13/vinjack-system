@@ -14,7 +14,7 @@ const transporter = nodemailer.createTransport({
  * Sends a low stock summary email.
  * @param {Array} lowStockItems - An array of products that are low on stock.
  */
-const sendLowStockEmail = async (lowStockItems) => {
+const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
   if (!lowStockItems || lowStockItems.length === 0) {
     console.log('No low stock items to report. Email not sent.');
     return;
@@ -27,7 +27,7 @@ const sendLowStockEmail = async (lowStockItems) => {
 
   const mailOptions = {
     from: `"VinJack System Alert" <${process.env.EMAIL_USER}>`,
-    to: process.env.EMAIL_USER, // Sending the alert to the owner's email
+    to: recipientEmail, // <-- Use the recipient's email
     subject: `Low Stock Alert - ${lowStockItems.length} Items Need Restocking`,
     html: `
       <h1>Inventory Alert</h1>
@@ -39,9 +39,9 @@ const sendLowStockEmail = async (lowStockItems) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log('Low stock alert email sent successfully.');
+    console.log(`Low stock alert email sent successfully to ${recipientEmail}.`);
   } catch (error) {
-    console.error('Error sending low stock email:', error);
+    console.error(`Error sending email to ${recipientEmail}:`, error);
   }
 };
 
