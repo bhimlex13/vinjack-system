@@ -1,9 +1,8 @@
 // server/controllers/deliveryController.js
 const Delivery = require('../models/deliveryModel');
 const Product = require('../models/productModel');
+const logAction = require('../utils/logger'); // <-- Import the logger
 
-// @desc    Create a new delivery
-// @route   POST /api/deliveries
 const createDelivery = async (req, res) => {
   const { supplier, productsReceived, recordedBy } = req.body;
 
@@ -18,13 +17,8 @@ const createDelivery = async (req, res) => {
       if (!product) {
         throw new Error(`Product with ID ${item.product} not found.`);
       }
-      
-      // Increase the product's quantity
       product.quantity += item.quantity;
-      
-      // Optional: Update the product's cost to the latest delivery cost
       product.cost = item.costAtTime;
-
       await product.save();
     }
 
@@ -34,8 +28,17 @@ const createDelivery = async (req, res) => {
       productsReceived,
       recordedBy,
     });
-
     const createdDelivery = await delivery.save();
+
+    // --- Part 3: Log the Action ---
+    // We need to populate the supplier name for a better log message
+    await createdDelivery.populate('supplier', 'name');
+    logAction(
+      req.user, 
+      'RECORD_DELIVERY', 
+      `Recorded delivery of ${productsReceived.length} product type(s) from supplier '${createdDelivery.supplier.name}'.`
+    );
+
     res.status(201).json(createdDelivery);
 
   } catch (error) {
@@ -43,8 +46,6 @@ const createDelivery = async (req, res) => {
   }
 };
 
-// @desc    Get all deliveries
-// @route   GET /api/deliveries
 const getDeliveries = async (req, res) => {
     try {
         const deliveries = await Delivery.find({})
@@ -56,6 +57,5 @@ const getDeliveries = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 }
-
 
 module.exports = { createDelivery, getDeliveries };
