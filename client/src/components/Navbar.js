@@ -26,7 +26,6 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
   return (
     <header className="navbar">
       <div className="navbar-left">
-        {/* CORRECTED LOGIC: Show button if sidebar is NOT collapsed */}
         {isSidebarCollapsed && (
           <button className="sidebar-toggle" onClick={toggleSidebar}>
             <FaBars />

@@ -3,15 +3,8 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  fullName: { 
-    type: String, 
-    required: true 
-  },
-  username: { 
-    type: String, 
-    required: true, 
-    unique: true 
-  },
+  fullName: { type: String, required: true },
+  username: { type: String, required: true, unique: true },
   email: {
     type: String,
     required: true,
@@ -19,34 +12,31 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
   },
-  password: { 
-    type: String, 
-    required: true 
-  },
+  password: { type: String, required: true },
   role: {
     type: String,
     enum: ['Owner', 'Clerk', 'Mechanic'],
     required: true,
-    default: 'Mechanic',
   },
-  status: { 
-    type: String, 
-    enum: ['pending', 'active', 'inactive'],
-    default: 'pending',
-  },
+  status: { type: String, default: 'active' },
   emailSettings: {
-    notificationsEnabled: {
-      type: Boolean,
-      default: true,
-    },
-    notificationTime: {
-      type: String,
-      default: '08:00',
-    }
+    notificationsEnabled: { type: Boolean, default: true },
+    notificationTime: { type: String, default: '08:00' }
+  },
+  
+
+  hasPendingChanges: {
+    type: Boolean,
+    default: false,
+  },
+  pendingChanges: {
+    fullName: { type: String },
+    username: { type: String },
+    email: { type: String },
   }
 }, { timestamps: true });
 
-// Hash password before saving
+
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(10);

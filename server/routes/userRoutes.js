@@ -2,24 +2,34 @@
 const express = require('express');
 const router = express.Router();
 const { 
-  registerUser, 
-  loginUser,
-  getAllUsers,
-  updateUser,
-  deleteUser
+    registerUser, 
+    loginUser, 
+    getAllUsers, 
+    updateUser, 
+    deleteUser,
+    requestProfileUpdate,
+    approveUserUpdate,
+    rejectUserUpdate
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// --- Public Routes ---
+// Public routes
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 
-// --- Admin Routes (Protected and for Owner only) ---
+// --- User's own profile update route ---
+router.put('/profile', protect, requestProfileUpdate);
+
+// --- Admin (Owner) routes ---
 router.route('/')
-  .get(protect, authorize('Owner'), getAllUsers);
+    .get(protect, authorize('Owner'), getAllUsers);
 
 router.route('/:id')
-  .put(protect, authorize('Owner'), updateUser)
-  .delete(protect, authorize('Owner'), deleteUser);
+    .put(protect, authorize('Owner'), updateUser) // This is for role/status changes by the Owner
+    .delete(protect, authorize('Owner'), deleteUser);
+
+// --- NEW Owner approval routes ---
+router.post('/:id/approve', protect, authorize('Owner'), approveUserUpdate);
+router.post('/:id/reject', protect, authorize('Owner'), rejectUserUpdate);
 
 module.exports = router;
