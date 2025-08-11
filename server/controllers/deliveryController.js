@@ -1,7 +1,7 @@
 // server/controllers/deliveryController.js
 const Delivery = require('../models/deliveryModel');
 const Product = require('../models/productModel');
-const logAction = require('../utils/logger'); // <-- Import the logger
+const logAction = require('../utils/logger'); 
 
 const createDelivery = async (req, res) => {
   const { supplier, productsReceived, recordedBy } = req.body;

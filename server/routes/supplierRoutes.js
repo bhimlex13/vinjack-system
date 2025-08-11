@@ -4,6 +4,7 @@ const router = express.Router();
 const { getSuppliers, createSupplier, updateSupplier, deleteSupplier } = require('../controllers/supplierController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
+
 // All routes are now protected
 router.route('/')
     .get(protect, getSuppliers)
