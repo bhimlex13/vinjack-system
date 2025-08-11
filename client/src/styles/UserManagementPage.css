@@ -125,11 +125,22 @@
 .modal-actions {
   margin-top: 1.5rem;
   display: flex;
-  justify-content: space-between; /* This pushes buttons to opposite ends */
+  justify-content: space-between;
   align-items: center;
 }
 
 .modal-actions-right {
     display: flex;
     gap: 1rem;
+}
+
+.changed-field {
+  background-color: #e8f4fd; /* Light blue highlight */
+  border-left: 4px solid #17a2b8;
+  padding-left: 4px;
+}
+
+.diff-cell {
+  vertical-align: top;
+  padding: 0.75rem;
 }
