@@ -27,7 +27,7 @@
   border-radius: 4px;
   background-color: var(--primary-color);
   color: white;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   margin-top: 1rem;
@@ -46,4 +46,81 @@
   padding: 0.75rem;
   margin-top: 1rem;
   text-align: center;
+}
+
+.form-group-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.form-actions-right {
+    display: flex;
+    gap: 1rem;
+}
+
+.form-action-btn {
+  padding: 0.8rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.form-delete-btn {
+  background-color: transparent;
+  color: #dc3545;
+}
+
+.form-delete-btn:hover {
+  background-color: #f8d7da;
+}
+
+.form-cancel-btn {
+  background-color: #6c757d;
+  color: white;
+}
+
+.form-cancel-btn:hover {
+  background-color: #5a6268;
+}
+
+/* --- NEW STYLES for Image Toggle --- */
+.image-source-toggle {
+  display: flex;
+  margin-bottom: 0.5rem;
+}
+
+.image-source-toggle button {
+  flex-grow: 1;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  background-color: #f8f9fa;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.image-source-toggle button:first-child {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.image-source-toggle button:last-child {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.image-source-toggle button.active {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
 }

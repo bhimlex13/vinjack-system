@@ -5,7 +5,6 @@ import '../styles/DashboardPage.css';
 import { Bar } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
-// This is important! It registers the necessary components for Chart.js to work.
 Chart.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const DashboardPage = () => {

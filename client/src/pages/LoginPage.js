@@ -1,7 +1,8 @@
+// client/src/pages/LoginPage.js
 import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Import Link
 import AuthContext from '../context/AuthContext';
-import '../styles/LoginPage.css'; // <-- The path is updated here
+import '../styles/LoginPage.css';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -62,6 +63,11 @@ const LoginPage = () => {
             {isLoading ? 'Signing In...' : 'Sign In'}
           </button>
           {error && <p className="error-message">{error}</p>}
+
+          {/* THIS IS THE NEW LINK */}
+          <p className="register-link">
+            Don't have an account? <Link to="/register">Create one</Link>
+          </p>
         </form>
       </div>
     </div>

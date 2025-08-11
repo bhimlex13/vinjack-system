@@ -1,26 +1,20 @@
 /* client/src/styles/SalesPage.css */
 .pos-container {
   display: flex;
-  height: calc(100vh - 4rem); /* Full height minus padding */
+  height: calc(100vh - 4rem);
   gap: 2rem;
   font-family: 'Segoe UI', sans-serif;
 }
 
 /* Left Column */
 .product-selection {
-  flex: 2; /* Takes up 2/3 of the space */
+  flex: 2;
   display: flex;
   flex-direction: column;
   background: white;
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.product-selection h2 {
-  margin-top: 0;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 1rem;
 }
 
 .search-bar {
@@ -33,27 +27,61 @@
   box-sizing: border-box;
 }
 
-.product-list {
+.product-grid {
   overflow-y: auto;
   flex-grow: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  padding-right: 1rem;
 }
 
-.product-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 1rem;
-  border-bottom: 1px solid #f0f0f0;
+.product-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: box-shadow 0.2s, transform 0.2s;
+  display: flex;
+  flex-direction: column;
 }
 
-.product-item:hover {
+.product-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-3px);
+}
+
+.product-card img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
   background-color: #f8f9fa;
+}
+
+.product-card-info {
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: space-between;
+}
+
+.product-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.product-price {
+  font-weight: bold;
+  color: var(--primary-color);
+  align-self: flex-end;
 }
 
 /* Right Column */
 .current-sale {
-  flex: 1; /* Takes up 1/3 of the space */
+  flex: 1;
   display: flex;
   flex-direction: column;
   background: white;
