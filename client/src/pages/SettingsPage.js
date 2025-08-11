@@ -1,24 +1,24 @@
 // client/src/pages/SettingsPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react'; // Import useContext
 import api from '../api/axios';
+import AuthContext from '../context/AuthContext'; // Import AuthContext
 import '../styles/SettingsPage.css';
 
 const SettingsPage = () => {
+  const { user } = useContext(AuthContext); // Get the logged-in user
+
   const [personalSettings, setPersonalSettings] = useState({
     notificationsEnabled: true,
     notificationTime: '08:00'
   });
-  const [notificationEmail, setNotificationEmail] = useState('');
   const [message, setMessage] = useState('');
 
+  // Fetch only the user's personal settings
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const personalRes = await api.get('/settings');
         setPersonalSettings(personalRes.data);
-        
-        const appRes = await api.get('/settings/global/notificationEmail');
-        setNotificationEmail(appRes.data.value);
       } catch (error) {
         console.error("Failed to fetch settings", error);
       }
@@ -34,15 +34,13 @@ const SettingsPage = () => {
     }));
   };
   
+  // The submit handler is now simpler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
     try {
+      // It only needs to save the personal settings now
       await api.put('/settings', personalSettings);
-      
-      const emailSetting = { key: 'notificationEmail', value: notificationEmail };
-      await api.put('/settings/global', emailSetting);
-
       setMessage('Settings saved successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
@@ -52,7 +50,7 @@ const SettingsPage = () => {
 
   return (
     <div className="settings-container">
-      <h1>Settings</h1>
+      <h1>My Settings</h1>
       <form className="settings-form" onSubmit={handleSubmit}>
         <section>
           <h2>My Notification Settings</h2>
@@ -70,7 +68,6 @@ const SettingsPage = () => {
           </div>
           <div className="form-group">
             <label htmlFor="notificationTime">My Notification Time</label>
-            {/* THIS IS THE CHANGE: Replaced the <select> with <input type="time"> */}
             <input
               type="time"
               id="notificationTime"
@@ -81,25 +78,14 @@ const SettingsPage = () => {
               disabled={!personalSettings.notificationsEnabled}
             />
           </div>
-        </section>
-
-        <section>
-          <h2>Global App Settings</h2>
-          <p>Set the email address that will receive all low-stock notifications.</p>
           <div className="form-group">
-            <label htmlFor="notificationEmail">Recipient Email</label>
-            <input
-              type="email"
-              id="notificationEmail"
-              className="email-input"
-              value={notificationEmail}
-              onChange={(e) => setNotificationEmail(e.target.value)}
-              placeholder="owner@example.com"
-            />
+            <label>Recipient Email</label>
+            {/* THIS IS THE CHANGE: Display the user's email as non-editable text */}
+            <p className="email-display">{user?.email || 'No email on record.'}</p>
           </div>
         </section>
 
-        <button type="submit" className="save-btn">Save All Settings</button>
+        <button type="submit" className="save-btn">Save My Settings</button>
         {message && <p className="success-message">{message}</p>}
       </form>
     </div>

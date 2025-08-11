@@ -4,34 +4,23 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 // @desc    Register a new user for approval
-// @route   POST /api/users/register
-// @access  Public
 const registerUser = async (req, res) => {
   try {
-    // Now expects email from the public registration form
     const { fullName, username, email, password } = req.body;
-
-    // Basic validation
     if (!fullName || !username || !email || !password) {
       return res.status(400).json({ message: 'Please provide all required fields.' });
     }
-
-    // Check if username or email already exists
     const userExists = await User.findOne({ $or: [{ username }, { email }] });
     if (userExists) {
       return res.status(400).json({ message: 'Username or email is already taken.' });
     }
-
-    // Create a new user. Role and status will use defaults from the model ('Mechanic', 'pending')
     const user = await User.create({
       fullName,
       username,
       email,
       password,
     });
-
     if (user) {
-      // Send a success message, but no token since they can't log in yet
       res.status(201).json({
         message: 'Registration successful! Your account is pending admin approval.'
       });
@@ -44,26 +33,22 @@ const registerUser = async (req, res) => {
 };
 
 // @desc    Authenticate a user & get token
-// @route   POST /api/users/login
-// @access  Public
 const loginUser = async (req, res) => {
   try {
     const { username, password } = req.body;
     const user = await User.findOne({ username });
 
-    // Check if user exists and password matches
     if (user && (await bcrypt.compare(password, user.password))) {
-      
-      // THIS IS THE NEW CHECK: Ensure the user's account is active
       if (user.status !== 'active') {
         return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
       }
-
-      // If active, send back user data and token
+      
+      // THIS IS THE FIX: We are adding the 'email' field to the response
       res.json({
         _id: user._id,
         fullName: user.fullName,
         username: user.username,
+        email: user.email, // <-- ADD THIS LINE
         role: user.role,
         token: generateToken(user._id),
       });
@@ -75,28 +60,93 @@ const loginUser = async (req, res) => {
   }
 };
 
-// --- Admin Functions (Owner Only) ---
+// --- NEW FUNCTION for a user to request an update to their own profile ---
+const requestProfileUpdate = async (req, res) => {
+  try {
+    const { fullName, username, email } = req.body;
+    const user = await User.findById(req.user.id);
 
-// @desc    Get all users
-// @route   GET /api/users
-// @access  Owner
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Store the requested changes in the pendingChanges field
+    user.pendingChanges = { fullName, username, email };
+    user.hasPendingChanges = true;
+    await user.save();
+    
+    logAction(req.user, 'REQUEST_PROFILE_UPDATE', `User ${user.username} requested profile changes.`);
+    res.json({ message: 'Update request submitted successfully. Waiting for owner approval.' });
+
+  } catch (error) {
+    res.status(400).json({ message: 'Error submitting update request.', error: error.message });
+  }
+};
+
+// --- NEW FUNCTION for the Owner to approve changes ---
+const approveUserUpdate = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || !user.hasPendingChanges) {
+            return res.status(404).json({ message: 'No pending changes found for this user.' });
+        }
+
+        // Apply the pending changes to the main fields
+        user.fullName = user.pendingChanges.fullName || user.fullName;
+        user.username = user.pendingChanges.username || user.username;
+        user.email = user.pendingChanges.email || user.email;
+
+        // Clear the pending changes
+        user.pendingChanges = {};
+        user.hasPendingChanges = false;
+        
+        const updatedUser = await user.save();
+        
+        logAction(req.user, 'APPROVE_PROFILE_UPDATE', `Approved profile changes for user ${updatedUser.username}.`);
+        res.json(updatedUser);
+
+    } catch (error) {
+        res.status(400).json({ message: 'Error approving changes.', error: error.message });
+    }
+};
+
+// --- NEW FUNCTION for the Owner to reject changes ---
+const rejectUserUpdate = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || !user.hasPendingChanges) {
+            return res.status(404).json({ message: 'No pending changes found for this user.' });
+        }
+
+        // Clear the pending changes without applying them
+        user.pendingChanges = {};
+        user.hasPendingChanges = false;
+        
+        await user.save();
+        
+        logAction(req.user, 'REJECT_PROFILE_UPDATE', `Rejected profile changes for user ${user.username}.`);
+        res.json({ message: 'Pending changes have been rejected.' });
+
+    } catch (error) {
+        res.status(400).json({ message: 'Error rejecting changes.', error: error.message });
+    }
+};
+
+
+// --- Admin Functions (Owner Only) ---
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({}).select('-password'); // Exclude passwords
+    const users = await User.find({}).select('-password');
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Update a user's status or role
-// @route   PUT /api/users/:id
-// @access  Owner
 const updateUser = async (req, res) => {
   try {
     const { role, status } = req.body;
     const user = await User.findById(req.params.id);
-
     if (user) {
       user.role = role || user.role;
       user.status = status || user.status;
@@ -117,9 +167,6 @@ const updateUser = async (req, res) => {
   }
 };
 
-// @desc    Delete a user
-// @route   DELETE /api/users/:id
-// @access  Owner
 const deleteUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -147,4 +194,7 @@ module.exports = {
   getAllUsers,
   updateUser,
   deleteUser,
+  requestProfileUpdate, // <-- EXPORT NEW
+  approveUserUpdate,    // <-- EXPORT NEW
+  rejectUserUpdate      // <-- EXPORT NEW
 };

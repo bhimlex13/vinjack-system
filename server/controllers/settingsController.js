@@ -17,15 +17,25 @@ const updateSettings = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'User not found' });
-    user.emailSettings = req.body;
+    
+    // Ensure emailSettings exists before assigning
+    if (!user.emailSettings) {
+        user.emailSettings = {};
+    }
+
+    user.emailSettings.notificationsEnabled = req.body.notificationsEnabled;
+    user.emailSettings.notificationTime = req.body.notificationTime;
+    
     await user.save();
     res.json(user.emailSettings);
   } catch (error) {
-    res.status(400).json({ message: 'Error updating settings' });
+    // THIS IS THE NEW, DETAILED LOGGING
+    console.error('Error updating settings:', error); // Log the full error to the terminal
+    res.status(400).json({ message: 'Error updating settings', error: error.message });
   }
 };
 
-// --- Global App Settings (Moved from appSettingsController) ---
+// --- Global App Settings ---
 const getGlobalSetting = async (req, res) => {
   try {
     const setting = await Setting.findOne({ key: req.params.key });
