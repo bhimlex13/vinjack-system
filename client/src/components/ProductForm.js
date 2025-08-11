@@ -5,7 +5,7 @@ import '../styles/Form.css';
 import ConfirmationContext from '../context/ConfirmationContext';
 import AuthContext from '../context/AuthContext';
 
-const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) => {
+const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
   const { confirm } = useContext(ConfirmationContext);
   const { user } = useContext(AuthContext);
   const [formData, setFormData] = useState({
@@ -15,7 +15,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [error, setError] = useState('');
-  const [imageSource, setImageSource] = useState('url'); // 'url' or 'upload'
+  const [imageSource, setImageSource] = useState('url');
 
   useEffect(() => {
     if (productToEdit) {
@@ -56,14 +56,53 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+  // --- FUNCTION TO RESIZE IMAGES ---
+  const resizeImage = (file, maxWidth, maxHeight) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onloadend = () => {
-        setFormData({ ...formData, image: reader.result });
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height *= maxWidth / width;
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width *= maxHeight / height;
+              height = maxHeight;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.9)); // Get Base64 string of the resized image
+        };
+        img.onerror = (error) => reject(error);
       };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        // Resize the image to a max of 800x800 pixels before setting it
+        const resizedImage = await resizeImage(file, 800, 800);
+        setFormData({ ...formData, image: resizedImage });
+      } catch (error) {
+        console.error("Failed to resize image", error);
+        setError("Failed to process image. Please try another file.");
+      }
     }
   };
 
@@ -89,6 +128,15 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
       }
     }
   };
+  
+  const onProductDelete = async (productId) => {
+      try {
+        await api.delete(`/products/${productId}`);
+        onFormSubmit(); // This will trigger a refetch on the parent page
+      } catch (err) {
+        alert('Failed to delete product.');
+      }
+  }
 
   const handleDelete = async () => {
     const isConfirmed = await confirm('Are you sure you want to permanently delete this product?');

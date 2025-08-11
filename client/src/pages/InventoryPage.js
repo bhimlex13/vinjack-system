@@ -30,28 +30,29 @@ const InventoryPage = () => {
     return 0;
   };
 
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setIsLoading(true);
-        const productsResponse = await api.get('/products');
-        const categoriesResponse = await api.get('/categories');
-        const brandsResponse = await api.get('/brands');
-        
-        const productsWithStatus = productsResponse.data.map(p => ({
-            ...p,
-            statusValue: getStatusValue(p)
-        }));
+  const fetchInitialData = async () => {
+    try {
+      setIsLoading(true);
+      const productsResponse = await api.get('/products');
+      const categoriesResponse = await api.get('/categories');
+      const brandsResponse = await api.get('/brands');
+      
+      const productsWithStatus = productsResponse.data.map(p => ({
+          ...p,
+          statusValue: getStatusValue(p)
+      }));
 
-        setProducts(productsWithStatus);
-        setCategories(categoriesResponse.data);
-        setBrands(brandsResponse.data);
-      } catch (err) {
-        setError('Failed to fetch data.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      setProducts(productsWithStatus);
+      setCategories(categoriesResponse.data);
+      setBrands(brandsResponse.data);
+    } catch (err) {
+      setError('Failed to fetch data.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchInitialData();
   }, []);
 
@@ -97,19 +98,7 @@ const InventoryPage = () => {
   };
   
   const handleFormSubmit = () => {
-    const fetchProducts = async () => {
-        try {
-            const response = await api.get('/products');
-            const productsWithStatus = response.data.map(p => ({
-                ...p,
-                statusValue: getStatusValue(p)
-            }));
-            setProducts(productsWithStatus);
-        } catch (err) {
-            setError('Failed to refetch products.');
-        }
-    };
-    fetchProducts();
+    fetchInitialData();
   };
   
   const handleClearFilters = () => {
@@ -129,7 +118,6 @@ const InventoryPage = () => {
   };
 
   const handleDelete = async (productId) => {
-    // This function now only handles the API call, not the confirmation
     try {
       await api.delete(`/products/${productId}`);
       setProducts(products.filter(p => p._id !== productId));
@@ -158,7 +146,7 @@ const InventoryPage = () => {
           onFormSubmit={handleFormSubmit}
           productToEdit={editingProduct}
           onClose={() => setIsModalOpen(false)}
-          onProductDelete={handleDelete} // <-- Pass the delete handler
+          onProductDelete={handleDelete}
         />
       </Modal>
 
@@ -215,6 +203,7 @@ const InventoryPage = () => {
       <table className="products-table">
         <thead>
           <tr>
+            <th className="column-image">Image</th>
             <th className={sortConfig.key === 'itemCode' ? 'active' : ''} onClick={() => requestSort('itemCode')}>Item Code{getSortIndicator('itemCode')}</th>
             <th className={sortConfig.key === 'name' ? 'active' : ''} onClick={() => requestSort('name')}>Product Name{getSortIndicator('name')}</th>
             <th className={sortConfig.key === 'category.name' ? 'active' : ''} onClick={() => requestSort('category.name')}>Category{getSortIndicator('category.name')}</th>
@@ -231,6 +220,14 @@ const InventoryPage = () => {
             const status = getStatusDetails(product);
             return (
               <tr key={product._id} className={product.quantity === 0 ? 'row-out-of-stock' : ''}>
+                <td>
+                  <img 
+                    src={product.image || 'https://placehold.co/60x40/e2e8f0/e2e8f0?text=No+Image'} 
+                    alt={product.name} 
+                    className="table-product-image"
+                    onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/60x40/e2e8f0/e2e8f0?text=No+Image'; }}
+                  />
+                </td>
                 <td>{product.itemCode}</td>
                 <td>{product.name}</td>
                 <td>{product.category?.name || 'N/A'}</td>
@@ -247,7 +244,6 @@ const InventoryPage = () => {
                   {user && (user.role === 'Owner' || user.role === 'Clerk') && (
                     <button className="btn-edit" onClick={() => openModalForEdit(product)}>Edit</button>
                   )}
-                  {/* The Delete button is now gone from the table */}
                 </td>
               </tr>
             );

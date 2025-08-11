@@ -1,9 +1,10 @@
 /* client/src/styles/SalesPage.css */
+
 .pos-container {
   display: flex;
   height: calc(100vh - 4rem);
   gap: 2rem;
-  font-family: 'Segoe UI', sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 /* Left Column */
@@ -14,7 +15,8 @@
   background: white;
   border-radius: 8px;
   padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  min-width: 0;
 }
 
 .search-bar {
@@ -27,13 +29,55 @@
   box-sizing: border-box;
 }
 
+.filter-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.filter-container button {
+  padding: 0.5rem 1.2rem;
+  border: 1px solid #ccc;
+  background-color: #f8f9fa;
+  border-radius: 5px; /* Rounded pill shape */
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: #444;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.filter-container button:hover {
+  background-color: #e2e6ea;
+  transform: translateY(-1px); /* Slight lift on hover */
+}
+
+.filter-container button.active {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+.filter-container button i {
+  font-size: 1rem;
+}
+
 .product-grid {
   overflow-y: auto;
   flex-grow: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 1rem;
   padding-right: 1rem;
+  align-content: flex-start;
 }
 
 .product-card {
@@ -44,18 +88,42 @@
   transition: box-shadow 0.2s, transform 0.2s;
   display: flex;
   flex-direction: column;
+  min-height: 200px; /* ✅ Ensures enough space for image, name & price */
 }
 
 .product-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transform: translateY(-3px);
+}
+
+.card-image-container {
+  position: relative;
 }
 
 .product-card img {
   width: 100%;
-  height: 120px;
+  height: 100px;
   object-fit: cover;
   background-color: #f8f9fa;
+}
+
+.product-card.out-of-stock {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.stock-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  color: #721c24;
 }
 
 .product-card-info {
@@ -63,7 +131,6 @@
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  justify-content: space-between;
 }
 
 .product-name {
@@ -71,12 +138,15 @@
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
   color: #333;
+  min-height: 40px;
 }
 
 .product-price {
   font-weight: bold;
   color: var(--primary-color);
   align-self: flex-end;
+  margin-top: auto; /* Keeps price at bottom */
+  white-space: normal; /* ✅ Allows wrapping if needed */
 }
 
 /* Right Column */
@@ -87,7 +157,7 @@
   background: white;
   border-radius: 8px;
   padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .current-sale h2 {
