@@ -38,3 +38,70 @@ input:checked + .slider:before { transform: translateX(26px); }
   color: #333;
   margin: 0;
 }
+
+.pending-changes-notice {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 0.75rem 1rem;
+  border-radius: 5px;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  border: 1px solid #ffeeba;
+}
+
+.edit-btn-inline {
+  background-color: #ffc107;
+  color: #212529;
+  border: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.pending-changes-notice {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 0.75rem 1rem;
+  border-radius: 5px;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  border: 1px solid #ffeeba;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 95%;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+}
+
+.modal-content ul {
+  padding-left: 1.2rem;
+}
+
+.modal-actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}

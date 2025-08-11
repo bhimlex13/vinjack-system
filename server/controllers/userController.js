@@ -60,21 +60,48 @@ const loginUser = async (req, res) => {
   }
 };
 
-// --- NEW FUNCTION for a user to request an update to their own profile ---
+// --- UPDATED FUNCTION for a user to request an update to their own profile ---
 const requestProfileUpdate = async (req, res) => {
   try {
-    const { fullName, username, email } = req.body;
+    const { fullName, username, email, oldPassword, newPassword, confirmPassword } = req.body;
     const user = await User.findById(req.user.id);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Store the requested changes in the pendingChanges field
-    user.pendingChanges = { fullName, username, email };
+    // Check if password change is requested
+    let hashedNewPassword = null;
+    if (oldPassword || newPassword || confirmPassword) {
+      if (!oldPassword || !newPassword || !confirmPassword) {
+        return res.status(400).json({ message: 'All password fields are required to change password.' });
+      }
+
+      const isMatch = await bcrypt.compare(oldPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: 'Old password is incorrect.' });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ message: 'New password and confirmation do not match.' });
+      }
+
+      // Hash new password immediately (more secure)
+      const salt = await bcrypt.genSalt(10);
+      hashedNewPassword = await bcrypt.hash(newPassword, salt);
+    }
+
+    // Store requested changes
+    user.pendingChanges = {
+      fullName: fullName || user.fullName,
+      username: username || user.username,
+      email: email || user.email,
+      ...(hashedNewPassword && { password: hashedNewPassword })
+    };
     user.hasPendingChanges = true;
+
     await user.save();
-    
+
     logAction(req.user, 'REQUEST_PROFILE_UPDATE', `User ${user.username} requested profile changes.`);
     res.json({ message: 'Update request submitted successfully. Waiting for owner approval.' });
 
@@ -83,33 +110,36 @@ const requestProfileUpdate = async (req, res) => {
   }
 };
 
-// --- NEW FUNCTION for the Owner to approve changes ---
+
+// --- UPDATED APPROVE FUNCTION to handle password changes ---
 const approveUserUpdate = async (req, res) => {
-    try {
-        const user = await User.findById(req.params.id);
-        if (!user || !user.hasPendingChanges) {
-            return res.status(404).json({ message: 'No pending changes found for this user.' });
-        }
-
-        // Apply the pending changes to the main fields
-        user.fullName = user.pendingChanges.fullName || user.fullName;
-        user.username = user.pendingChanges.username || user.username;
-        user.email = user.pendingChanges.email || user.email;
-
-        // Clear the pending changes
-        user.pendingChanges = {};
-        user.hasPendingChanges = false;
-        
-        const updatedUser = await user.save();
-        
-        logAction(req.user, 'APPROVE_PROFILE_UPDATE', `Approved profile changes for user ${updatedUser.username}.`);
-        res.json(updatedUser);
-
-    } catch (error) {
-        res.status(400).json({ message: 'Error approving changes.', error: error.message });
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user || !user.hasPendingChanges) {
+      return res.status(404).json({ message: 'No pending changes found for this user.' });
     }
-};
 
+    // Apply pending changes to main fields
+    user.fullName = user.pendingChanges.fullName || user.fullName;
+    user.username = user.pendingChanges.username || user.username;
+    user.email = user.pendingChanges.email || user.email;
+    if (user.pendingChanges.password) {
+      user.password = user.pendingChanges.password; // already hashed
+    }
+
+    // Clear pending changes
+    user.pendingChanges = {};
+    user.hasPendingChanges = false;
+
+    const updatedUser = await user.save();
+
+    logAction(req.user, 'APPROVE_PROFILE_UPDATE', `Approved profile changes for user ${updatedUser.username}.`);
+    res.json(updatedUser);
+
+  } catch (error) {
+    res.status(400).json({ message: 'Error approving changes.', error: error.message });
+  }
+};
 // --- NEW FUNCTION for the Owner to reject changes ---
 const rejectUserUpdate = async (req, res) => {
     try {
@@ -194,7 +224,7 @@ module.exports = {
   getAllUsers,
   updateUser,
   deleteUser,
-  requestProfileUpdate, // <-- EXPORT NEW
-  approveUserUpdate,    // <-- EXPORT NEW
-  rejectUserUpdate      // <-- EXPORT NEW
+  requestProfileUpdate, 
+  approveUserUpdate,    
+  rejectUserUpdate      
 };
