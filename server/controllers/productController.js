@@ -2,8 +2,6 @@
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger');
 
-// @desc    Get all products
-// @route   GET /api/products
 const getProducts = async (req, res) => {
   try {
     const products = await Product.find({}).populate('category').populate('brand');
@@ -13,15 +11,12 @@ const getProducts = async (req, res) => {
   }
 };
 
-// @desc    Create a product
-// @route   POST /api/products
 const createProduct = async (req, res) => {
   try {
-    const { name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel } = req.body;
-    const newProduct = new Product({ name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel });
+    const { name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel, image } = req.body;
+    const newProduct = new Product({ name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel, image });
     const savedProduct = await newProduct.save();
-
-     // Log the action
+    
     logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`);
 
     res.status(201).json(savedProduct);
@@ -30,28 +25,23 @@ const createProduct = async (req, res) => {
   }
 };
 
-// @desc    Update a product
-// @route   PUT /api/products/:id
 const updateProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
 
     if (product) {
-      // Update fields from request body
       product.name = req.body.name || product.name;
       product.itemCode = req.body.itemCode || product.itemCode;
       product.category = req.body.category || product.category;
       product.brand = req.body.brand || product.brand;
-      product.cost = req.body.cost || product.cost;
-      product.price = req.body.price || product.price;
-      product.quantity = req.body.quantity || product.quantity;
-      //... and so on for other fields
+      product.cost = req.body.cost ?? product.cost;
+      product.price = req.body.price ?? product.price;
+      product.quantity = req.body.quantity ?? product.quantity;
+      product.reorderLevel = req.body.reorderLevel ?? product.reorderLevel;
+      product.image = req.body.image || product.image; // <-- UPDATED to 'image'
 
       const updatedProduct = await product.save();
-
-       // Log the action
-        logAction(req.user, 'UPDATE_PRODUCT', `Updated product: '${updatedProduct.name}' (Code: ${updatedProduct.itemCode})`);
-
+      logAction(req.user, 'UPDATE_PRODUCT', `Updated product: '${updatedProduct.name}' (Code: ${updatedProduct.itemCode})`);
       res.json(updatedProduct);
     } else {
       res.status(404).json({ message: 'Product not found' });
@@ -61,32 +51,23 @@ const updateProduct = async (req, res) => {
   }
 };
 
-// @desc    Delete a product
-// @route   DELETE /api/products/:id
 const deleteProduct = async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-
-    if (product) {
-      await product.deleteOne();
-
-       // Log the action
+    try {
+        const product = await Product.findById(req.params.id);
+        if (product) {
+            await product.deleteOne();
             logAction(req.user, 'DELETE_PRODUCT', `Deleted product: '${product.name}' (Code: ${product.itemCode})`);
-
-      res.json({ message: 'Product removed' });
-    } else {
-      res.status(404).json({ message: 'Product not found' });
+            res.json({ message: 'Product removed' });
+        } else {
+            res.status(404).json({ message: 'Product not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server Error', error: error.message });
     }
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
 };
 
-// @desc    Get all products with low stock
-// @route   GET /api/products/low-stock
 const getLowStockProducts = async (req, res) => {
   try {
-    // Find products where the quantity is less than or equal to the reorderLevel
     const lowStockProducts = await Product.find({
       $expr: { $lte: ['$quantity', '$reorderLevel'] }
     });
@@ -96,5 +77,10 @@ const getLowStockProducts = async (req, res) => {
   }
 };
 
-// Export the new functions
-module.exports = { getProducts, createProduct, updateProduct, deleteProduct, getLowStockProducts };
+module.exports = { 
+  getProducts, 
+  createProduct, 
+  updateProduct, 
+  deleteProduct,
+  getLowStockProducts
+};

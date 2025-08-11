@@ -1,7 +1,7 @@
+// server/controllers/categoryController.js
 const Category = require('../models/categoryModel');
+const Product = require('../models/productModel');
 
-// @desc    Get all categories
-// @route   GET /api/categories
 const getCategories = async (req, res) => {
   try {
     const categories = await Category.find({});
@@ -11,8 +11,6 @@ const getCategories = async (req, res) => {
   }
 };
 
-// @desc    Create a category
-// @route   POST /api/categories
 const createCategory = async (req, res) => {
   try {
     const { name, description } = req.body;
@@ -24,4 +22,28 @@ const createCategory = async (req, res) => {
   }
 };
 
-module.exports = { getCategories, createCategory };
+const updateCategory = async (req, res) => {
+    try {
+        const category = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!category) return res.status(404).json({ message: 'Category not found' });
+        res.json(category);
+    } catch (error) {
+        res.status(400).json({ message: 'Error updating category' });
+    }
+};
+
+const deleteCategory = async (req, res) => {
+    try {
+        const product = await Product.findOne({ category: req.params.id });
+        if (product) {
+            return res.status(400).json({ message: 'Cannot delete category. It is currently in use by a product.' });
+        }
+        const category = await Category.findByIdAndDelete(req.params.id);
+        if (!category) return res.status(404).json({ message: 'Category not found' });
+        res.json({ message: 'Category removed' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+module.exports = { getCategories, createCategory, updateCategory, deleteCategory };

@@ -8,9 +8,8 @@ const SalesPage = () => {
   const [products, setProducts] = useState([]);
   const [cartItems, setCartItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const { user } = useContext(AuthContext); // To get the user who recorded the sale
+  const { user } = useContext(AuthContext);
 
-  // Fetch all products when the component loads
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -24,10 +23,8 @@ const SalesPage = () => {
   }, []);
 
   const addProductToCart = (product) => {
-    // Check if the product is already in the cart
     const exist = cartItems.find((item) => item._id === product._id);
     if (exist) {
-      // If it exists, increase quantity, but don't exceed available stock
       setCartItems(
         cartItems.map((item) =>
           item._id === product._id && exist.quantity < product.quantity
@@ -36,7 +33,6 @@ const SalesPage = () => {
         )
       );
     } else {
-      // If it doesn't exist, add it to the cart with a quantity of 1
       if (product.quantity > 0) {
         setCartItems([...cartItems, { ...product, quantity: 1 }]);
       }
@@ -50,10 +46,8 @@ const SalesPage = () => {
     const newQuantity = exist.quantity + amount;
   
     if (newQuantity <= 0) {
-      // If quantity becomes 0 or less, remove the item
       setCartItems(cartItems.filter((item) => item._id !== product._id));
     } else if (newQuantity <= product.quantity) {
-      // Otherwise, update the quantity
       setCartItems(
         cartItems.map((item) =>
           item._id === product._id ? { ...exist, quantity: newQuantity } : item
@@ -79,7 +73,7 @@ const SalesPage = () => {
         priceAtTime: item.price,
         costAtTime: item.cost
       })),
-      services: [], // We'll add services later
+      services: [],
       totalAmount: calculateTotal(),
       recordedBy: user._id,
     };
@@ -87,40 +81,44 @@ const SalesPage = () => {
     try {
       await api.post('/sales', saleData);
       alert('Sale completed successfully!');
-      setCartItems([]); // Clear the cart
-      // You might want to refetch products here to update stock numbers visually
+      setCartItems([]);
+      const response = await api.get('/products');
+      setProducts(response.data);
     } catch (error) {
       alert(`Sale failed: ${error.response?.data?.message || error.message}`);
     }
   };
   
-  // Filter products based on search term
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="pos-container">
-      {/* Left Column: Product List */}
       <div className="product-selection">
-        <h2>Products</h2>
         <input
           type="text"
           placeholder="Search for products..."
           className="search-bar"
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <div className="product-list">
+        <div className="product-grid">
           {filteredProducts.map(product => (
-            <div key={product._id} className="product-item" onClick={() => addProductToCart(product)}>
-              <span>{product.name}</span>
-              <span>₱{product.price.toFixed(2)}</span>
+            <div key={product._id} className="product-card" onClick={() => addProductToCart(product)}>
+              <img 
+                src={product.image || 'https://placehold.co/300x200/e2e8f0/e2e8f0?text=No+Image'} 
+                alt={product.name}
+                onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/300x200/e2e8f0/e2e8f0?text=No+Image'; }}
+              />
+              <div className="product-card-info">
+                <span className="product-name">{product.name}</span>
+                <span className="product-price">₱{product.price.toFixed(2)}</span>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Right Column: Current Sale (Cart) */}
       <div className="current-sale">
         <h2>Current Sale</h2>
         <div className="cart-items">

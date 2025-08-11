@@ -4,13 +4,13 @@ import api from '../api/axios';
 import '../styles/InventoryPage.css';
 import Modal from '../components/Modal';
 import SupplierForm from '../components/SupplierForm';
-import RecordDeliveryForm from '../components/RecordDeliveryForm'; // <-- Import the new form
+import RecordDeliveryForm from '../components/RecordDeliveryForm'; 
 
 const SuppliersPage = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
-  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false); // <-- New state for delivery modal
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false); 
   const [editingSupplier, setEditingSupplier] = useState(null);
 
   useEffect(() => {

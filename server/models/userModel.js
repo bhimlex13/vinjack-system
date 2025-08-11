@@ -1,16 +1,39 @@
+// server/models/userModel.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  fullName: { type: String, required: true },
-  username: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  fullName: { 
+    type: String, 
+    required: true 
+  },
+  username: { 
+    type: String, 
+    required: true, 
+    unique: true 
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+  },
+  password: { 
+    type: String, 
+    required: true 
+  },
   role: {
     type: String,
     enum: ['Owner', 'Clerk', 'Mechanic'],
     required: true,
+    default: 'Mechanic',
   },
-  status: { type: String, default: 'active' },
+  status: { 
+    type: String, 
+    enum: ['pending', 'active', 'inactive'],
+    default: 'pending',
+  },
   emailSettings: {
     notificationsEnabled: {
       type: Boolean,
@@ -22,8 +45,6 @@ const userSchema = new mongoose.Schema({
     }
   }
 }, { timestamps: true });
-
-
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {

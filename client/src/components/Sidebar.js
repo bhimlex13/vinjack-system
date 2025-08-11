@@ -1,61 +1,54 @@
 // client/src/components/Sidebar.js
 import React, { useContext } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import { FaBell } from 'react-icons/fa';
+import {
+  FaTachometerAlt, FaBoxOpen, FaShoppingCart, FaTruck, FaChartBar,
+  FaUsersCog, FaDatabase, FaFileAlt, FaChevronLeft
+} from 'react-icons/fa';
 import '../styles/MainLayout.css';
 
-const Sidebar = () => {
-  const { lowStockItems = [], logout, user } = useContext(AuthContext);
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+const Sidebar = ({ isCollapsed, toggleSidebar }) => {
+  const { user } = useContext(AuthContext);
 
   return (
-    <div className="sidebar">
+    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div>
         <div className="sidebar-header">
-          <h3>VinJack MS</h3>
-        </div>
-        <div className="user-info">
-          <p>Welcome, {user?.fullName || 'User'}</p>
-        </div>
-        <nav className="sidebar-nav">
-          <NavLink to="/dashboard">Dashboard</NavLink>
-          <NavLink to="/inventory">Inventory</NavLink>
-          <NavLink to="/sales">Sales (POS)</NavLink>
-          <NavLink to="/suppliers">Suppliers</NavLink>
-          <NavLink to="/alerts" className="alerts-link">
-            <div className="link-content">
-              <FaBell /> 
-              <span>Alerts</span>
-            </div>
-            {lowStockItems.length > 0 && (
-              <span className="notification-badge">{lowStockItems.length}</span>
+          <img src="/assets/vinjack_logo.png" alt="VinJack Logo" className="logo-img" />
+          {!isCollapsed && <h3>VinJack MS</h3>}
+
+
+          <div className="sidebar-footer">
+            {!isCollapsed && (
+              <button className="sidebar-toggle-footer" onClick={toggleSidebar}>
+                <FaChevronLeft />
+              </button>
             )}
-          </NavLink>
-          <NavLink to="/reports">Reports</NavLink>
-          
-          {/* --- THIS IS THE CHANGE --- */}
-          {/* Now only the Owner can see the Settings and Audit Log links */}
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          {!isCollapsed && <span className="nav-group-title">Main</span>}
+          <NavLink to="/dashboard"><FaTachometerAlt /> {!isCollapsed && <span>Dashboard</span>}</NavLink>
+          <NavLink to="/sales"><FaShoppingCart /> {!isCollapsed && <span>Sales (POS)</span>}</NavLink>
+
+          {!isCollapsed && <span className="nav-group-title">Management</span>}
+          <NavLink to="/inventory"><FaBoxOpen /> {!isCollapsed && <span>Inventory</span>}</NavLink>
+          <NavLink to="/suppliers"><FaTruck /> {!isCollapsed && <span>Suppliers</span>}</NavLink>
+          <NavLink to="/reports"><FaChartBar /> {!isCollapsed && <span>Reports</span>}</NavLink>
+
           {user && user.role === 'Owner' && (
             <>
-              <NavLink to="/settings">Settings</NavLink>
-              <NavLink to="/audit-log">Audit Log</NavLink>
+              {!isCollapsed && <span className="nav-group-title">Administration</span>}
+              <NavLink to="/user-management"><FaUsersCog /> {!isCollapsed && <span>User Management</span>}</NavLink>
+              <NavLink to="/data-management"><FaDatabase /> {!isCollapsed && <span>Data Management</span>}</NavLink>
+              <NavLink to="/audit-log"><FaFileAlt /> {!isCollapsed && <span>Audit Log</span>}</NavLink>
             </>
           )}
         </nav>
       </div>
-      
-      <div className="sidebar-footer">
-        <button onClick={handleLogout} className="logout-btn">
-          Logout
-        </button>
-      </div>
-    </div>
+    </aside>
   );
 };
 
