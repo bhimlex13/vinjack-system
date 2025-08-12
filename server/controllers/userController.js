@@ -19,8 +19,8 @@ const registerUser = async (req, res) => {
       username,
       email,
       password,
-      role: 'Clerk', // <-- Added a default role
-      status: 'pending' // <-- Explicitly setting status
+      role: 'Clerk',
+      status: 'pending'
     });
     if (user) {
       res.status(201).json({
@@ -40,20 +40,26 @@ const loginUser = async (req, res) => {
     const { username, password } = req.body;
     const user = await User.findOne({ username });
 
-    if (user && (await bcrypt.compare(password, user.password))) {
-      if (user.status !== 'active') {
-        return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
-      }
+    if (user) {
+      const isMatch = await bcrypt.compare(password, user.password);
+      console.log(`Attempting login for user: ${username}. Password comparison result: ${isMatch}`); // <-- ADDED LOG
       
-      // THIS IS THE FIX: We are adding the 'email' field to the response
-      res.json({
-        _id: user._id,
-        fullName: user.fullName,
-        username: user.username,
-        email: user.email, // <-- ADD THIS LINE
-        role: user.role,
-        token: generateToken(user._id),
-      });
+      if (isMatch) {
+        if (user.status !== 'active') {
+          return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
+        }
+        
+        res.json({
+          _id: user._id,
+          fullName: user.fullName,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          token: generateToken(user._id),
+        });
+      } else {
+        res.status(401).json({ message: 'Invalid username or password.' });
+      }
     } else {
       res.status(401).json({ message: 'Invalid username or password.' });
     }
@@ -62,7 +68,25 @@ const loginUser = async (req, res) => {
   }
 };
 
-// --- UPDATED FUNCTION for a user to request an update to their own profile ---
+// @desc    Get current user profile
+// @route   GET /api/users/me
+// @access  Private
+const getMe = async (req, res) => {
+  try {
+    // req.user is set by the protect middleware
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    User requests an update to their own profile
+// @route   PUT /api/users/profile
+// @access  Private
 const requestProfileUpdate = async (req, res) => {
   try {
     const { fullName, username, email, oldPassword, newPassword, confirmPassword } = req.body;
@@ -72,10 +96,16 @@ const requestProfileUpdate = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const requestedChanges = {};
+
+    // Check for non-password field changes
+    if (fullName) requestedChanges.fullName = fullName;
+    if (username) requestedChanges.username = username;
+    if (email) requestedChanges.email = email;
+
     // Check if password change is requested
-    let hashedNewPassword = null;
-    if (oldPassword || newPassword || confirmPassword) {
-      if (!oldPassword || !newPassword || !confirmPassword) {
+    if (newPassword) {
+      if (!oldPassword || !confirmPassword) {
         return res.status(400).json({ message: 'All password fields are required to change password.' });
       }
 
@@ -88,23 +118,21 @@ const requestProfileUpdate = async (req, res) => {
         return res.status(400).json({ message: 'New password and confirmation do not match.' });
       }
 
-      // Hash new password immediately (more secure)
+      // Pre-hash the new password before storing it for approval
       const salt = await bcrypt.genSalt(10);
-      hashedNewPassword = await bcrypt.hash(newPassword, salt);
+      requestedChanges.password = await bcrypt.hash(newPassword, salt);
     }
 
-    // Store requested changes
-    user.pendingChanges = {
-      fullName: fullName || user.fullName,
-      username: username || user.username,
-      email: email || user.email,
-      ...(hashedNewPassword && { password: hashedNewPassword })
-    };
+    if (Object.keys(requestedChanges).length === 0) {
+        return res.status(400).json({ message: 'No changes were requested.' });
+    }
+
+    // Store requested changes for approval
+    user.pendingChanges = requestedChanges;
     user.hasPendingChanges = true;
-
     await user.save();
-
-    logAction(req.user, 'REQUEST_PROFILE_UPDATE', `User ${user.username} requested profile changes.`);
+    
+    // logAction(req.user, 'REQUEST_PROFILE_UPDATE', ...);
     res.json({ message: 'Update request submitted successfully. Waiting for owner approval.' });
 
   } catch (error) {
@@ -113,7 +141,9 @@ const requestProfileUpdate = async (req, res) => {
 };
 
 
-// --- UPDATED APPROVE FUNCTION to handle password changes ---
+// @desc    Owner approves a user's pending update
+// @route   POST /api/users/:id/approve
+// @access  Private (Owner)
 const approveUserUpdate = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -121,27 +151,26 @@ const approveUserUpdate = async (req, res) => {
       return res.status(404).json({ message: 'No pending changes found for this user.' });
     }
 
-    // Apply pending changes to main fields
-    user.fullName = user.pendingChanges.fullName || user.fullName;
-    user.username = user.pendingChanges.username || user.username;
-    user.email = user.pendingChanges.email || user.email;
-    if (user.pendingChanges.password) {
-      user.password = user.pendingChanges.password; // already hashed
-    }
-
-    // Clear pending changes
-    user.pendingChanges = {};
+    // Apply all pending changes directly from the pendingChanges object
+    Object.assign(user, user.pendingChanges);
+    
+    // Clear the pending changes flags
+    user.pendingChanges = undefined; // Use undefined to remove the object completely
     user.hasPendingChanges = false;
-
+    
+    // The pre-save hook in userModel will now see that `password` is modified,
+    // but it will NOT re-hash it because it's already a hash (length > 50).
     const updatedUser = await user.save();
 
-    logAction(req.user, 'APPROVE_PROFILE_UPDATE', `Approved profile changes for user ${updatedUser.username}.`);
-    res.json(updatedUser);
+    // logAction(req.user, 'APPROVE_PROFILE_UPDATE', ...);
+    res.json({ message: 'User profile updated successfully.', user: updatedUser });
 
   } catch (error) {
     res.status(400).json({ message: 'Error approving changes.', error: error.message });
   }
 };
+
+
 // --- NEW FUNCTION for the Owner to reject changes ---
 const rejectUserUpdate = async (req, res) => {
     try {
@@ -220,9 +249,15 @@ const generateToken = (id) => {
   });
 };
 
+// Mock logAction function
+const logAction = (user, actionType, description) => {
+  console.log(`Action Logged: User=${user.username}, Type=${actionType}, Description=${description}`);
+};
+
 module.exports = {
   registerUser,
   loginUser,
+  getMe,
   getAllUsers,
   updateUser,
   deleteUser,

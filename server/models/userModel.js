@@ -25,7 +25,6 @@ const userSchema = new mongoose.Schema({
     notificationTime: { type: String, default: '08:00' }
   },
   
-
   hasPendingChanges: {
     type: Boolean,
     default: false,
@@ -34,14 +33,21 @@ const userSchema = new mongoose.Schema({
     fullName: { type: String },
     username: { type: String },
     email: { type: String },
+    // ADDED: This field is crucial to store the new password for approval
+    password: { type: String }, 
   }
 }, { timestamps: true });
 
 
+// CORRECTED PRE-SAVE HOOK
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  // Only hash the password if it has been modified AND is not already a long hash string.
+  // This prevents double-hashing during the approval step.
+  if (this.isModified('password') && this.password.length < 50) {
+      console.log('Password modified and is plain-text. Hashing now...');
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
+  }
   next();
 });
 

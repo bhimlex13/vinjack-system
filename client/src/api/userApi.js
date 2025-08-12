@@ -1,19 +1,20 @@
-import axios from 'axios';
+// client/src/api/userApi.js
+import api from './axios'; // <-- Import your configured 'api' instance
 
 export const requestProfileUpdate = async (token, changes) => {
-  return axios.put('/api/users/profile', changes, {
+  return api.put('/users/profile', changes, { // <-- Use 'api.put' instead of 'axios.put'
     headers: { Authorization: `Bearer ${token}` }
   });
 };
 
 export const approveUserUpdate = async (token, userId) => {
-  return axios.post(`/api/users/${userId}/approve`, {}, {
+  return api.post(`/users/${userId}/approve`, {}, {
     headers: { Authorization: `Bearer ${token}` }
   });
 };
 
 export const rejectUserUpdate = async (token, userId) => {
-  return axios.post(`/api/users/${userId}/reject`, {}, {
+  return api.post(`/users/${userId}/reject`, {}, {
     headers: { Authorization: `Bearer ${token}` }
   });
 };
