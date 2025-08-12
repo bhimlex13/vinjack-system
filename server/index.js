@@ -16,6 +16,8 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
 const auditLogRoutes = require('./routes/auditLogRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+// ADDED: Import the new movement routes
+const movementRoutes = require('./routes/movementRoutes'); 
 const appSettingsRoutes = require('./routes/appSettingsRoutes');
 
 // Connect to Database
@@ -25,8 +27,6 @@ const app = express();
 
 // Middleware
 app.use(cors());
-
-// Increase the request body size limit
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -41,6 +41,8 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/settings', settingsRoutes);
+// ADDED: Register the new movement routes
+app.use('/api/movements', movementRoutes);
 app.use('/api/app-settings', appSettingsRoutes);
 
 // Start the scheduled jobs

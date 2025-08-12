@@ -6,51 +6,77 @@ const Product = require('../models/productModel');
 // @route   GET /api/reports/summary
 const getDashboardSummary = async (req, res) => {
   try {
-    // 1. Get total revenue and number of sales using aggregation
+    const { range } = req.query;
+    const dateFilter = {};
+    const now = new Date();
+
+    // Set the start date based on the selected range
+    switch (range) {
+      case 'today':
+        const today = new Date(now.setHours(0, 0, 0, 0));
+        dateFilter.createdAt = { $gte: today };
+        break;
+      case 'week':
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        dateFilter.createdAt = { $gte: startOfWeek };
+        break;
+      case 'month':
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        dateFilter.createdAt = { $gte: startOfMonth };
+        break;
+      default:
+        // 'all' or no range provided, dateFilter remains empty to fetch all data
+        break;
+    }
+
+    // 1. Get total revenue and sales, applying the date filter
     const salesData = await Sale.aggregate([
+      { $match: dateFilter }, // MODIFIED: Filter by date range first
       {
         $group: {
-          _id: null, // Group all sales together
+          _id: null,
           totalRevenue: { $sum: '$totalAmount' },
           totalSales: { $sum: 1 }
         }
       }
     ]);
 
-    // 2. Get product-related statistics
+    // 2. Product stats are not time-sensitive, so no filter is applied
     const productStats = await Product.aggregate([
       {
         $group: {
           _id: null,
-          totalProducts: { $sum: 1 }, // Count total number of product documents
-          totalStock: { $sum: '$quantity' } // Sum up the quantity of all products
+          totalProducts: { $sum: 1 },
+          totalStock: { $sum: '$quantity' }
         }
       }
     ]);
 
-    // 3. Get top 5 selling products by quantity
+    // 3. Top selling products, applying the date filter
     const topSellingProducts = await Sale.aggregate([
-      { $unwind: '$items' }, // Deconstruct the items array from each sale
+      { $match: dateFilter }, // MODIFIED: Filter by date range first
+      { $unwind: '$items' },
       { 
         $group: {
-            _id: '$items.product', // Group by the product's ID
-            totalQuantitySold: { $sum: '$items.quantity' } // Sum the quantity for each product
+            _id: '$items.product',
+            totalQuantitySold: { $sum: '$items.quantity' }
         }
       },
-      { $sort: { totalQuantitySold: -1 } }, // Sort in descending order
-      { $limit: 5 }, // Limit to the top 5
+      { $sort: { totalQuantitySold: -1 } },
+      { $limit: 5 },
       { 
-        $lookup: { // Join with the 'products' collection to get product details
+        $lookup: {
             from: 'products',
             localField: '_id',
             foreignField: '_id',
             as: 'productInfo'
         }
       },
-      { $unwind: '$productInfo' } // Deconstruct the productInfo array created by $lookup
+      { $unwind: '$productInfo' }
     ]);
     
-    // Combine all stats into a single response object
     res.json({
       totalRevenue: salesData[0]?.totalRevenue || 0,
       totalSales: salesData[0]?.totalSales || 0,

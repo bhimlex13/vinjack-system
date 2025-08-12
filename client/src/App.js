@@ -18,6 +18,8 @@ import AuditLogPage from './pages/AuditLogPage';
 import SettingsPage from './pages/SettingsPage';
 import UserManagementPage from './pages/UserManagementPage';
 import DataManagementPage from './pages/DataManagementPage';
+// ADDED: Import the new TransactionsPage
+import TransactionsPage from './pages/TransactionsPage';
 
 function App() {
   return (
@@ -38,6 +40,7 @@ function App() {
                 <Route path="/suppliers" element={<SuppliersPage />} />
                 <Route path="/alerts" element={<AlertsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/transactions" element={<TransactionsPage />} />
                 <Route path="/audit-log" element={<AuditLogPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/user-management" element={<UserManagementPage />} />

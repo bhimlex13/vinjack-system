@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 const saleSchema = new mongoose.Schema({
-  // An array to hold all items sold in this transaction
+
   items: [{
     product: {
       type: mongoose.Schema.Types.ObjectId,
@@ -14,17 +14,16 @@ const saleSchema = new mongoose.Schema({
       required: true,
       min: 1
     },
-    priceAtTime: { // The price of the item when it was sold
+    priceAtTime: { 
       type: Number,
       required: true
     },
-    costAtTime: { // The cost of the item when it was sold
+    costAtTime: {
         type: Number,
         required: true
     }
   }],
   
-  // An array for any services rendered
   services: [{
     service: {
         type: mongoose.Schema.Types.ObjectId,
@@ -48,21 +47,20 @@ const saleSchema = new mongoose.Schema({
     required: true
   },
 
-  // Optional fields
   motorcycle: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Motorcycle' // We will create this model later
+    ref: 'Motorcycle' 
   },
 
-  customerReceiptImage: { // For uploading a photo of the physical receipt
+  customerReceiptImage: { 
     type: String, 
   },
 
-  isManualEntry: { // To flag sales entered after the fact
+  isManualEntry: { 
     type: Boolean,
     default: false
   },
 
-}, { timestamps: true }); // Automatically adds createdAt and updatedAt fields
+}, { timestamps: true }); 
 
 module.exports = mongoose.model('Sale', saleSchema);

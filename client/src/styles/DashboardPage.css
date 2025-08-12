@@ -3,12 +3,51 @@
   font-family: 'Segoe UI', sans-serif;
 }
 
-.dashboard-container h1 {
-  margin-top: 0;
+/* MODIFIED: Changed h1 to be part of a flex container */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 2rem;
+}
+
+.dashboard-header h1 {
+  margin: 0;
   font-size: 1.8rem;
   color: #333;
 }
+
+/* --- ADDED: Styles for Filter Buttons --- */
+.dashboard-filters {
+  display: flex;
+  gap: 0.5rem;
+  background-color: #e9ecef;
+  padding: 0.3rem;
+  border-radius: 8px;
+}
+
+.filter-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  background-color: transparent;
+  border-radius: 6px;
+  font-weight: 600;
+  color: #495057;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.filter-btn:hover {
+  background-color: #dee2e6;
+}
+
+.filter-btn.active {
+  background-color: #fff;
+  color: var(--primary-color);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+/* ------------------------------------ */
+
 
 .stats-cards {
   display: grid;

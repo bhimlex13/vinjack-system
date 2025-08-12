@@ -1,0 +1,43 @@
+/* client/src/styles/ProductMovementHistory.css */
+.movement-history-container { 
+  max-height: 400px; 
+  overflow-y: auto; 
+  padding: 0.5rem;
+  border-top: 1px solid #eee;
+}
+.movement-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  font-size: 0.9rem; 
+}
+.movement-table th, .movement-table td { 
+  padding: 0.75rem; 
+  text-align: left; 
+  border-bottom: 1px solid #eee; 
+}
+.movement-table th { 
+  background-color: #f8f9fa; 
+  font-weight: 600; 
+  position: sticky;
+  top: 0;
+}
+.qty-in { 
+  color: #28a745; 
+  font-weight: bold; 
+}
+.qty-out { 
+  color: #dc3545; 
+  font-weight: bold; 
+}
+.move-type-badge { 
+  padding: 0.3rem 0.6rem; 
+  border-radius: 4px; 
+  font-size: 0.8rem; 
+  font-weight: 600; 
+  text-transform: uppercase; 
+  color: white; 
+}
+.move-type-sale { background-color: #dc3545; }
+.move-type-delivery { background-color: #28a745; }
+.move-type-adjustment { background-color: #ffc107; color: #212529; }
+.move-type-return { background-color: #17a2b8; }
