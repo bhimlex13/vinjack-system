@@ -10,6 +10,33 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
+ * Sends a profile update verification code email.
+ * @param {string} recipientEmail - The email address to send the code to.
+ * @param {string} code - The verification code.
+ */
+const sendVerificationEmail = async (recipientEmail, code) => {
+  const mailOptions = {
+    from: `"VinJack System" <${process.env.EMAIL_USER}>`,
+    to: recipientEmail,
+    subject: 'Your Profile Update Verification Code',
+    html: `
+      <h1>Verification Required</h1>
+      <p>Please use the following code to confirm your profile update. This code will expire in 5 minutes.</p>
+      <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px;">${code}</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Verification email sent successfully to ${recipientEmail}.`);
+  } catch (error) {
+    console.error(`Error sending verification email to ${recipientEmail}:`, error);
+    throw new Error('Failed to send verification email.');
+  }
+};
+
+
+/**
  * Sends a low stock summary email.
  * @param {Array} lowStockItems - An array of products that are low on stock.
  */
@@ -19,14 +46,13 @@ const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
     return;
   }
 
-  // Create an HTML list of the low stock items
   const itemsHtml = lowStockItems
     .map(item => `<li>${item.name} (Current: ${item.quantity}, Reorder at: ${item.reorderLevel})</li>`)
     .join('');
 
   const mailOptions = {
     from: `"VinJack System Alert" <${process.env.EMAIL_USER}>`,
-    to: recipientEmail, // <-- Use the recipient's email
+    to: recipientEmail,
     subject: `Low Stock Alert - ${lowStockItems.length} Items Need Restocking`,
     html: `
       <h1>Inventory Alert</h1>
@@ -44,4 +70,4 @@ const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
   }
 };
 
-module.exports = { sendLowStockEmail };
+module.exports = { sendLowStockEmail, sendVerificationEmail };

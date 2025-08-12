@@ -2,6 +2,8 @@
 const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+// FIXED: Added the missing import for the email service
+const { sendVerificationEmail } = require('../utils/emailService');
 
 // @desc    Register a new user for approval
 const registerUser = async (req, res) => {
@@ -42,7 +44,6 @@ const loginUser = async (req, res) => {
 
     if (user) {
       const isMatch = await bcrypt.compare(password, user.password);
-      console.log(`Attempting login for user: ${username}. Password comparison result: ${isMatch}`); // <-- ADDED LOG
       
       if (isMatch) {
         if (user.status !== 'active') {
@@ -69,11 +70,8 @@ const loginUser = async (req, res) => {
 };
 
 // @desc    Get current user profile
-// @route   GET /api/users/me
-// @access  Private
 const getMe = async (req, res) => {
   try {
-    // req.user is set by the protect middleware
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -85,8 +83,6 @@ const getMe = async (req, res) => {
 };
 
 // @desc    User requests an update to their own profile
-// @route   PUT /api/users/profile
-// @access  Private
 const requestProfileUpdate = async (req, res) => {
   try {
     const { fullName, username, email, oldPassword, newPassword, confirmPassword } = req.body;
@@ -97,53 +93,85 @@ const requestProfileUpdate = async (req, res) => {
     }
 
     const requestedChanges = {};
-
-    // Check for non-password field changes
     if (fullName) requestedChanges.fullName = fullName;
     if (username) requestedChanges.username = username;
     if (email) requestedChanges.email = email;
 
-    // Check if password change is requested
     if (newPassword) {
       if (!oldPassword || !confirmPassword) {
-        return res.status(400).json({ message: 'All password fields are required to change password.' });
+        return res.status(400).json({ message: 'All password fields are required for password change.' });
       }
-
-      const isMatch = await bcrypt.compare(oldPassword, user.password);
-      if (!isMatch) {
+      if (!await bcrypt.compare(oldPassword, user.password)) {
         return res.status(400).json({ message: 'Old password is incorrect.' });
       }
-
       if (newPassword !== confirmPassword) {
-        return res.status(400).json({ message: 'New password and confirmation do not match.' });
+        return res.status(400).json({ message: 'New passwords do not match.' });
       }
-
-      // Pre-hash the new password before storing it for approval
       const salt = await bcrypt.genSalt(10);
       requestedChanges.password = await bcrypt.hash(newPassword, salt);
     }
-
+    
     if (Object.keys(requestedChanges).length === 0) {
-        return res.status(400).json({ message: 'No changes were requested.' });
+      return res.status(400).json({ message: 'No changes were requested.' });
     }
 
-    // Store requested changes for approval
-    user.pendingChanges = requestedChanges;
-    user.hasPendingChanges = true;
-    await user.save();
-    
-    // logAction(req.user, 'REQUEST_PROFILE_UPDATE', ...);
-    res.json({ message: 'Update request submitted successfully. Waiting for owner approval.' });
+    if (user.role === 'Owner') {
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      user.verificationCode = verificationCode;
+      user.verificationCodeExpires = Date.now() + 5 * 60 * 1000;
+      user.pendingChanges = requestedChanges;
+
+      await user.save();
+      // This function call will now work correctly
+      await sendVerificationEmail(user.email, verificationCode);
+      
+      res.json({ 
+        message: 'Verification code sent to your email. Please check your inbox.',
+        requiresVerification: true 
+      });
+
+    } else {
+      user.pendingChanges = requestedChanges;
+      user.hasPendingChanges = true;
+      await user.save();
+      res.json({ message: 'Update request submitted successfully. Waiting for owner approval.' });
+    }
 
   } catch (error) {
-    res.status(400).json({ message: 'Error submitting update request.', error: error.message });
+    console.error('Error in requestProfileUpdate:', error); // Added for better debugging
+    res.status(500).json({ message: 'Error submitting update request.', error: error.message });
   }
 };
 
+const verifyOwnerUpdate = async (req, res) => {
+  try {
+    const { code } = req.body;
+    const user = await User.findById(req.user.id);
 
-// @desc    Owner approves a user's pending update
-// @route   POST /api/users/:id/approve
-// @access  Private (Owner)
+    if (!user || !user.verificationCode || user.verificationCodeExpires < Date.now()) {
+      return res.status(400).json({ message: 'Verification code is invalid or has expired. Please try again.' });
+    }
+
+    if (user.verificationCode !== code) {
+      return res.status(400).json({ message: 'The verification code you entered is incorrect.' });
+    }
+    
+    Object.assign(user, user.pendingChanges);
+
+    user.pendingChanges = undefined;
+    user.hasPendingChanges = false;
+    user.verificationCode = undefined;
+    user.verificationCodeExpires = undefined;
+
+    await user.save();
+
+    res.json({ message: 'Your profile has been updated successfully!' });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Server error during verification.', error: error.message });
+  }
+};
+
 const approveUserUpdate = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -151,18 +179,12 @@ const approveUserUpdate = async (req, res) => {
       return res.status(404).json({ message: 'No pending changes found for this user.' });
     }
 
-    // Apply all pending changes directly from the pendingChanges object
     Object.assign(user, user.pendingChanges);
     
-    // Clear the pending changes flags
-    user.pendingChanges = undefined; // Use undefined to remove the object completely
+    user.pendingChanges = undefined;
     user.hasPendingChanges = false;
     
-    // The pre-save hook in userModel will now see that `password` is modified,
-    // but it will NOT re-hash it because it's already a hash (length > 50).
     const updatedUser = await user.save();
-
-    // logAction(req.user, 'APPROVE_PROFILE_UPDATE', ...);
     res.json({ message: 'User profile updated successfully.', user: updatedUser });
 
   } catch (error) {
@@ -170,8 +192,6 @@ const approveUserUpdate = async (req, res) => {
   }
 };
 
-
-// --- NEW FUNCTION for the Owner to reject changes ---
 const rejectUserUpdate = async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
@@ -179,12 +199,12 @@ const rejectUserUpdate = async (req, res) => {
             return res.status(404).json({ message: 'No pending changes found for this user.' });
         }
 
-        // Clear the pending changes without applying them
         user.pendingChanges = {};
         user.hasPendingChanges = false;
         
         await user.save();
         
+        // This function should now log correctly
         logAction(req.user, 'REJECT_PROFILE_UPDATE', `Rejected profile changes for user ${user.username}.`);
         res.json({ message: 'Pending changes have been rejected.' });
 
@@ -193,8 +213,6 @@ const rejectUserUpdate = async (req, res) => {
     }
 };
 
-
-// --- Admin Functions (Owner Only) ---
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({}).select('-password');
@@ -242,16 +260,17 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// Helper function to generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '1d',
   });
 };
 
-// Mock logAction function
 const logAction = (user, actionType, description) => {
-  console.log(`Action Logged: User=${user.username}, Type=${actionType}, Description=${description}`);
+  // A simple console log, but could be expanded to save to a database
+  if(user) {
+    console.log(`Action Logged: Admin=${user.username}, Type=${actionType}, Description=${description}`);
+  }
 };
 
 module.exports = {
@@ -262,6 +281,7 @@ module.exports = {
   updateUser,
   deleteUser,
   requestProfileUpdate, 
+  verifyOwnerUpdate,
   approveUserUpdate,    
   rejectUserUpdate      
 };
