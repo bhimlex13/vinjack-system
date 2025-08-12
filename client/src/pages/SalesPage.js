@@ -31,22 +31,29 @@ const SalesPage = () => {
   }, []);
 
   const addProductToCart = (product) => {
-    if (product.quantity === 0) return;
+    const productInState = products.find(p => p._id === product._id);
+    if (!productInState || productInState.quantity === 0) return;
+
     const exist = cartItems.find((item) => item._id === product._id);
     if (exist) {
-      // Correctly check against the original product's quantity
-      if (exist.cartQuantity < product.quantity) {
-          setCartItems(
-            cartItems.map((item) =>
-              item._id === product._id
-                ? { ...item, cartQuantity: item.cartQuantity + 1 }
-                : item
-            )
-          );
+      if (exist.cartQuantity < productInState.quantity) {
+        setCartItems(
+          cartItems.map((item) =>
+            item._id === product._id
+              ? { ...item, cartQuantity: item.cartQuantity + 1 }
+              : item
+          )
+        );
       }
     } else {
-      setCartItems([...cartItems, { ...product, cartQuantity: 1, stock: product.quantity }]);
+      setCartItems([...cartItems, { ...productInState, cartQuantity: 1, stock: productInState.quantity }]);
     }
+    
+    setProducts(currentProducts =>
+      currentProducts.map(p =>
+        p._id === product._id ? { ...p, quantity: p.quantity - 1 } : p
+      )
+    );
   };
   
   const updateQuantity = (product, amount) => {
@@ -63,7 +70,15 @@ const SalesPage = () => {
           item._id === product._id ? { ...exist, cartQuantity: newQuantity } : item
         )
       );
+    } else {
+      return; 
     }
+
+    setProducts(currentProducts =>
+      currentProducts.map(p =>
+        p._id === product._id ? { ...p, quantity: p.quantity - amount } : p
+      )
+    );
   };
   
   const calculateTotal = () => {
@@ -75,7 +90,6 @@ const SalesPage = () => {
       alert("Cart is empty.");
       return;
     }
-
     const saleData = {
       items: cartItems.map(item => ({
         product: item._id,
@@ -111,72 +125,47 @@ const SalesPage = () => {
   return (
     <div className="pos-container">
       <div className="product-selection">
-        <input
-          type="text"
-          placeholder="Search for products..."
-          className="search-bar"
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <input type="text" placeholder="Search for products..." className="search-bar" onChange={(e) => setSearchTerm(e.target.value)} />
         <div className="filter-container">
             <button onClick={() => setSelectedBrand(null)} className={!selectedBrand ? 'active' : ''}>All Brands</button>
-            {brands.map(brand => (
-                <button key={brand._id} onClick={() => setSelectedBrand(brand._id)} className={selectedBrand === brand._id ? 'active' : ''}>
-                    {brand.name}
-                </button>
-            ))}
+            {brands.map(brand => (<button key={brand._id} onClick={() => setSelectedBrand(brand._id)} className={selectedBrand === brand._id ? 'active' : ''}>{brand.name}</button>))}
         </div>
         <div className="filter-container">
             <button onClick={() => setSelectedCategory(null)} className={!selectedCategory ? 'active' : ''}>All Categories</button>
-            {categories.map(cat => (
-                <button key={cat._id} onClick={() => setSelectedCategory(cat._id)} className={selectedCategory === cat._id ? 'active' : ''}>
-                    {cat.name}
-                </button>
-            ))}
+            {categories.map(cat => (<button key={cat._id} onClick={() => setSelectedCategory(cat._id)} className={selectedCategory === cat._id ? 'active' : ''}>{cat.name}</button>))}
         </div>
-        
         <div className="product-grid">
           {filteredProducts.map(product => (
             <div key={product._id} className={`product-card ${product.quantity === 0 ? 'out-of-stock' : ''}`} onClick={() => addProductToCart(product)}>
               <div className="card-image-container">
-                <img 
-                  src={product.image || 'https://placehold.co/300x200/e2e8f0/e2e8f0?text=No+Image'} 
-                  alt={product.name}
-                  onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/300x200/e2e8f0/e2e8f0?text=No+Image'; }}
-                />
+                <img src={product.image || 'https://placehold.co/300x200/e2e8f0/e2e8f0?text=No+Image'} alt={product.name} onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/300x200/e2e8f0/e2e8f0?text=No+Image'; }} />
                 {product.quantity === 0 && <div className="stock-overlay">Out of Stock</div>}
               </div>
+              {/* MODIFIED: Reverted to a simpler structure */}
               <div className="product-card-info">
                 <span className="product-name">{product.name}</span>
+                <span className={`product-stock ${product.quantity === 0 ? 'stock-out' : ''} ${(product.quantity > 0 && product.reorderLevel && product.quantity <= product.reorderLevel) ? 'stock-low' : ''}`}>
+                  {product.quantity} in stock
+                </span>
                 <span className="product-price">₱{product.price.toFixed(2)}</span>
               </div>
             </div>
           ))}
         </div>
       </div>
-
       <div className="current-sale">
         <h2>Current Sale</h2>
         <div className="cart-items">
           {cartItems.length === 0 && <p className="empty-cart">Cart is empty</p>}
           {cartItems.map(item => (
             <div key={item._id} className="cart-item">
-              <div className="item-info">
-                <span className="item-name">{item.name}</span>
-                <span className="item-price">₱{(item.price * item.cartQuantity).toFixed(2)}</span>
-              </div>
-              <div className="item-controls">
-                <button onClick={() => updateQuantity(item, -1)}>-</button>
-                <span>{item.cartQuantity}</span>
-                <button onClick={() => updateQuantity(item, 1)}>+</button>
-              </div>
+              <div className="item-info"><span className="item-name">{item.name}</span><span className="item-price">₱{(item.price * item.cartQuantity).toFixed(2)}</span></div>
+              <div className="item-controls"><button onClick={() => updateQuantity(item, -1)}>-</button><span>{item.cartQuantity}</span><button onClick={() => updateQuantity(item, 1)}>+</button></div>
             </div>
           ))}
         </div>
         <div className="sale-summary">
-          <div className="total">
-            <span>Total</span>
-            <span>₱{calculateTotal().toFixed(2)}</span>
-          </div>
+          <div className="total"><span>Total</span><span>₱{calculateTotal().toFixed(2)}</span></div>
           <button className="complete-sale-btn" onClick={handleCompleteSale}>Complete Sale</button>
         </div>
       </div>

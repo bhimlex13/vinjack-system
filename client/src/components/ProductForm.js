@@ -56,7 +56,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // --- FUNCTION TO RESIZE IMAGES ---
+
   const resizeImage = (file, maxWidth, maxHeight) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -84,7 +84,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.9)); // Get Base64 string of the resized image
+          resolve(canvas.toDataURL('image/jpeg', 0.9)); 
         };
         img.onerror = (error) => reject(error);
       };
@@ -96,7 +96,6 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
     const file = e.target.files[0];
     if (file) {
       try {
-        // Resize the image to a max of 800x800 pixels before setting it
         const resizedImage = await resizeImage(file, 800, 800);
         setFormData({ ...formData, image: resizedImage });
       } catch (error) {
