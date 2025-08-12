@@ -4,8 +4,9 @@ import api from '../api/axios';
 import '../styles/Form.css';
 import ConfirmationContext from '../context/ConfirmationContext';
 import AuthContext from '../context/AuthContext';
+import ProductMovementHistory from './ProductMovementHistory';
 
-const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
+const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) => {
   const { confirm } = useContext(ConfirmationContext);
   const { user } = useContext(AuthContext);
   const [formData, setFormData] = useState({
@@ -16,6 +17,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
   const [brands, setBrands] = useState([]);
   const [error, setError] = useState('');
   const [imageSource, setImageSource] = useState('url');
+  const [activeTab, setActiveTab] = useState('details');
 
   useEffect(() => {
     if (productToEdit) {
@@ -30,11 +32,13 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
         reorderLevel: productToEdit.reorderLevel,
         image: productToEdit.image || '',
       });
+      setActiveTab('details');
     } else {
         setFormData({
             itemCode: '', name: '', category: '', brand: '',
             cost: '', price: '', quantity: '', reorderLevel: 5, image: ''
         });
+        setActiveTab('details');
     }
   }, [productToEdit]);
 
@@ -55,7 +59,6 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
-
 
   const resizeImage = (file, maxWidth, maxHeight) => {
     return new Promise((resolve, reject) => {
@@ -84,7 +87,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.9)); 
+          resolve(canvas.toDataURL('image/jpeg', 0.9));
         };
         img.onerror = (error) => reject(error);
       };
@@ -127,103 +130,114 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose }) => {
       }
     }
   };
-  
-  const onProductDelete = async (productId) => {
-      try {
-        await api.delete(`/products/${productId}`);
-        onFormSubmit(); // This will trigger a refetch on the parent page
-      } catch (err) {
-        alert('Failed to delete product.');
-      }
-  }
 
   const handleDelete = async () => {
-    const isConfirmed = await confirm('Are you sure you want to permanently delete this product?');
+    const isConfirmed = await confirm('Are you sure you want to permanently delete this product? This action cannot be undone.');
     if (isConfirmed) {
-      onProductDelete(productToEdit._id);
-      onClose();
+        onProductDelete(productToEdit._id);
+        onClose();
     }
   };
-
-  const handleCancel = async () => {
-    const isConfirmed = await confirm('Are you sure you want to cancel? Any unsaved changes will be lost.');
-    if (isConfirmed) {
-      onClose();
-    }
+  
+  const handleCancel = () => {
+    onClose();
   };
 
   return (
-    <form className="data-form" onSubmit={handleSubmit}>
-      <div className="form-group-grid">
-        <div className="form-group">
-          <label>Item Code</label>
-          <input type="text" name="itemCode" value={formData.itemCode} onChange={handleChange} required />
-        </div>
-        <div className="form-group">
-          <label>Product Name</label>
-          <input type="text" name="name" value={formData.name} onChange={handleChange} required />
-        </div>
-        <div className="form-group">
-          <label>Category</label>
-          <select name="category" value={formData.category} onChange={handleChange} required>
-            <option value="">Select Category</option>
-            {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Brand</label>
-          <select name="brand" value={formData.brand} onChange={handleChange} required>
-            <option value="">Select Brand</option>
-            {brands.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Cost</label>
-          <input type="number" step="0.01" name="cost" value={formData.cost} onChange={handleChange} required />
-        </div>
-        <div className="form-group">
-          <label>Price</label>
-          <input type="number" step="0.01" name="price" value={formData.price} onChange={handleChange} required />
-        </div>
-        <div className="form-group">
-          <label>Quantity</label>
-          <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required />
-        </div>
-        <div className="form-group">
-          <label>Reorder Level</label>
-          <input type="number" name="reorderLevel" value={formData.reorderLevel} onChange={handleChange} required />
-        </div>
-      </div>
-      
-      <div className="form-group">
-        <label>Image</label>
-        <div className="image-source-toggle">
-          <button type="button" className={imageSource === 'url' ? 'active' : ''} onClick={() => setImageSource('url')}>URL</button>
-          <button type="button" className={imageSource === 'upload' ? 'active' : ''} onClick={() => setImageSource('upload')}>Upload</button>
-        </div>
-        {imageSource === 'url' ? (
-          <input type="text" name="image" value={formData.image} onChange={handleChange} placeholder="https://example.com/image.jpg" />
-        ) : (
-          <input type="file" name="imageFile" onChange={handleImageUpload} accept="image/*" />
-        )}
-      </div>
-      
-      {error && <p className="form-error-message">{error}</p>}
-      
-      <div className="form-actions">
-        {productToEdit && user.role === 'Owner' && (
-          <button type="button" className="form-action-btn form-delete-btn" onClick={handleDelete}>
-            Delete Product
+    <div className="product-form-container">
+      {productToEdit && (
+        <div className="form-tabs">
+          <button 
+            type="button"
+            className={`form-tab-btn ${activeTab === 'details' ? 'active' : ''}`} 
+            onClick={() => setActiveTab('details')}>
+            Product Details
           </button>
-        )}
-        <div className="form-actions-right">
-          <button type="button" className="form-action-btn form-cancel-btn" onClick={handleCancel}>Cancel</button>
-          <button type="submit" className="form-action-btn form-submit-btn">
-            {productToEdit ? 'Save Changes' : 'Add Product'}
+          <button 
+            type="button"
+            className={`form-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}>
+            Movement History
           </button>
         </div>
-      </div>
-    </form>
+      )}
+
+      {activeTab === 'details' || !productToEdit ? (
+        <form className="data-form" onSubmit={handleSubmit}>
+          <div className="form-group-grid">
+            <div className="form-group">
+              <label>Item Code</label>
+              <input type="text" name="itemCode" value={formData.itemCode} onChange={handleChange} required />
+            </div>
+            <div className="form-group">
+              <label>Product Name</label>
+              <input type="text" name="name" value={formData.name} onChange={handleChange} required />
+            </div>
+            <div className="form-group">
+              <label>Category</label>
+              <select name="category" value={formData.category} onChange={handleChange} required>
+                <option value="">Select Category</option>
+                {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Brand</label>
+              <select name="brand" value={formData.brand} onChange={handleChange} required>
+                <option value="">Select Brand</option>
+                {brands.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Cost</label>
+              <input type="number" step="0.01" name="cost" value={formData.cost} onChange={handleChange} required />
+            </div>
+            <div className="form-group">
+              <label>Price</label>
+              <input type="number" step="0.01" name="price" value={formData.price} onChange={handleChange} required />
+            </div>
+            <div className="form-group">
+              <label>Quantity</label>
+              <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required />
+            </div>
+            <div className="form-group">
+              <label>Reorder Level</label>
+              <input type="number" name="reorderLevel" value={formData.reorderLevel} onChange={handleChange} required />
+            </div>
+          </div>
+          
+          <div className="form-group">
+            <label>Image</label>
+            <div className="image-source-toggle">
+              <button type="button" className={imageSource === 'url' ? 'active' : ''} onClick={() => setImageSource('url')}>URL</button>
+              <button type="button" className={imageSource === 'upload' ? 'active' : ''} onClick={() => setImageSource('upload')}>Upload</button>
+            </div>
+            {imageSource === 'url' ? (
+              <input type="text" name="image" value={formData.image} onChange={handleChange} placeholder="https://example.com/image.jpg" />
+            ) : (
+              <input type="file" name="imageFile" onChange={handleImageUpload} accept="image/*" />
+            )}
+          </div>
+          
+          {error && <p className="form-error-message">{error}</p>}
+          
+          <div className="form-actions">
+            {productToEdit && user.role === 'Owner' && (
+              <button type="button" className="form-action-btn form-delete-btn" onClick={handleDelete}>
+                Delete Product
+              </button>
+            )}
+            <div className="form-actions-right">
+              <button type="button" className="form-action-btn form-cancel-btn" onClick={handleCancel}>Cancel</button>
+              <button type="submit" className="form-action-btn form-submit-btn">
+                {productToEdit ? 'Save Changes' : 'Add Product'}
+              </button>
+            </div>
+          </div>
+        </form>
+      ) : (
+        <ProductMovementHistory productId={productToEdit._id} />
+      )}
+    </div>
   );
 };
 

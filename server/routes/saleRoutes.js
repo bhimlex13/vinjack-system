@@ -1,10 +1,13 @@
 // server/routes/saleRoutes.js
 const express = require('express');
 const router = express.Router();
-const { createSale } = require('../controllers/saleController');
+// MODIFIED: Import the new getAllSales function
+const { createSale, getAllSales } = require('../controllers/saleController');
 const { protect } = require('../middleware/authMiddleware');
 
-// We'll protect this route later to ensure only logged-in users can create sales
-router.route('/').post(protect, createSale);
+// MODIFIED: This route now handles both GET and POST requests
+router.route('/')
+    .post(protect, createSale)
+    .get(protect, getAllSales);
 
 module.exports = router;

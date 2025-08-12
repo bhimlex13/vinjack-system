@@ -4,7 +4,8 @@ import { NavLink } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import {
   FaTachometerAlt, FaBoxOpen, FaShoppingCart, FaTruck, FaChartBar,
-  FaUsersCog, FaDatabase, FaFileAlt, FaChevronLeft
+  FaUsersCog, FaDatabase, FaFileAlt, FaChevronLeft,
+  FaReceipt // ADDED: New icon for the transactions link
 } from 'react-icons/fa';
 import '../styles/MainLayout.css';
 
@@ -37,6 +38,8 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
           <NavLink to="/inventory"><FaBoxOpen /> {!isCollapsed && <span>Inventory</span>}</NavLink>
           <NavLink to="/suppliers"><FaTruck /> {!isCollapsed && <span>Suppliers</span>}</NavLink>
           <NavLink to="/reports"><FaChartBar /> {!isCollapsed && <span>Reports</span>}</NavLink>
+          {/* ADDED: New link to the Transactions page */}
+          <NavLink to="/transactions"><FaReceipt /> {!isCollapsed && <span>Transactions</span>}</NavLink>
 
           {user && user.role === 'Owner' && (
             <>
