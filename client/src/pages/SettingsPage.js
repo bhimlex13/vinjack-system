@@ -149,8 +149,7 @@ const SettingsPage = () => {
 
         <button type="submit" className="save-btn">Request Profile Update</button>
       </form>
-
-      {/* Personal Notification Settings */}
+      
       <form className="settings-form" onSubmit={handleSavePersonalSettings}>
         <section>
           <h2>My Notification Settings</h2>

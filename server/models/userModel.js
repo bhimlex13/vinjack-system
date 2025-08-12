@@ -17,8 +17,9 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['Owner', 'Clerk', 'Mechanic'],
     required: true,
+    default: 'Clerk'
   },
-  status: { type: String, default: 'active' },
+  status: { type: String, default: 'pending' },
   emailSettings: {
     notificationsEnabled: { type: Boolean, default: true },
     notificationTime: { type: String, default: '08:00' }

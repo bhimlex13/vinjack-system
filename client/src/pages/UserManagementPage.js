@@ -83,7 +83,7 @@ const UserManagementPage = () => {
         </Modal>
       )}
 
-      {/* Profile Update Requests */}
+
       <section className="user-section">
         <h2>Profile Update Requests</h2>
         {profileUpdateRequests.length > 0 ? (

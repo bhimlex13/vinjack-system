@@ -1,7 +1,6 @@
 // server/utils/emailService.js
 const nodemailer = require('nodemailer');
 
-// Set up the transporter using your .env variables
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -35,7 +34,7 @@ const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
       <ul>${itemsHtml}</ul>
       <p>Please reorder these items soon.</p>
     `,
-  };
+  };  
 
   try {
     await transporter.sendMail(mailOptions);

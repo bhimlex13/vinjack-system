@@ -50,7 +50,6 @@
   font-weight: 300;
 }
 
-/* Right panel with the login form */
 .login-form-area {
   flex: 1;
   display: flex;
