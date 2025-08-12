@@ -5,7 +5,7 @@ const User = require('../models/userModel');
 const { sendLowStockEmail } = require('../utils/emailService');
 
 const startLowStockCheck = () => {
-  // This job runs every minute to check if it's time to send an alert
+
   cron.schedule('* * * * *', async () => {
     const now = new Date();
     const timeInZone = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
@@ -14,19 +14,17 @@ const startLowStockCheck = () => {
     const currentTime = `${currentHour}:${currentMinute}`;
 
     try {
-      // 1. Find any users who have scheduled a notification for this exact time
       const usersToNotify = await User.find({
         'emailSettings.notificationsEnabled': true,
         'emailSettings.notificationTime': currentTime
       });
 
       if (usersToNotify.length === 0) {
-        return; // No one to notify at this time
+        return; 
       }
       
       console.log(`Notification time matched for ${usersToNotify.length} user(s). Preparing alert...`);
 
-      // 2. Find low stock items
       const lowStockItems = await Product.find({
         $expr: { $lte: ['$quantity', '$reorderLevel'] }
       });
@@ -36,7 +34,6 @@ const startLowStockCheck = () => {
         return;
       }
 
-      // 3. Send an email to each user who wants to be notified
       for (const user of usersToNotify) {
         if (user.email) {
           console.log(`Sending alert to ${user.email}...`);

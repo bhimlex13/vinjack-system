@@ -19,6 +19,8 @@ const registerUser = async (req, res) => {
       username,
       email,
       password,
+      role: 'Clerk', // <-- Added a default role
+      status: 'pending' // <-- Explicitly setting status
     });
     if (user) {
       res.status(201).json({

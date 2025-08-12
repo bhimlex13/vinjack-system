@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import '../styles/RegistrationPage.css'; // We'll create this next
+import '../styles/RegistrationPage.css';
 
 const RegistrationPage = () => {
   const [formData, setFormData] = useState({
@@ -42,7 +42,7 @@ const RegistrationPage = () => {
       });
       
       setSuccessMessage(response.data.message);
-      // Optional: Redirect to login page after a short delay
+
       setTimeout(() => {
         navigate('/login');
       }, 3000);
