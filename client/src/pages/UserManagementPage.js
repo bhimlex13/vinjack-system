@@ -13,6 +13,8 @@ const UserManagementPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchUsers();
@@ -34,21 +36,50 @@ const UserManagementPage = () => {
   const managedUsers = useMemo(() => users.filter(u => u.status !== 'pending'), [users]);
 
   const handleApproveProfile = async (userId) => {
-    await approveUserUpdate(token, userId);
-    fetchUsers();
+    try {
+      await approveUserUpdate(token, userId);
+      setMessage('Profile update approved successfully!');
+      fetchUsers(); // Re-fetch to update the UI
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Failed to approve profile update.';
+      setError(errorMessage);
+    } finally {
+      setTimeout(() => {
+        setMessage('');
+        setError('');
+      }, 5000);
+    }
   };
 
   const handleRejectProfile = async (userId) => {
-    await rejectUserUpdate(token, userId);
-    fetchUsers();
+    try {
+      await rejectUserUpdate(token, userId);
+      setMessage('Profile update request rejected.');
+      fetchUsers();
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Failed to reject profile update.';
+      setError(errorMessage);
+    } finally {
+      setTimeout(() => {
+        setMessage('');
+        setError('');
+      }, 5000);
+    }
   };
 
   const handleApproveRegistration = async (userId) => {
     try {
       await api.put(`/users/${userId}`, { status: 'active' });
+      setMessage('User registration approved successfully.');
       fetchUsers();
-    } catch {
-      alert('Failed to approve user.');
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Failed to approve user.';
+      setError(errorMessage);
+    } finally {
+      setTimeout(() => {
+        setMessage('');
+        setError('');
+      }, 5000);
     }
   };
 
@@ -56,9 +87,16 @@ const UserManagementPage = () => {
     if (window.confirm('Are you sure you want to permanently delete this user?')) {
       try {
         await api.delete(`/users/${userId}`);
+        setMessage('User deleted successfully.');
         setUsers(users.filter(user => user._id !== userId));
-      } catch {
-        alert('Failed to delete user.');
+      } catch (err) {
+        const errorMessage = err.response?.data?.message || 'Failed to delete user.';
+        setError(errorMessage);
+      } finally {
+        setTimeout(() => {
+          setMessage('');
+          setError('');
+        }, 5000);
       }
     }
   };
@@ -83,6 +121,9 @@ const UserManagementPage = () => {
         </Modal>
       )}
 
+      {message && <p className="success-message">{message}</p>}
+      {error && <p className="error-message">{error}</p>}
+
 
       <section className="user-section">
         <h2>Profile Update Requests</h2>
@@ -103,8 +144,8 @@ const UserManagementPage = () => {
                     {user.email}
                   </td>
                   <td>
-                    <strong>{user.pendingChanges.fullName || user.fullName}</strong> ({user.pendingChanges.username || user.username})<br/>
-                    {user.pendingChanges.email || user.email}
+                    <strong>{user.pendingChanges?.fullName || user.fullName}</strong> ({user.pendingChanges?.username || user.username})<br/>
+                    {user.pendingChanges?.email || user.email}
                   </td>
                   <td className="actions">
                     <button className="action-btn approve-btn" onClick={() => handleApproveProfile(user._id)}>Approve</button>

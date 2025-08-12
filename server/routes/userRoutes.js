@@ -9,7 +9,8 @@ const {
     deleteUser,
     requestProfileUpdate,
     approveUserUpdate,
-    rejectUserUpdate
+    rejectUserUpdate,
+    getMe
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -17,7 +18,8 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 
-// --- User's own profile update route ---
+// --- User's own profile routes ---
+router.get('/me', protect, getMe);
 router.put('/profile', protect, requestProfileUpdate);
 
 // --- Admin (Owner) routes ---
@@ -25,7 +27,7 @@ router.route('/')
     .get(protect, authorize('Owner'), getAllUsers);
 
 router.route('/:id')
-    .put(protect, authorize('Owner'), updateUser) // This is for role/status changes by the Owner
+    .put(protect, authorize('Owner'), updateUser) 
     .delete(protect, authorize('Owner'), deleteUser);
 
 // --- NEW Owner approval routes ---
