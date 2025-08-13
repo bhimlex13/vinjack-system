@@ -2,9 +2,11 @@
 const Sale = require('../models/saleModel');
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger');
-const logMovement = require('../utils/movementLogger'); // <-- ADDED
+const logMovement = require('../utils/movementLogger');
+const { createNotification } = require('../utils/notificationManager');
 
 const createSale = async (req, res) => {
+  const io = req.app.get('socketio');
   const { items, services, totalAmount } = req.body;
 
   if ((!items || items.length === 0) && (!services || services.length === 0)) {
@@ -13,7 +15,7 @@ const createSale = async (req, res) => {
 
   try {
     const processedItems = [];
-    const movementsToLog = []; // Array to hold movements until sale is saved
+    const movementsToLog = [];
 
     for (const item of items) {
       const product = await Product.findById(item.product);
@@ -27,7 +29,6 @@ const createSale = async (req, res) => {
       const stockBefore = product.quantity;
       product.quantity -= item.quantity;
       
-      // Prepare the movement log without the referenceId for now
       movementsToLog.push({
           product: product._id,
           type: 'SALE',
@@ -37,6 +38,37 @@ const createSale = async (req, res) => {
       });
       
       await product.save();
+      
+      if (product.quantity === 0 && stockBefore > 0) {
+        const newNotifications = await createNotification({
+            recipientRole: 'Owner',
+            message: `${product.name} is now OUT OF STOCK.`,
+            type: 'OUT_OF_STOCK',
+            link: '/inventory'
+        });
+
+
+        if (newNotifications && newNotifications.length) {
+            newNotifications.forEach(notification => {
+                io.to(notification.user.toString()).emit('new_notification', notification);
+            });
+        }
+      } 
+      else if (product.quantity <= product.reorderLevel && stockBefore > product.reorderLevel) {
+        const newNotifications = await createNotification({
+            recipientRole: 'Owner',
+            message: `${product.name} is low on stock (${product.quantity} remaining).`,
+            type: 'LOW_STOCK',
+            link: '/inventory'
+        });
+        
+
+        if (newNotifications && newNotifications.length) {
+            newNotifications.forEach(notification => {
+                io.to(notification.user.toString()).emit('new_notification', notification);
+            });
+        }
+      }
       
       processedItems.push({
         product: item.product,
@@ -54,7 +86,6 @@ const createSale = async (req, res) => {
     });
     const createdSale = await sale.save();
     
-    // Now that the sale is saved, log all movements with the new Sale ID
     for (const movement of movementsToLog) {
         movement.referenceId = createdSale._id;
         await logMovement(movement);

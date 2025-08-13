@@ -2,10 +2,12 @@
 const Delivery = require('../models/deliveryModel');
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger'); 
-const logMovement = require('../utils/movementLogger'); // <-- ADDED
+const logMovement = require('../utils/movementLogger');
+// ADDED: Import the new notification manager
+const { createNotification } = require('../utils/notificationManager');
 
 const createDelivery = async (req, res) => {
-  const { supplier, productsReceived } = req.body;
+  const { supplier, productsReceived, recordedBy } = req.body;
 
   if (!productsReceived || productsReceived.length === 0) {
     return res.status(400).json({ message: 'Delivery must include at least one product.' });
@@ -22,7 +24,6 @@ const createDelivery = async (req, res) => {
 
       const stockBefore = product.quantity;
       product.quantity += item.quantity;
-      // Also update the product's cost to the latest delivery cost
       if (item.costAtTime) { 
         product.cost = item.costAtTime;
       }
@@ -36,6 +37,17 @@ const createDelivery = async (req, res) => {
       });
 
       await product.save();
+
+      // ADDED: Check if the stock is now low after this delivery
+      // This case is less common for deliveries but is included for completeness
+      if (product.quantity <= product.reorderLevel && stockBefore > product.reorderLevel) {
+        await createNotification({
+            recipientRole: 'Owner',
+            message: `${product.name} is now low on stock (${product.quantity} remaining).`,
+            type: 'LOW_STOCK',
+            link: '/inventory'
+        });
+      }
     }
 
     const delivery = new Delivery({
