@@ -2,10 +2,11 @@
 const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-// FIXED: Added the missing import for the email service
 const { sendVerificationEmail } = require('../utils/emailService');
+// ADDED: Import the new notification manager
+const { createNotification } = require('../utils/notificationManager'); 
+const logAction = require('../utils/logger');
 
-// @desc    Register a new user for approval
 const registerUser = async (req, res) => {
   try {
     const { fullName, username, email, password } = req.body;
@@ -25,6 +26,14 @@ const registerUser = async (req, res) => {
       status: 'pending'
     });
     if (user) {
+      // ADDED: Create a notification for the Owner about the new registration
+      await createNotification({
+        recipientRole: 'Owner',
+        message: `${user.fullName} has registered and is awaiting approval.`,
+        type: 'USER_ACTION',
+        link: '/user-management'
+      });
+
       res.status(201).json({
         message: 'Registration successful! Your account is pending admin approval.'
       });
@@ -36,7 +45,6 @@ const registerUser = async (req, res) => {
   }
 };
 
-// @desc    Authenticate a user & get token
 const loginUser = async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -69,7 +77,6 @@ const loginUser = async (req, res) => {
   }
 };
 
-// @desc    Get current user profile
 const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -82,7 +89,6 @@ const getMe = async (req, res) => {
   }
 };
 
-// @desc    User requests an update to their own profile
 const requestProfileUpdate = async (req, res) => {
   try {
     const { fullName, username, email, oldPassword, newPassword, confirmPassword } = req.body;
@@ -122,7 +128,6 @@ const requestProfileUpdate = async (req, res) => {
       user.pendingChanges = requestedChanges;
 
       await user.save();
-      // This function call will now work correctly
       await sendVerificationEmail(user.email, verificationCode);
       
       res.json({ 
@@ -134,11 +139,20 @@ const requestProfileUpdate = async (req, res) => {
       user.pendingChanges = requestedChanges;
       user.hasPendingChanges = true;
       await user.save();
+
+      // ADDED: Create a notification for the Owner about the update request
+      await createNotification({
+        recipientRole: 'Owner',
+        message: `${user.fullName} has requested a profile update.`,
+        type: 'USER_ACTION',
+        link: '/user-management'
+      });
+
       res.json({ message: 'Update request submitted successfully. Waiting for owner approval.' });
     }
 
   } catch (error) {
-    console.error('Error in requestProfileUpdate:', error); // Added for better debugging
+    console.error('Error in requestProfileUpdate:', error);
     res.status(500).json({ message: 'Error submitting update request.', error: error.message });
   }
 };
@@ -185,6 +199,15 @@ const approveUserUpdate = async (req, res) => {
     user.hasPendingChanges = false;
     
     const updatedUser = await user.save();
+
+    // ADDED: Create a notification for the specific user whose request was approved
+    await createNotification({
+        recipientId: updatedUser._id,
+        message: `Your profile update request has been approved.`,
+        type: 'REQUEST_STATUS',
+        link: '/settings'
+    });
+
     res.json({ message: 'User profile updated successfully.', user: updatedUser });
 
   } catch (error) {
@@ -204,7 +227,14 @@ const rejectUserUpdate = async (req, res) => {
         
         await user.save();
         
-        // This function should now log correctly
+        // ADDED: Create a notification for the specific user whose request was rejected
+        await createNotification({
+            recipientId: user._id,
+            message: `Your profile update request was rejected.`,
+            type: 'REQUEST_STATUS',
+            link: '/settings'
+        });
+
         logAction(req.user, 'REJECT_PROFILE_UPDATE', `Rejected profile changes for user ${user.username}.`);
         res.json({ message: 'Pending changes have been rejected.' });
 
@@ -264,13 +294,6 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '1d',
   });
-};
-
-const logAction = (user, actionType, description) => {
-  // A simple console log, but could be expanded to save to a database
-  if(user) {
-    console.log(`Action Logged: Admin=${user.username}, Type=${actionType}, Description=${description}`);
-  }
 };
 
 module.exports = {

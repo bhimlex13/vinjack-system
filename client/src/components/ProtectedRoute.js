@@ -4,10 +4,17 @@ import { Navigate, Outlet } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 
 const ProtectedRoute = () => {
-  const { user } = useContext(AuthContext);
+  // MODIFIED: Get the isInitializing flag from the context
+  const { user, isInitializing } = useContext(AuthContext);
 
-  // If there's a user, render the child component (e.g., Dashboard)
-  // Otherwise, redirect to the login page
+  // ADDED: New loading check
+  // If the app is still checking for the user, show a loading screen.
+  // This prevents the premature redirect.
+  if (isInitializing) {
+    return <div>Loading...</div>; // Or a spinner component
+  }
+
+  // This part now only runs AFTER the initialization is complete
   return user ? <Outlet /> : <Navigate to="/login" />;
 };
 

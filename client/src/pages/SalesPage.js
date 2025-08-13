@@ -4,7 +4,6 @@ import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
 import '../styles/SalesPage.css';
 import ReceiptModal from '../components/ReceiptModal';
-// NEW: Import the confirmation context
 import ConfirmationContext from '../context/ConfirmationContext';
 
 const SalesPage = () => {
@@ -16,7 +15,6 @@ const SalesPage = () => {
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const { user } = useContext(AuthContext);
-  // NEW: Get the confirm function from the context
   const { confirm } = useContext(ConfirmationContext);
 
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -38,62 +36,89 @@ const SalesPage = () => {
     fetchInitialData();
   }, []);
 
+  // --- REWRITTEN: More robust cart logic ---
   const addProductToCart = (product) => {
+    // First, check if the product is available in the main list
     const productInState = products.find(p => p._id === product._id);
-    if (!productInState || productInState.quantity === 0) return;
+    if (!productInState || productInState.quantity <= 0) {
+      return; // Do nothing if product is out of stock in the main list
+    }
 
-    const exist = cartItems.find((item) => item._id === product._id);
-    if (exist) {
-      if (exist.cartQuantity < productInState.quantity) {
-        setCartItems(
-          cartItems.map((item) =>
+    // Use functional update to avoid race conditions
+    setCartItems(prevCart => {
+      const existingItem = prevCart.find(item => item._id === product._id);
+
+      if (existingItem) {
+        // If item exists in cart, increment its quantity if stock allows
+        if (existingItem.cartQuantity < existingItem.stock) {
+          return prevCart.map(item =>
             item._id === product._id
               ? { ...item, cartQuantity: item.cartQuantity + 1 }
               : item
-          )
-        );
+          );
+        }
+        // If stock is maxed, return the cart as is
+        return prevCart;
+      } else {
+        // If item is not in cart, add it with a quantity of 1
+        // The `stock` property tracks the original quantity available
+        return [...prevCart, { ...product, cartQuantity: 1, stock: product.quantity }];
       }
-    } else {
-      setCartItems([...cartItems, { ...productInState, cartQuantity: 1, stock: productInState.quantity }]);
-    }
-    
-    setProducts(currentProducts =>
-      currentProducts.map(p =>
+    });
+
+    // Decrement the quantity in the visual product list
+    setProducts(prevProducts =>
+      prevProducts.map(p =>
         p._id === product._id ? { ...p, quantity: p.quantity - 1 } : p
       )
     );
   };
-  
-  const updateQuantity = (product, amount) => {
-    const exist = cartItems.find((item) => item._id === product._id);
-    if (!exist) return;
-  
-    const newQuantity = exist.cartQuantity + amount;
-  
-    if (newQuantity <= 0) {
-      setCartItems(cartItems.filter((item) => item._id !== product._id));
-    } else if (newQuantity <= exist.stock) {
-      setCartItems(
-        cartItems.map((item) =>
-          item._id === product._id ? { ...exist, cartQuantity: newQuantity } : item
-        )
-      );
-    } else {
-      return; 
-    }
 
-    setProducts(currentProducts =>
-      currentProducts.map(p =>
-        p._id === product._id ? { ...p, quantity: p.quantity - amount } : p
-      )
+  // --- REWRITTEN: More robust quantity update logic ---
+  const updateQuantity = (product, amount) => {
+    // Use functional update for cart to ensure accuracy
+    setCartItems(prevCart => {
+      const existingItem = prevCart.find(item => item._id === product._id);
+      if (!existingItem) return prevCart; // Should not happen, but safe check
+
+      const newQuantity = existingItem.cartQuantity + amount;
+
+      if (newQuantity <= 0) {
+        // Remove item from cart if quantity is 0 or less
+        return prevCart.filter(item => item._id !== product._id);
+      }
+
+      if (newQuantity <= existingItem.stock) {
+        // Update quantity if within available stock
+        return prevCart.map(item =>
+          item._id === product._id ? { ...item, cartQuantity: newQuantity } : item
+        );
+      }
+      
+      // If requested quantity exceeds stock, do not change the cart
+      return prevCart;
+    });
+
+    // Use functional update for products to sync visual stock counter
+    setProducts(prevProducts => 
+      prevProducts.map(p => {
+        if (p._id === product._id) {
+          // Check against cart state to prevent visual stock from becoming incorrect
+          const cartItem = cartItems.find(item => item._id === product._id);
+          const newCartQuantity = cartItem ? cartItem.cartQuantity + amount : 0;
+          if (newCartQuantity > p.stock) return p; // prevent going over stock
+
+          return { ...p, quantity: p.quantity - amount };
+        }
+        return p;
+      })
     );
   };
-  
+
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => total + item.price * item.cartQuantity, 0);
   };
   
-  // MODIFIED: This function now prompts the user for confirmation
   const handleCompleteSale = async () => {
     if (cartItems.length === 0) {
       alert("Cart is empty.");
@@ -121,10 +146,14 @@ const SalesPage = () => {
         setLastSaleData(response.data);
         setShowReceiptModal(true);
         setCartItems([]);
+        // Refetch products to ensure stock is 100% accurate from the server
         const productsResponse = await api.get('/products');
         setProducts(productsResponse.data);
       } catch (error) {
         alert(`Sale failed: ${error.response?.data?.message || error.message}`);
+        // If sale fails, refetch products to revert optimistic updates
+        const productsResponse = await api.get('/products');
+        setProducts(productsResponse.data);
       }
     }
   };

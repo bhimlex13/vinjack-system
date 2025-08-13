@@ -1,7 +1,9 @@
 // server/controllers/productController.js
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger');
-const logMovement = require('../utils/movementLogger'); 
+const logMovement = require('../utils/movementLogger');
+// ADDED: Import the new notification manager
+const { createNotification } = require('../utils/notificationManager');
 
 const getProducts = async (req, res) => {
   try {
@@ -18,7 +20,6 @@ const createProduct = async (req, res) => {
     const newProduct = new Product({ name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel, image });
     const savedProduct = await newProduct.save();
     
-    // Log the initial stock as an ADJUSTMENT
     if (savedProduct.quantity > 0) {
       await logMovement({
         product: savedProduct._id,
@@ -30,8 +31,17 @@ const createProduct = async (req, res) => {
       });
     }
 
-    logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`);
+    // ADDED: Check if the new product is already low on stock
+    if (savedProduct.quantity <= savedProduct.reorderLevel) {
+        await createNotification({
+            recipientRole: 'Owner',
+            message: `${savedProduct.name} was created with low stock (${savedProduct.quantity} remaining).`,
+            type: 'LOW_STOCK',
+            link: '/inventory'
+        });
+    }
 
+    logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`);
     res.status(201).json(savedProduct);
   } catch (error) {
     res.status(400).json({ message: 'Error creating product', error: error.message });
@@ -43,11 +53,9 @@ const updateProduct = async (req, res) => {
     const product = await Product.findById(req.params.id);
 
     if (product) {
-      // --- CAPTURE these values before making changes ---
       const stockBefore = product.quantity;
       const newQuantity = req.body.quantity;
 
-      // --- UPDATE the product object in memory ---
       product.name = req.body.name || product.name;
       product.itemCode = req.body.itemCode || product.itemCode;
       product.category = req.body.category || product.category;
@@ -58,11 +66,8 @@ const updateProduct = async (req, res) => {
       product.reorderLevel = req.body.reorderLevel ?? product.reorderLevel;
       product.image = req.body.image || product.image;
       
-      // --- SAVE the product to the database ---
       const updatedProduct = await product.save();
 
-      // --- LOG the movement if the quantity has been manually changed ---
-      // This is done after saving to ensure the update was successful
       if (newQuantity !== undefined && stockBefore !== newQuantity) {
         await logMovement({
           product: product._id,
@@ -72,6 +77,16 @@ const updateProduct = async (req, res) => {
           notes: 'Manual stock update from product form.',
           recordedBy: req.user.id
         });
+
+        // ADDED: Check if the manual adjustment made the stock low
+        if (updatedProduct.quantity <= updatedProduct.reorderLevel && stockBefore > updatedProduct.reorderLevel) {
+            await createNotification({
+                recipientRole: 'Owner',
+                message: `${updatedProduct.name} is now low on stock (${updatedProduct.quantity} remaining).`,
+                type: 'LOW_STOCK',
+                link: '/inventory'
+            });
+        }
       }
 
       logAction(req.user, 'UPDATE_PRODUCT', `Updated product: '${updatedProduct.name}' (Code: ${updatedProduct.itemCode})`);
@@ -79,8 +94,7 @@ const updateProduct = async (req, res) => {
     } else {
       res.status(404).json({ message: 'Product not found' });
     }
-  } catch (error)
- {
+  } catch (error) {
     res.status(400).json({ message: 'Error updating product', error: error.message });
   }
 };
