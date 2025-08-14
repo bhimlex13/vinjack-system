@@ -1,8 +1,10 @@
 // client/src/context/AuthContext.js
-import React, { createContext, useReducer, useEffect, useCallback } from 'react';
+import React, { createContext, useReducer, useEffect, useCallback, useContext } from 'react';
 import api from '../api/axios';
-// --- ADDED: Import the socket.io client ---
 import { io } from 'socket.io-client';
+import { useWarning } from './WarningContext';
+import { toast } from 'react-toastify';
+
 
 const initialState = {
   user: null,
@@ -51,9 +53,7 @@ const authReducer = (state, action) => {
       return { ...state, lowStockItems: action.payload };
     case 'SET_NOTIFICATIONS':
       return { ...state, notifications: action.payload };
-    // --- ADDED: New reducer case to handle incoming real-time notifications ---
     case 'ADD_NOTIFICATION':
-      // Prepend the new notification to the top of the list
       return {
         ...state,
         notifications: [action.payload, ...state.notifications],
@@ -70,8 +70,8 @@ const authReducer = (state, action) => {
 
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const { showWarning } = useWarning();
 
-  // This useEffect handles session persistence from localStorage
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('user');
@@ -88,7 +88,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // This useEffect handles fetching initial data like notifications
   const fetchInitialData = useCallback(async () => {
     if (state.token) {
       try {
@@ -110,28 +109,42 @@ export const AuthProvider = ({ children }) => {
     }
   }, [state.isInitializing, state.user, fetchInitialData]);
 
-  // --- ADDED: useEffect for managing the Socket.IO connection ---
   useEffect(() => {
-    // Only connect if there is a logged-in user
     if (state.user) {
-      // Connect to the server. Make sure the URL is correct.
       const socket = io(process.env.REACT_APP_API_URL);
 
-      // Join a private room based on the user's ID
       socket.emit('joinRoom', state.user._id);
 
-      // Listen for the 'new_notification' event from the server
       socket.on('new_notification', (notification) => {
         console.log('Real-time notification received:', notification);
         dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
+        
+        // --- MODIFIED: Use a switch to show different toast colors ---
+        switch (notification.type) {
+          case 'LOW_STOCK':
+            toast.warn(notification.message);
+            break;
+          case 'OUT_OF_STOCK':
+            toast.error(notification.message);
+            break;
+          case 'USER_ACTION':
+          case 'REQUEST_STATUS':
+          default:
+            toast.info(notification.message);
+            break;
+        }
+      });
+      
+      socket.on('stock_level_warning', (warningData) => {
+        console.log('Stock level warning received:', warningData);
+        showWarning(warningData);
       });
 
-      // Cleanup on component unmount or when user logs out
       return () => {
         socket.disconnect();
       };
     }
-  }, [state.user]); // This effect depends on the user state
+  }, [state.user, showWarning]);
 
   const login = async (username, password) => {
     try {
