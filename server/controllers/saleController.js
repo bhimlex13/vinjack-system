@@ -42,7 +42,6 @@ const createSale = async (req, res) => {
       const warningPayload = {
         productName: product.name,
         remainingQuantity: product.quantity,
-        // --- ADDED: Include the product's image URL ---
         image: product.image,
       };
 
@@ -61,8 +60,8 @@ const createSale = async (req, res) => {
             });
         }
 
-        // --- For the User making the sale: Emit a real-time pop-up warning ---
-        io.to(req.user.id).emit('stock_level_warning', {
+        // --- MODIFIED: Broadcast the warning to EVERYONE connected ---
+        io.emit('stock_level_warning', {
           ...warningPayload,
           type: 'OUT_OF_STOCK',
           message: `${product.name} is now OUT OF STOCK.`
@@ -84,8 +83,8 @@ const createSale = async (req, res) => {
             });
         }
         
-        // --- For the User making the sale: Emit a real-time pop-up warning ---
-        io.to(req.user.id).emit('stock_level_warning', {
+        // --- MODIFIED: Broadcast the warning to EVERYONE connected ---
+        io.emit('stock_level_warning', {
           ...warningPayload,
           type: 'LOW_STOCK',
           message: `${product.name} is low on stock (${product.quantity} remaining).`
