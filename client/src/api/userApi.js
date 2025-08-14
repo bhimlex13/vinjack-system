@@ -1,27 +1,22 @@
 // client/src/api/userApi.js
 import api from './axios';
 
-export const requestProfileUpdate = async (token, changes) => {
-  return api.put('/users/profile', changes, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export const requestProfileUpdate = async (changes) => {
+  // MODIFIED: Removed token and manual headers
+  return api.put('/users/profile', changes);
 };
 
-// ADDED: New function for submitting the OTP
-export const verifyOwnerUpdate = async (token, code) => {
-  return api.post('/users/profile/verify', { code }, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export const verifyOwnerUpdate = async (code) => {
+  // MODIFIED: Removed token and manual headers
+  return api.post('/users/profile/verify', { code });
 };
 
-export const approveUserUpdate = async (token, userId) => {
-  return api.post(`/users/${userId}/approve`, {}, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export const approveUserUpdate = async (userId) => {
+  // MODIFIED: Removed token and manual headers
+  return api.post(`/users/${userId}/approve`, {});
 };
 
-export const rejectUserUpdate = async (token, userId) => {
-  return api.post(`/users/${userId}/reject`, {}, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export const rejectUserUpdate = async (userId) => {
+  // MODIFIED: Removed token and manual headers
+  return api.post(`/users/${userId}/reject`, {});
 };
