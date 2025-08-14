@@ -229,7 +229,7 @@ const approveUserUpdate = async (req, res) => {
         type: 'REQUEST_STATUS',
         link: '/settings'
     });
-    
+
     if (newNotifications && newNotifications.length) {
         newNotifications.forEach(notification => {
             io.to(notification.user.toString()).emit('new_notification', notification);

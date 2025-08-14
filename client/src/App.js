@@ -1,8 +1,14 @@
 // client/src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+// --- ADDED: Imports from react-toastify ---
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 import { AuthProvider } from './context/AuthContext';
 import { ConfirmationProvider } from './context/ConfirmationContext';
+import { WarningProvider } from './context/WarningContext';
+import WarningModal from './components/WarningModal';
 
 import LoginPage from './pages/LoginPage';
 import RegistrationPage from './pages/RegistrationPage';
@@ -18,40 +24,55 @@ import AuditLogPage from './pages/AuditLogPage';
 import SettingsPage from './pages/SettingsPage';
 import UserManagementPage from './pages/UserManagementPage';
 import DataManagementPage from './pages/DataManagementPage';
-// ADDED: Import the new TransactionsPage
 import TransactionsPage from './pages/TransactionsPage';
 
 function App() {
   return (
-    <AuthProvider>
-      <ConfirmationProvider>
-        <Router>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegistrationPage />} />
+    <WarningProvider>
+      <AuthProvider>
+        <ConfirmationProvider>
+          <Router>
+            <WarningModal />
+            {/* --- ADDED: The ToastContainer for pop-up notifications --- */}
+            <ToastContainer
+              position="top-right"
+              autoClose={3500}
+              hideProgressBar={false}
+              newestOnTop={false}
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="colored"
+            />
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegistrationPage />} />
 
-            {/* Protected Routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route element={<MainLayout />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/inventory" element={<InventoryPage />} />
-                <Route path="/sales" element={<SalesPage />} />
-                <Route path="/suppliers" element={<SuppliersPage />} />
-                <Route path="/alerts" element={<AlertsPage />} />
-                <Route path="/reports" element={<ReportsPage />} />
-                <Route path="/transactions" element={<TransactionsPage />} />
-                <Route path="/audit-log" element={<AuditLogPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/user-management" element={<UserManagementPage />} />
-                <Route path="/data-management" element={<DataManagementPage />} /> 
-                <Route path="/" element={<Navigate to="/dashboard" />} />
+              {/* Protected Routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route element={<MainLayout />}>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/inventory" element={<InventoryPage />} />
+                  <Route path="/sales" element={<SalesPage />} />
+                  <Route path="/suppliers" element={<SuppliersPage />} />
+                  <Route path="/alerts" element={<AlertsPage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/transactions" element={<TransactionsPage />} />
+                  <Route path="/audit-log" element={<AuditLogPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/user-management" element={<UserManagementPage />} />
+                  <Route path="/data-management" element={<DataManagementPage />} /> 
+                  <Route path="/" element={<Navigate to="/dashboard" />} />
+                </Route>
               </Route>
-            </Route>
-          </Routes>
-        </Router>
-      </ConfirmationProvider>
-    </AuthProvider>
+            </Routes>
+          </Router>
+        </ConfirmationProvider>
+      </AuthProvider>
+    </WarningProvider>
   );
 }
 

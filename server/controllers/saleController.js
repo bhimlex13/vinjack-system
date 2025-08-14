@@ -39,7 +39,15 @@ const createSale = async (req, res) => {
       
       await product.save();
       
+      const warningPayload = {
+        productName: product.name,
+        remainingQuantity: product.quantity,
+        // --- ADDED: Include the product's image URL ---
+        image: product.image,
+      };
+
       if (product.quantity === 0 && stockBefore > 0) {
+        // --- For Admins: Create a persistent notification ---
         const newNotifications = await createNotification({
             recipientRole: 'Owner',
             message: `${product.name} is now OUT OF STOCK.`,
@@ -47,14 +55,22 @@ const createSale = async (req, res) => {
             link: '/inventory'
         });
 
-
         if (newNotifications && newNotifications.length) {
             newNotifications.forEach(notification => {
                 io.to(notification.user.toString()).emit('new_notification', notification);
             });
         }
+
+        // --- For the User making the sale: Emit a real-time pop-up warning ---
+        io.to(req.user.id).emit('stock_level_warning', {
+          ...warningPayload,
+          type: 'OUT_OF_STOCK',
+          message: `${product.name} is now OUT OF STOCK.`
+        });
+
       } 
       else if (product.quantity <= product.reorderLevel && stockBefore > product.reorderLevel) {
+        // --- For Admins: Create a persistent notification ---
         const newNotifications = await createNotification({
             recipientRole: 'Owner',
             message: `${product.name} is low on stock (${product.quantity} remaining).`,
@@ -62,12 +78,18 @@ const createSale = async (req, res) => {
             link: '/inventory'
         });
         
-
         if (newNotifications && newNotifications.length) {
             newNotifications.forEach(notification => {
                 io.to(notification.user.toString()).emit('new_notification', notification);
             });
         }
+        
+        // --- For the User making the sale: Emit a real-time pop-up warning ---
+        io.to(req.user.id).emit('stock_level_warning', {
+          ...warningPayload,
+          type: 'LOW_STOCK',
+          message: `${product.name} is low on stock (${product.quantity} remaining).`
+        });
       }
       
       processedItems.push({

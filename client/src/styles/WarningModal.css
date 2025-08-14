@@ -1,0 +1,109 @@
+/* client/src/styles/WarningModal.css */
+.warning-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.warning-modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.warning-modal-header {
+  padding: 16px;
+  color: white;
+  display: flex;
+  align-items: center;
+}
+
+.warning-modal-header.low-stock {
+  background-color: #f0ad4e; /* Warning Orange */
+}
+
+.warning-modal-header.out-of-stock {
+  background-color: #d9534f; /* Danger Red */
+}
+
+.warning-modal-header h3 {
+  margin: 0 0 0 10px;
+  font-size: 1.2rem;
+}
+
+.warning-icon {
+  font-size: 1.5rem;
+  /* --- ADDED: Blinking animation --- */
+  animation: blink-animation 1.5s infinite;
+}
+
+.warning-modal-body {
+  padding: 20px;
+  font-size: 1rem;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.warning-product-image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+.warning-modal-body p {
+  margin: 0;
+}
+
+.warning-modal-footer {
+  padding: 12px;
+  text-align: right;
+  background-color: #f7f7f7;
+  border-top: 1px solid #eee;
+}
+
+.ok-btn {
+  padding: 8px 24px;
+  border: none;
+  border-radius: 5px;
+  background-color: #007bff;
+  color: white;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.ok-btn:hover {
+  background-color: #0056b3;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes blink-animation {
+  50% {
+    opacity: 0.3;
+  }
+}
