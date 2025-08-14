@@ -1,20 +1,22 @@
 // client/src/pages/UserManagementPage.js
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../api/axios';
-import AuthContext from '../context/AuthContext';
+// MODIFIED: We no longer need the token from context for these specific API calls
 import { approveUserUpdate, rejectUserUpdate } from '../api/userApi';
 import '../styles/UserManagementPage.css';
 import Modal from '../components/Modal';
 import EditUserModal from '../components/EditUserModal';
 
 const UserManagementPage = () => {
-  const { token } = useContext(AuthContext);
+  // This component no longer needs the token directly for these actions
   const [users, setUsers] = useState([]);
+  // ... (the rest of the state declarations are unchanged) ...
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
 
   useEffect(() => {
     fetchUsers();
@@ -37,7 +39,8 @@ const UserManagementPage = () => {
 
   const handleApproveProfile = async (userId) => {
     try {
-      await approveUserUpdate(token, userId);
+      // MODIFIED: No longer passing the token
+      await approveUserUpdate(userId);
       setMessage('Profile update approved successfully!');
       fetchUsers(); // Re-fetch to update the UI
     } catch (err) {
@@ -53,7 +56,8 @@ const UserManagementPage = () => {
 
   const handleRejectProfile = async (userId) => {
     try {
-      await rejectUserUpdate(token, userId);
+      // MODIFIED: No longer passing the token
+      await rejectUserUpdate(userId);
       setMessage('Profile update request rejected.');
       fetchUsers();
     } catch (err) {
@@ -67,6 +71,7 @@ const UserManagementPage = () => {
     }
   };
 
+  // ... (The rest of the file is unchanged) ...
   const handleApproveRegistration = async (userId) => {
     try {
       await api.put(`/users/${userId}`, { status: 'active' });

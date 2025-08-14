@@ -6,7 +6,8 @@ import { requestProfileUpdate, verifyOwnerUpdate } from '../api/userApi';
 import '../styles/SettingsPage.css';
 
 const SettingsPage = () => {
-  const { auth, token } = useContext(AuthContext);
+  // MODIFIED: We only need the user object, not the token directly
+  const { user } = useContext(AuthContext);
 
   const [profile, setProfile] = useState({ fullName: '', username: '', email: '' });
   const [originalProfile, setOriginalProfile] = useState({});
@@ -29,16 +30,16 @@ const SettingsPage = () => {
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const [timer, setTimer] = useState(180); // 3 minutes in seconds
+  const [timer, setTimer] = useState(180);
   const timerId = useRef(null);
 
-  // useEffect for fetching data (no changes here)
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // The interceptor in axios.js handles the token, so no need to pass headers manually
         const [settingsRes, profileRes] = await Promise.all([
-          api.get('/settings', { headers: { Authorization: `Bearer ${token}` } }),
-          api.get('/users/me', { headers: { Authorization: `Bearer ${token}` } })
+          api.get('/settings'),
+          api.get('/users/me')
         ]);
 
         if (settingsRes.data) {
@@ -61,25 +62,20 @@ const SettingsPage = () => {
         console.error("Failed to fetch data", error);
       }
     };
-    if (token) {
+    if (user) { // Depend on user object instead of token
         fetchData();
     }
-  }, [token]);
+  }, [user]);
 
-  // FIXED: useEffect to manage the countdown timer
   useEffect(() => {
-    // Only run the interval when verification is required
     if (requiresVerification) {
-      // Use setInterval to decrement the timer every second
       timerId.current = setInterval(() => {
         setTimer(prevTimer => prevTimer - 1);
       }, 1000);
     }
-    // Cleanup function to clear the interval
     return () => clearInterval(timerId.current);
   }, [requiresVerification]);
 
-  // NEW: useEffect to handle the timeout action when timer hits zero
   useEffect(() => {
     if (timer <= 0 && requiresVerification) {
       clearInterval(timerId.current);
@@ -106,7 +102,8 @@ const SettingsPage = () => {
   const handleSavePersonalSettings = async (e) => {
     e.preventDefault();
     try {
-      await api.put('/settings', personalSettings, { headers: { Authorization: `Bearer ${token}` } });
+      // The interceptor in axios.js handles the token
+      await api.put('/settings', personalSettings);
       setMessage('Settings saved successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch {
@@ -178,13 +175,15 @@ const SettingsPage = () => {
     setUpdateError('');
     setUpdateMessage('');
     try {
-      const response = await requestProfileUpdate(token, updateFormData);
+      // --- THE FIX: Removed the extra 'token' argument ---
+      const response = await requestProfileUpdate(updateFormData);
+      
       setShowConfirmModal(false);
 
       if (response.data.requiresVerification) {
         setRequiresVerification(true);
         setUpdateMessage(response.data.message);
-        setTimer(180); // Reset timer to 3 minutes
+        setTimer(180); 
       } else {
         setUpdateMessage(response.data.message);
         setPendingChanges(updateFormData);
@@ -201,10 +200,11 @@ const SettingsPage = () => {
   const handleVerificationSubmit = async (e) => {
     e.preventDefault();
     setUpdateError('');
-    clearInterval(timerId.current); // Stop timer on submission
+    clearInterval(timerId.current); 
 
     try {
-      const response = await verifyOwnerUpdate(token, verificationCode);
+      // The userApi function doesn't need the token passed here
+      const response = await verifyOwnerUpdate(verificationCode);
       setUpdateMessage(response.data.message);
 
       const updatedProfile = {
@@ -225,6 +225,7 @@ const SettingsPage = () => {
     }
   };
 
+  // ... (The JSX part of the component remains unchanged) ...
   return (
     <div className="settings-container">
       <h1>My Settings</h1>

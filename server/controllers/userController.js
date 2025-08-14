@@ -1,13 +1,14 @@
 // server/controllers/userController.js
 const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const jwt =require('jsonwebtoken');
 const { sendVerificationEmail } = require('../utils/emailService');
-// ADDED: Import the new notification manager
-const { createNotification } = require('../utils/notificationManager'); 
+const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
 
+// ... (registerUser, loginUser, getMe functions are unchanged) ...
 const registerUser = async (req, res) => {
+  const io = req.app.get('socketio');
   try {
     const { fullName, username, email, password } = req.body;
     if (!fullName || !username || !email || !password) {
@@ -26,13 +27,18 @@ const registerUser = async (req, res) => {
       status: 'pending'
     });
     if (user) {
-      // ADDED: Create a notification for the Owner about the new registration
-      await createNotification({
+      const newNotifications = await createNotification({
         recipientRole: 'Owner',
         message: `${user.fullName} has registered and is awaiting approval.`,
         type: 'USER_ACTION',
         link: '/user-management'
       });
+
+      if (newNotifications && newNotifications.length) {
+        newNotifications.forEach(notification => {
+            io.to(notification.user.toString()).emit('new_notification', notification);
+        });
+      }
 
       res.status(201).json({
         message: 'Registration successful! Your account is pending admin approval.'
@@ -89,7 +95,9 @@ const getMe = async (req, res) => {
   }
 };
 
+
 const requestProfileUpdate = async (req, res) => {
+  const io = req.app.get('socketio');
   try {
     const { fullName, username, email, oldPassword, newPassword, confirmPassword } = req.body;
     const user = await User.findById(req.user.id);
@@ -126,27 +134,33 @@ const requestProfileUpdate = async (req, res) => {
       user.verificationCode = verificationCode;
       user.verificationCodeExpires = Date.now() + 5 * 60 * 1000;
       user.pendingChanges = requestedChanges;
-
       await user.save();
       await sendVerificationEmail(user.email, verificationCode);
-      
       res.json({ 
         message: 'Verification code sent to your email. Please check your inbox.',
         requiresVerification: true 
       });
 
     } else {
-      user.pendingChanges = requestedChanges;
-      user.hasPendingChanges = true;
-      await user.save();
+      await User.findByIdAndUpdate(req.user.id, {
+        $set: {
+          pendingChanges: requestedChanges,
+          hasPendingChanges: true,
+        }
+      });
 
-      // ADDED: Create a notification for the Owner about the update request
-      await createNotification({
+      const newNotifications = await createNotification({
         recipientRole: 'Owner',
         message: `${user.fullName} has requested a profile update.`,
         type: 'USER_ACTION',
         link: '/user-management'
       });
+      
+      if (newNotifications && newNotifications.length) {
+          newNotifications.forEach(notification => {
+              io.to(notification.user.toString()).emit('new_notification', notification);
+          });
+      }
 
       res.json({ message: 'Update request submitted successfully. Waiting for owner approval.' });
     }
@@ -170,7 +184,10 @@ const verifyOwnerUpdate = async (req, res) => {
       return res.status(400).json({ message: 'The verification code you entered is incorrect.' });
     }
     
-    Object.assign(user, user.pendingChanges);
+    if (user.pendingChanges.fullName) user.fullName = user.pendingChanges.fullName;
+    if (user.pendingChanges.username) user.username = user.pendingChanges.username;
+    if (user.pendingChanges.email) user.email = user.pendingChanges.email;
+    if (user.pendingChanges.password) user.password = user.pendingChanges.password;
 
     user.pendingChanges = undefined;
     user.hasPendingChanges = false;
@@ -187,62 +204,82 @@ const verifyOwnerUpdate = async (req, res) => {
 };
 
 const approveUserUpdate = async (req, res) => {
+  const io = req.app.get('socketio');
   try {
-    const user = await User.findById(req.params.id);
+    // --- FINAL FIX: Using req.params.id to match the route definition ---
+    const user = await User.findById(req.params.id); 
+    
     if (!user || !user.hasPendingChanges) {
-      return res.status(404).json({ message: 'No pending changes found for this user.' });
+      return res.status(400).json({ message: 'No pending changes found for this user.' });
     }
 
-    Object.assign(user, user.pendingChanges);
+    if (user.pendingChanges.fullName) user.fullName = user.pendingChanges.fullName;
+    if (user.pendingChanges.username) user.username = user.pendingChanges.username;
+    if (user.pendingChanges.email) user.email = user.pendingChanges.email;
+    if (user.pendingChanges.password) user.password = user.pendingChanges.password;
     
     user.pendingChanges = undefined;
     user.hasPendingChanges = false;
     
     const updatedUser = await user.save();
 
-    // ADDED: Create a notification for the specific user whose request was approved
-    await createNotification({
+    const newNotifications = await createNotification({
         recipientId: updatedUser._id,
         message: `Your profile update request has been approved.`,
         type: 'REQUEST_STATUS',
         link: '/settings'
     });
+    
+    if (newNotifications && newNotifications.length) {
+        newNotifications.forEach(notification => {
+            io.to(notification.user.toString()).emit('new_notification', notification);
+        });
+    }
 
     res.json({ message: 'User profile updated successfully.', user: updatedUser });
 
   } catch (error) {
-    res.status(400).json({ message: 'Error approving changes.', error: error.message });
+    res.status(500).json({ message: 'Error approving changes.', error: error.message });
   }
 };
 
 const rejectUserUpdate = async (req, res) => {
+    const io = req.app.get('socketio');
     try {
+        // --- FINAL FIX: Using req.params.id to match the route definition ---
         const user = await User.findById(req.params.id);
+
         if (!user || !user.hasPendingChanges) {
-            return res.status(404).json({ message: 'No pending changes found for this user.' });
+            return res.status(400).json({ message: 'No pending changes found for this user.' });
         }
 
-        user.pendingChanges = {};
+        user.pendingChanges = undefined;
         user.hasPendingChanges = false;
         
         await user.save();
         
-        // ADDED: Create a notification for the specific user whose request was rejected
-        await createNotification({
+        const newNotifications = await createNotification({
             recipientId: user._id,
             message: `Your profile update request was rejected.`,
             type: 'REQUEST_STATUS',
             link: '/settings'
         });
 
+        if (newNotifications && newNotifications.length) {
+            newNotifications.forEach(notification => {
+                io.to(notification.user.toString()).emit('new_notification', notification);
+            });
+        }
+
         logAction(req.user, 'REJECT_PROFILE_UPDATE', `Rejected profile changes for user ${user.username}.`);
         res.json({ message: 'Pending changes have been rejected.' });
 
     } catch (error) {
-        res.status(400).json({ message: 'Error rejecting changes.', error: error.message });
+        res.status(500).json({ message: 'Error rejecting changes.', error: error.message });
     }
 };
 
+// ... (getAllUsers, updateUser, deleteUser, generateToken functions are unchanged) ...
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({}).select('-password');
@@ -295,6 +332,7 @@ const generateToken = (id) => {
     expiresIn: '1d',
   });
 };
+
 
 module.exports = {
   registerUser,
