@@ -1,5 +1,5 @@
 // client/src/context/AuthContext.js
-import React, { createContext, useReducer, useEffect, useCallback, useContext } from 'react';
+import React, { createContext, useReducer, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { io } from 'socket.io-client';
 import { useWarning } from './WarningContext';
@@ -10,6 +10,7 @@ const initialState = {
   user: null,
   token: null,
   isInitializing: true,
+  mustChangePassword: false, // ADDED: To track if password change is needed
   lowStockItems: [],
   notifications: [],
 };
@@ -18,6 +19,7 @@ const AuthContext = createContext({
     ...initialState,
     login: () => Promise.resolve(),
     logout: () => {},
+    passwordChangeCompleted: () => {}, // ADDED
     markNotificationsAsRead: () => Promise.resolve(),
 });
 
@@ -39,6 +41,7 @@ const authReducer = (state, action) => {
         ...state,
         user: action.payload,
         token: action.payload.token,
+        mustChangePassword: action.payload.mustChangePassword, // MODIFIED: Set flag on login
       };
     case 'LOGOUT':
       return {
@@ -46,9 +49,15 @@ const authReducer = (state, action) => {
         user: null,
         token: null,
         isInitializing: false,
+        mustChangePassword: false, // Reset flag
         lowStockItems: [],
         notifications: [],
       };
+    case 'PASSWORD_CHANGED': // ADDED: New action to clear the flag
+        return {
+            ...state,
+            mustChangePassword: false,
+        };
     case 'SET_LOW_STOCK_ITEMS':
       return { ...state, lowStockItems: action.payload };
     case 'SET_NOTIFICATIONS':
@@ -119,7 +128,6 @@ export const AuthProvider = ({ children }) => {
         console.log('Real-time notification received:', notification);
         dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
         
-        // --- MODIFIED: Use a switch to show different toast colors ---
         switch (notification.type) {
           case 'LOW_STOCK':
             toast.warn(notification.message);
@@ -152,7 +160,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(res.data));
       api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
       dispatch({ type: 'LOGIN_SUCCESS', payload: res.data });
-      return { success: true };
+      // MODIFIED: Return success and the flag
+      return { success: true, mustChangePassword: !!res.data.mustChangePassword };
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Network error.';
       return { success: false, message: errorMessage };
@@ -163,6 +172,11 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
     delete api.defaults.headers.common['Authorization'];
     dispatch({ type: 'LOGOUT' });
+  };
+  
+  // ADDED: Function to call when password has been successfully changed
+  const passwordChangeCompleted = () => {
+    dispatch({ type: 'PASSWORD_CHANGED' });
   };
 
   const markNotificationsAsRead = async () => {
@@ -175,7 +189,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, markNotificationsAsRead }}>
+    <AuthContext.Provider value={{ ...state, login, logout, passwordChangeCompleted, markNotificationsAsRead }}>
       {children}
     </AuthContext.Provider>
   );

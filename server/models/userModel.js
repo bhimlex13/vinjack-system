@@ -20,6 +20,13 @@ const userSchema = new mongoose.Schema({
     default: 'Clerk'
   },
   status: { type: String, default: 'pending' },
+  
+  // ADDED: Flag to force password change on first login
+  mustChangePassword: {
+    type: Boolean,
+    default: false,
+  },
+
   emailSettings: {
     notificationsEnabled: { type: Boolean, default: true },
     notificationTime: { type: String, default: '08:00' }
@@ -36,7 +43,6 @@ const userSchema = new mongoose.Schema({
     password: { type: String }, 
   },
 
-  // ADDED: Fields for Owner's OTP verification
   verificationCode: {
     type: String,
   },
@@ -46,6 +52,7 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 userSchema.pre('save', async function(next) {
+  // Only hash the password if it has been modified and is not already a long hash
   if (this.isModified('password') && this.password.length < 50) {
       const salt = await bcrypt.genSalt(10);
       this.password = await bcrypt.hash(this.password, salt);
