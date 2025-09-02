@@ -1,22 +1,25 @@
 // client/src/pages/UserManagementPage.js
-import React, { useState, useEffect, useMemo, useContext } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
-// MODIFIED: We no longer need the token from context for these specific API calls
 import { approveUserUpdate, rejectUserUpdate } from '../api/userApi';
 import '../styles/UserManagementPage.css';
 import Modal from '../components/Modal';
 import EditUserModal from '../components/EditUserModal';
+// ADDED: Import new modals
+import CreateUserModal from '../components/CreateUserModal'; 
+import CredentialsDisplayModal from '../components/CredentialsDisplayModal';
 
 const UserManagementPage = () => {
-  // This component no longer needs the token directly for these actions
   const [users, setUsers] = useState([]);
-  // ... (the rest of the state declarations are unchanged) ...
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  // ADDED: State for the new user creation flow
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newCredentials, setNewCredentials] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -28,21 +31,29 @@ const UserManagementPage = () => {
       setUsers(response.data);
     } catch (error) {
       console.error("Failed to fetch users", error);
+      setError('Failed to fetch users.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const pendingRegistrations = useMemo(() => users.filter(u => u.status === 'pending'), [users]);
   const profileUpdateRequests = useMemo(() => users.filter(u => u.hasPendingChanges), [users]);
-  const managedUsers = useMemo(() => users.filter(u => u.status !== 'pending'), [users]);
+  // MODIFIED: managedUsers now filters 'Owner' role as well for display
+  const managedUsers = useMemo(() => users.filter(u => u.role !== 'Owner'), [users]);
+
+
+  // Handler for when user creation is successful
+  const handleUserCreated = (credentials) => {
+    setIsCreateModalOpen(false);
+    setNewCredentials(credentials); // This will trigger the credentials display modal
+    fetchUsers(); // Refresh the user list
+  };
 
   const handleApproveProfile = async (userId) => {
     try {
-      // MODIFIED: No longer passing the token
       await approveUserUpdate(userId);
       setMessage('Profile update approved successfully!');
-      fetchUsers(); // Re-fetch to update the UI
+      fetchUsers();
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Failed to approve profile update.';
       setError(errorMessage);
@@ -56,7 +67,6 @@ const UserManagementPage = () => {
 
   const handleRejectProfile = async (userId) => {
     try {
-      // MODIFIED: No longer passing the token
       await rejectUserUpdate(userId);
       setMessage('Profile update request rejected.');
       fetchUsers();
@@ -70,42 +80,7 @@ const UserManagementPage = () => {
       }, 5000);
     }
   };
-
-  // ... (The rest of the file is unchanged) ...
-  const handleApproveRegistration = async (userId) => {
-    try {
-      await api.put(`/users/${userId}`, { status: 'active' });
-      setMessage('User registration approved successfully.');
-      fetchUsers();
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Failed to approve user.';
-      setError(errorMessage);
-    } finally {
-      setTimeout(() => {
-        setMessage('');
-        setError('');
-      }, 5000);
-    }
-  };
-
-  const handleDelete = async (userId) => {
-    if (window.confirm('Are you sure you want to permanently delete this user?')) {
-      try {
-        await api.delete(`/users/${userId}`);
-        setMessage('User deleted successfully.');
-        setUsers(users.filter(user => user._id !== userId));
-      } catch (err) {
-        const errorMessage = err.response?.data?.message || 'Failed to delete user.';
-        setError(errorMessage);
-      } finally {
-        setTimeout(() => {
-          setMessage('');
-          setError('');
-        }, 5000);
-      }
-    }
-  };
-
+  
   const openEditModal = (user) => {
     setEditingUser(user);
     setIsEditModalOpen(true);
@@ -115,20 +90,35 @@ const UserManagementPage = () => {
 
   return (
     <div className="user-management-container">
+      {/* --- MODALS --- */}
       {isEditModalOpen && (
         <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit User">
           <EditUserModal 
             user={editingUser}
             onClose={() => setIsEditModalOpen(false)}
             onUserUpdate={fetchUsers}
-            onUserDelete={handleDelete}
           />
         </Modal>
       )}
 
+      {isCreateModalOpen && (
+        <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create New Employee">
+          <CreateUserModal 
+            onClose={() => setIsCreateModalOpen(false)}
+            onUserCreated={handleUserCreated}
+          />
+        </Modal>
+      )}
+
+      {newCredentials && (
+        <CredentialsDisplayModal
+          credentials={newCredentials}
+          onClose={() => setNewCredentials(null)}
+        />
+      )}
+
       {message && <p className="success-message">{message}</p>}
       {error && <p className="error-message">{error}</p>}
-
 
       <section className="user-section">
         <h2>Profile Update Requests</h2>
@@ -165,41 +155,15 @@ const UserManagementPage = () => {
         )}
       </section>
 
-      {/* Pending Registrations */}
-      <section className="user-section">
-        <h2>Pending Registrations</h2>
-        {pendingRegistrations.length > 0 ? (
-          <table className="user-table">
-            <thead>
-              <tr>
-                <th>Full Name</th>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingRegistrations.map(user => (
-                <tr key={user._id}>
-                  <td>{user.fullName}</td>
-                  <td>{user.username}</td>
-                  <td>{user.email}</td>
-                  <td className="actions">
-                    <button className="action-btn approve-btn" onClick={() => handleApproveRegistration(user._id)}>Approve</button>
-                    <button className="action-btn delete-btn" onClick={() => handleDelete(user._id)}>Deny</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p>No new user registrations to approve.</p>
-        )}
-      </section>
+      {/* REMOVED: Pending Registrations Section */}
 
-      {/* Active Users */}
       <section className="user-section">
-        <h2>Active & Archived Users</h2>
+        <div className="section-header">
+            <h2>Manage Employees</h2>
+            <button className="add-employee-btn" onClick={() => setIsCreateModalOpen(true)}>
+              + Add New Employee
+            </button>
+        </div>
         <table className="user-table">
           <thead>
             <tr>

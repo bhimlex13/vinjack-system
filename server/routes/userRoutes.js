@@ -2,8 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const { 
-    registerUser, 
+    createUserByAdmin, // MODIFIED
     loginUser, 
+    forceChangePassword, // ADDED
     getAllUsers, 
     updateUser, 
     deleteUser,
@@ -11,24 +12,25 @@ const {
     approveUserUpdate,
     rejectUserUpdate,
     getMe,
-    verifyOwnerUpdate // ADDED
+    verifyOwnerUpdate
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Public routes
-router.post('/register', registerUser);
+// router.post('/register', registerUser); // REMOVED
 router.post('/login', loginUser);
 
 // --- User's own profile routes ---
 router.get('/me', protect, getMe);
 router.put('/profile', protect, requestProfileUpdate);
-// ADDED: New route for the owner to verify their update
 router.post('/profile/verify', protect, verifyOwnerUpdate);
-
+router.put('/force-change-password', protect, forceChangePassword); // ADDED
 
 // --- Admin (Owner) routes ---
 router.route('/')
     .get(protect, authorize('Owner'), getAllUsers);
+
+router.post('/create', protect, authorize('Owner'), createUserByAdmin); // ADDED
 
 router.route('/:id')
     .put(protect, authorize('Owner'), updateUser) 

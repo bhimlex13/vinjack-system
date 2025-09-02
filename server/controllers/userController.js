@@ -6,42 +6,45 @@ const { sendVerificationEmail } = require('../utils/emailService');
 const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
 
-// ... (registerUser, loginUser, getMe functions are unchanged) ...
-const registerUser = async (req, res) => {
-  const io = req.app.get('socketio');
+// MODIFIED: This function replaces the public 'registerUser'
+const createUserByAdmin = async (req, res) => {
   try {
-    const { fullName, username, email, password } = req.body;
-    if (!fullName || !username || !email || !password) {
-      return res.status(400).json({ message: 'Please provide all required fields.' });
+    const { fullName, email, role } = req.body;
+    if (!fullName || !email || !role) {
+      return res.status(400).json({ message: 'Please provide Full Name, Email, and Role.' });
     }
-    const userExists = await User.findOne({ $or: [{ username }, { email }] });
+
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
+      return res.status(400).json({ message: 'Email is already in use.' });
+    }
+    
+    // Generate username from email, ensuring uniqueness
+    let username = email.split('@')[0];
+    const userExists = await User.findOne({ username });
     if (userExists) {
-      return res.status(400).json({ message: 'Username or email is already taken.' });
+      username = `${username}${crypto.randomBytes(2).toString('hex')}`; // Append random chars if username exists
     }
+
+    // Generate a secure temporary password
+    const temporaryPassword = crypto.randomBytes(8).toString('hex').slice(0, 10);
+
     const user = await User.create({
       fullName,
       username,
       email,
-      password,
-      role: 'Clerk',
-      status: 'pending'
+      password: temporaryPassword, // The 'pre-save' hook will hash this
+      role,
+      status: 'active', // User is active immediately
+      mustChangePassword: true, // Force password change on first login
     });
+
     if (user) {
-      const newNotifications = await createNotification({
-        recipientRole: 'Owner',
-        message: `${user.fullName} has registered and is awaiting approval.`,
-        type: 'USER_ACTION',
-        link: '/user-management'
-      });
-
-      if (newNotifications && newNotifications.length) {
-        newNotifications.forEach(notification => {
-            io.to(notification.user.toString()).emit('new_notification', notification);
-        });
-      }
-
+      logAction(req.user, 'CREATE_USER', `Created a new user account for ${user.fullName}.`);
       res.status(201).json({
-        message: 'Registration successful! Your account is pending admin approval.'
+        message: 'User created successfully. Please provide them with their credentials.',
+        generatedUsername: username,
+        temporaryPassword: temporaryPassword, // Return plain-text password to admin
       });
     } else {
       res.status(400).json({ message: 'Invalid user data.' });
@@ -64,6 +67,7 @@ const loginUser = async (req, res) => {
           return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
         }
         
+        // MODIFIED: Respond with all user data and the password change flag
         res.json({
           _id: user._id,
           fullName: user.fullName,
@@ -71,6 +75,7 @@ const loginUser = async (req, res) => {
           email: user.email,
           role: user.role,
           token: generateToken(user._id),
+          mustChangePassword: user.mustChangePassword || false, // Send the flag to the client
         });
       } else {
         res.status(401).json({ message: 'Invalid username or password.' });
@@ -82,6 +87,36 @@ const loginUser = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// ADDED: New controller for forcing password change
+const forceChangePassword = async (req, res) => {
+    try {
+        const { newPassword, confirmPassword } = req.body;
+        if (!newPassword || !confirmPassword) {
+            return res.status(400).json({ message: 'Please provide both new password fields.' });
+        }
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ message: 'Passwords do not match.' });
+        }
+
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        
+        user.password = newPassword; // The pre-save hook will hash it
+        user.mustChangePassword = false; // The flag is now cleared
+        await user.save();
+
+        logAction(req.user, 'FORCE_PASSWORD_CHANGE', `User successfully changed their temporary password.`);
+        res.json({ message: 'Password has been updated successfully. You can now access the system.' });
+        
+    } catch (error) {
+        res.status(500).json({ message: 'Server error while updating password.', error: error.message });
+    }
+};
+
 
 const getMe = async (req, res) => {
   try {
@@ -335,8 +370,9 @@ const generateToken = (id) => {
 
 
 module.exports = {
-  registerUser,
+  createUserByAdmin, 
   loginUser,
+  forceChangePassword, 
   getMe,
   getAllUsers,
   updateUser,
