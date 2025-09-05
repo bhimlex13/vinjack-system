@@ -1,8 +1,21 @@
 // client/src/pages/RegistrationPage.js
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
-import '../styles/RegistrationPage.css';
+
+// MUI Imports
+import {
+  Box,
+  Button,
+  Container,
+  TextField,
+  Typography,
+  Paper,
+  Link,
+  CircularProgress,
+  Alert,
+  Stack
+} from '@mui/material';
 
 const RegistrationPage = () => {
   const [formData, setFormData] = useState({
@@ -55,54 +68,108 @@ const RegistrationPage = () => {
   };
 
   return (
-    <div className="registration-container">
-      <div className="registration-form-area">
-        <form className="registration-form" onSubmit={handleSubmit}>
-          <h2>Create an Account</h2>
+    <Container component="main" maxWidth="sm" sx={{ display: 'flex', alignItems: 'center', minHeight: '100vh' }}>
+      <Paper elevation={6} sx={{ p: 4, width: '100%' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <Typography component="h1" variant="h5">
+            Create an Account
+          </Typography>
           
-          {/* If registration is successful, show the success message */}
-          {successMessage ? (
-            <div className="success-message-box">
-              <p>{successMessage}</p>
-              <Link to="/login" className="back-to-login">Back to Login</Link>
-            </div>
-          ) : (
-            <>
-              <div className="input-group">
-                <label htmlFor="fullName">Full Name</label>
-                <input id="fullName" name="fullName" type="text" onChange={handleChange} required />
-              </div>
-              <div className="input-group">
-                <label htmlFor="username">Username</label>
-                <input id="username" name="username" type="text" onChange={handleChange} required />
-              </div>
-              <div className="input-group">
-                <label htmlFor="email">Email Address</label>
-                <input id="email" name="email" type="email" onChange={handleChange} required />
-              </div>
-              <div className="input-group">
-                <label htmlFor="password">Password</label>
-                <input id="password" name="password" type="password" onChange={handleChange} required />
-              </div>
-              <div className="input-group">
-                <label htmlFor="confirmPassword">Confirm Password</label>
-                <input id="confirmPassword" name="confirmPassword" type="password" onChange={handleChange} required />
-              </div>
-              
-              <button type="submit" className="register-button" disabled={isLoading}>
-                {isLoading ? 'Registering...' : 'Register'}
-              </button>
-              
-              {error && <p className="error-message">{error}</p>}
-            </>
-          )}
+          <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 3, width: '100%' }}>
+            {successMessage ? (
+              <Alert severity="success" action={
+                <Button component={RouterLink} to="/login" color="inherit" size="small">
+                  Login
+                </Button>
+              }>
+                {successMessage}
+              </Alert>
+            ) : (
+              <Stack spacing={2}>
+                <TextField
+                  required
+                  fullWidth
+                  id="fullName"
+                  label="Full Name"
+                  name="fullName"
+                  autoComplete="name"
+                  onChange={handleChange}
+                />
+                <TextField
+                  required
+                  fullWidth
+                  id="username"
+                  label="Username"
+                  name="username"
+                  autoComplete="username"
+                  onChange={handleChange}
+                />
+                <TextField
+                  required
+                  fullWidth
+                  id="email"
+                  label="Email Address"
+                  name="email"
+                  autoComplete="email"
+                  onChange={handleChange}
+                />
+                <TextField
+                  required
+                  fullWidth
+                  name="password"
+                  label="Password"
+                  type="password"
+                  id="password"
+                  autoComplete="new-password"
+                  onChange={handleChange}
+                />
+                <TextField
+                  required
+                  fullWidth
+                  name="confirmPassword"
+                  label="Confirm Password"
+                  type="password"
+                  id="confirmPassword"
+                  autoComplete="new-password"
+                  onChange={handleChange}
+                  error={!!error && error.includes("Passwords")}
+                />
+                
+                {error && (
+                  <Typography color="error" variant="body2" align="center">
+                    {error}
+                  </Typography>
+                )}
 
-          <p className="login-link">
-            Already have an account? <Link to="/login">Sign In</Link>
-          </p>
-        </form>
-      </div>
-    </div>
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  color="primary"
+                  disabled={isLoading}
+                  sx={{ py: 1.5 }}
+                >
+                  {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Register'}
+                </Button>
+              </Stack>
+            )}
+
+            <Typography variant="body2" align="center" sx={{ mt: 3 }}>
+              Already have an account?{' '}
+              <Link component={RouterLink} to="/login" variant="body2">
+                Sign In
+              </Link>
+            </Typography>
+          </Box>
+        </Box>
+      </Paper>
+    </Container>
   );
 };
 

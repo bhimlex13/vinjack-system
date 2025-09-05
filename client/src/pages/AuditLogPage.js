@@ -1,7 +1,21 @@
 // client/src/pages/AuditLogPage.js
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import '../styles/AuditLogPage.css';
+
+// MUI Imports
+import {
+  Box,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  CircularProgress
+} from '@mui/material';
 
 const AuditLogPage = () => {
   const [logs, setLogs] = useState([]);
@@ -21,33 +35,53 @@ const AuditLogPage = () => {
     fetchLogs();
   }, []);
 
-  if (isLoading) return <div className="loading">Loading logs...</div>;
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
-    <div className="audit-log-container">
-      <h1>Audit Log</h1>
-      <p>A record of all important actions performed by users.</p>
-      <table className="log-table">
-        <thead>
-          <tr>
-            <th>Timestamp</th>
-            <th>User</th>
-            <th>Action</th>
-            <th>Details</th>
-          </tr>
-        </thead>
-        <tbody>
-          {logs.map(log => (
-            <tr key={log._id}>
-              <td>{new Date(log.createdAt).toLocaleString()}</td>
-              <td>{log.user?.fullName || 'N/A'}</td>
-              <td><span className="action-tag">{log.action.replace('_', ' ')}</span></td>
-              <td>{log.details}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
+        Audit Log
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        A record of all important actions performed by users.
+      </Typography>
+      
+      <TableContainer component={Paper}>
+        <Table sx={{ minWidth: 650 }} aria-label="audit log table">
+          <TableHead sx={{ backgroundColor: 'action.hover' }}>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold' }}>Timestamp</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>User</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Details</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {logs.map(log => (
+              <TableRow
+                key={log._id}
+                sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+              >
+                <TableCell component="th" scope="row">
+                  {new Date(log.createdAt).toLocaleString()}
+                </TableCell>
+                <TableCell>{log.user?.fullName || 'N/A'}</TableCell>
+                <TableCell>
+                  <Chip label={log.action.replace('_', ' ')} size="small" />
+                </TableCell>
+                <TableCell>{log.details}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
   );
 };
 

@@ -2,9 +2,37 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
-import '../styles/SalesPage.css';
 import ReceiptModal from '../components/ReceiptModal';
 import ConfirmationContext from '../context/ConfirmationContext';
+
+// MUI Imports
+import {
+  Box,
+  Grid,
+  Paper,
+  TextField,
+  InputAdornment,
+  Typography,
+  Card,
+  CardActionArea,
+  CardMedia,
+  CardContent,
+  ToggleButtonGroup,
+  ToggleButton,
+  List,
+  ListItem,
+  ListItemText,
+  IconButton,
+  Divider,
+  Button,
+  Chip
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+
 
 const SalesPage = () => {
   const [products, setProducts] = useState([]);
@@ -23,9 +51,11 @@ const SalesPage = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const productsRes = await api.get('/products');
-        const categoriesRes = await api.get('/categories');
-        const brandsRes = await api.get('/brands');
+        const [productsRes, categoriesRes, brandsRes] = await Promise.all([
+          api.get('/products'),
+          api.get('/categories'),
+          api.get('/brands'),
+        ]);
         setProducts(productsRes.data);
         setCategories(categoriesRes.data);
         setBrands(brandsRes.data);
@@ -36,37 +66,24 @@ const SalesPage = () => {
     fetchInitialData();
   }, []);
 
-  // --- REWRITTEN: More robust cart logic ---
   const addProductToCart = (product) => {
-    // First, check if the product is available in the main list
     const productInState = products.find(p => p._id === product._id);
-    if (!productInState || productInState.quantity <= 0) {
-      return; // Do nothing if product is out of stock in the main list
-    }
+    if (!productInState || productInState.quantity <= 0) return;
 
-    // Use functional update to avoid race conditions
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item._id === product._id);
-
       if (existingItem) {
-        // If item exists in cart, increment its quantity if stock allows
         if (existingItem.cartQuantity < existingItem.stock) {
           return prevCart.map(item =>
-            item._id === product._id
-              ? { ...item, cartQuantity: item.cartQuantity + 1 }
-              : item
+            item._id === product._id ? { ...item, cartQuantity: item.cartQuantity + 1 } : item
           );
         }
-        // If stock is maxed, return the cart as is
         return prevCart;
       } else {
-        // If item is not in cart, add it with a quantity of 1
-        // The `stock` property tracks the original quantity available
         return [...prevCart, { ...product, cartQuantity: 1, stock: product.quantity }];
       }
     });
 
-    // Decrement the quantity in the visual product list
     setProducts(prevProducts =>
       prevProducts.map(p =>
         p._id === product._id ? { ...p, quantity: p.quantity - 1 } : p
@@ -74,70 +91,55 @@ const SalesPage = () => {
     );
   };
 
-  // --- REWRITTEN: More robust quantity update logic ---
   const updateQuantity = (product, amount) => {
-    // Use functional update for cart to ensure accuracy
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item._id === product._id);
-      if (!existingItem) return prevCart; // Should not happen, but safe check
+      if (!existingItem) return prevCart;
 
       const newQuantity = existingItem.cartQuantity + amount;
 
       if (newQuantity <= 0) {
-        // Remove item from cart if quantity is 0 or less
+        // Find the original stock from the cart item and add it back to the product list
+        const productInList = products.find(p => p._id === product._id);
+        if (productInList) {
+          setProducts(prevProducts =>
+            prevProducts.map(p =>
+              p._id === product._id ? { ...p, quantity: p.quantity + existingItem.cartQuantity } : p
+            )
+          );
+        }
         return prevCart.filter(item => item._id !== product._id);
       }
 
       if (newQuantity <= existingItem.stock) {
-        // Update quantity if within available stock
+        setProducts(prevProducts =>
+          prevProducts.map(p =>
+            p._id === product._id ? { ...p, quantity: p.quantity - amount } : p
+          )
+        );
         return prevCart.map(item =>
           item._id === product._id ? { ...item, cartQuantity: newQuantity } : item
         );
       }
-      
-      // If requested quantity exceeds stock, do not change the cart
       return prevCart;
     });
-
-    // Use functional update for products to sync visual stock counter
-    setProducts(prevProducts => 
-      prevProducts.map(p => {
-        if (p._id === product._id) {
-          // Check against cart state to prevent visual stock from becoming incorrect
-          const cartItem = cartItems.find(item => item._id === product._id);
-          const newCartQuantity = cartItem ? cartItem.cartQuantity + amount : 0;
-          if (newCartQuantity > p.stock) return p; // prevent going over stock
-
-          return { ...p, quantity: p.quantity - amount };
-        }
-        return p;
-      })
-    );
   };
 
-  const calculateTotal = () => {
+  const calculateTotal = useMemo(() => {
     return cartItems.reduce((total, item) => total + item.price * item.cartQuantity, 0);
-  };
-  
-  const handleCompleteSale = async () => {
-    if (cartItems.length === 0) {
-      alert("Cart is empty.");
-      return;
-    }
+  }, [cartItems]);
 
-    const total = calculateTotal();
-    const isConfirmed = await confirm(`Complete sale for a total of ₱${total.toFixed(2)}? This action cannot be undone.`);
+  const handleCompleteSale = async () => {
+    if (cartItems.length === 0) return;
+
+    const isConfirmed = await confirm(`Complete sale for a total of ₱${calculateTotal.toFixed(2)}? This action cannot be undone.`);
 
     if (isConfirmed) {
       const saleData = {
         items: cartItems.map(item => ({
-          product: item._id,
-          quantity: item.cartQuantity,
-          priceAtTime: item.price,
-          costAtTime: item.cost
+          product: item._id, quantity: item.cartQuantity, priceAtTime: item.price, costAtTime: item.cost
         })),
-        services: [],
-        totalAmount: total,
+        totalAmount: calculateTotal,
         recordedBy: user._id,
       };
       
@@ -146,18 +148,16 @@ const SalesPage = () => {
         setLastSaleData(response.data);
         setShowReceiptModal(true);
         setCartItems([]);
-        // Refetch products to ensure stock is 100% accurate from the server
         const productsResponse = await api.get('/products');
         setProducts(productsResponse.data);
       } catch (error) {
         alert(`Sale failed: ${error.response?.data?.message || error.message}`);
-        // If sale fails, refetch products to revert optimistic updates
         const productsResponse = await api.get('/products');
         setProducts(productsResponse.data);
       }
     }
   };
-  
+
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
         const searchMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -167,88 +167,120 @@ const SalesPage = () => {
     });
   }, [products, searchTerm, selectedBrand, selectedCategory]);
 
-  return (
-    <div className="pos-container">
-      {/* (The JSX for this component remains the same) */}
-      <div className="product-selection">
-        <input
-          type="text"
-          placeholder="Search for products..."
-          className="search-bar"
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <div className="filter-container">
-            <button onClick={() => setSelectedBrand(null)} className={!selectedBrand ? 'active' : ''}>All Brands</button>
-            {brands.map(brand => (
-                <button key={brand._id} onClick={() => setSelectedBrand(brand._id)} className={selectedBrand === brand._id ? 'active' : ''}>
-                    {brand.name}
-                </button>
-            ))}
-        </div>
-        <div className="filter-container">
-            <button onClick={() => setSelectedCategory(null)} className={!selectedCategory ? 'active' : ''}>All Categories</button>
-            {categories.map(cat => (
-                <button key={cat._id} onClick={() => setSelectedCategory(cat._id)} className={selectedCategory === cat._id ? 'active' : ''}>
-                    {cat.name}
-                </button>
-            ))}
-        </div>
-        
-        <div className="product-grid">
-          {filteredProducts.map(product => (
-            <div key={product._id} className={`product-card ${product.quantity === 0 ? 'out-of-stock' : ''}`} onClick={() => addProductToCart(product)}>
-              <div className="card-image-container">
-                <img 
-                  src={product.image || 'https://placehold.co/300x200/e2e8f0/e2e8f0?text=No+Image'} 
-                  alt={product.name}
-                  onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/300x200/e2e8f0/e2e8f0?text=No+Image'; }}
-                />
-                {product.quantity === 0 && <div className="stock-overlay">Out of Stock</div>}
-              </div>
-              <div className="product-card-info">
-                <span className="product-name">{product.name}</span>
-                <span 
-                  className={`
-                    product-stock 
-                    ${product.quantity === 0 ? 'stock-out' : ''}
-                    ${(product.quantity > 0 && product.reorderLevel && product.quantity <= product.reorderLevel) ? 'stock-low' : ''}
-                  `}
-                >
-                  {product.quantity} in stock
-                </span>
-                <span className="product-price">₱{product.price.toFixed(2)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+  const handleFilterChange = (setter) => (event, newValue) => {
+    setter(newValue);
+  };
 
-      <div className="current-sale">
-        <h2>Current Sale</h2>
-        <div className="cart-items">
-          {cartItems.length === 0 && <p className="empty-cart">Cart is empty</p>}
-          {cartItems.map(item => (
-            <div key={item._id} className="cart-item">
-              <div className="item-info">
-                <span className="item-name">{item.name}</span>
-                <span className="item-price">₱{(item.price * item.cartQuantity).toFixed(2)}</span>
-              </div>
-              <div className="item-controls">
-                <button onClick={() => updateQuantity(item, -1)}>-</button>
-                <span>{item.cartQuantity}</span>
-                <button onClick={() => updateQuantity(item, 1)}>+</button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="sale-summary">
-          <div className="total">
-            <span>Total</span>
-            <span>₱{calculateTotal().toFixed(2)}</span>
-          </div>
-          <button className="complete-sale-btn" onClick={handleCompleteSale}>Complete Sale</button>
-        </div>
-      </div>
+  return (
+    <Box sx={{ p: 2, height: 'calc(100vh - 80px)' }}>
+      <Grid container spacing={2} sx={{ height: '100%' }}>
+        
+        {/* Left Column: Product Selection */}
+        <Grid item xs={12} md={7} lg={8} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+            <TextField
+              fullWidth
+              label="Search Products"
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
+              sx={{ mb: 2 }}
+            />
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="caption" color="text.secondary">Categories</Typography>
+              <ToggleButtonGroup value={selectedCategory} exclusive onChange={handleFilterChange(setSelectedCategory)} size="small" fullWidth>
+                <ToggleButton value={null}>All</ToggleButton>
+                {categories.map(cat => <ToggleButton key={cat._id} value={cat._id}>{cat.name}</ToggleButton>)}
+              </ToggleButtonGroup>
+            </Box>
+            <Box sx={{ mb: 2 }}>
+                <Typography variant="caption" color="text.secondary">Brands</Typography>
+                <ToggleButtonGroup value={selectedBrand} exclusive onChange={handleFilterChange(setSelectedBrand)} size="small" fullWidth>
+                    <ToggleButton value={null}>All</ToggleButton>
+                    {brands.map(brand => <ToggleButton key={brand._id} value={brand._id}>{brand.name}</ToggleButton>)}
+                </ToggleButtonGroup>
+            </Box>
+            <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+              <Grid container spacing={2}>
+                {filteredProducts.map(product => (
+                  <Grid item key={product._id} xs={6} sm={4} md={4} lg={3}>
+                    <Card sx={{ height: '100%', position: 'relative' }}>
+                      <CardActionArea onClick={() => addProductToCart(product)} disabled={product.quantity === 0}>
+                        <CardMedia
+                          component="img"
+                          height="100"
+                          image={product.image || 'https://placehold.co/300x200'}
+                          alt={product.name}
+                          sx={{ objectFit: 'cover' }}
+                        />
+                        {product.quantity === 0 && (
+                          <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100px', backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Typography variant="button" color="error">Out of Stock</Typography>
+                          </Box>
+                        )}
+                        <CardContent sx={{ p: 1 }}>
+                          <Typography gutterBottom variant="body2" component="div" sx={{ fontWeight: 'bold', height: '40px', overflow: 'hidden' }}>{product.name}</Typography>
+                          <Typography variant="body2" color="text.secondary">Stock: {product.quantity}</Typography>
+                          <Typography variant="h6" color="primary.main">₱{product.price.toFixed(2)}</Typography>
+                        </CardContent>
+                      </CardActionArea>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          </Paper>
+        </Grid>
+
+        {/* Right Column: Current Sale */}
+        <Grid item xs={12} md={5} lg={4} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+            <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale</Typography>
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 2 }}>
+              {cartItems.length === 0 ? (
+                <Typography color="text.secondary" align="center" sx={{ mt: 4 }}>Cart is empty</Typography>
+              ) : (
+                <List>
+                  {cartItems.map(item => (
+                    <ListItem key={item._id} disablePadding secondaryAction={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <IconButton size="small" onClick={() => updateQuantity(item, -1)}><RemoveIcon fontSize="small"/></IconButton>
+                        <Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography>
+                        <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton>
+                      </Box>
+                    }>
+                      <ListItemText 
+                        primary={item.name} 
+                        secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`} 
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Box>
+            <Divider sx={{ my: 1 }} />
+            <Box sx={{ mt: 'auto' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Total</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>₱{calculateTotal.toFixed(2)}</Typography>
+              </Box>
+              <Button 
+                variant="contained" 
+                color="success" 
+                fullWidth 
+                size="large"
+                startIcon={<PointOfSaleIcon />}
+                onClick={handleCompleteSale}
+                disabled={cartItems.length === 0}
+              >
+                Complete Sale
+              </Button>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
 
       {showReceiptModal && lastSaleData && (
         <ReceiptModal 
@@ -256,7 +288,7 @@ const SalesPage = () => {
           onClose={() => setShowReceiptModal(false)}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

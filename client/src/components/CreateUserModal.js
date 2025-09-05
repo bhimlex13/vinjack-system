@@ -1,7 +1,13 @@
 // client/src/components/CreateUserModal.js
 import React, { useState } from 'react';
 import { createUser } from '../api/userApi';
-import '../styles/Form.css';
+
+// MUI Imports
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, TextField, FormControl, InputLabel, Select, MenuItem,
+  Alert, CircularProgress, Box
+} from '@mui/material';
 
 const CreateUserModal = ({ onClose, onUserCreated }) => {
   const [formData, setFormData] = useState({
@@ -35,53 +41,65 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="form-container">
-      {error && <p className="error-message">{error}</p>}
-      <div className="form-group">
-        <label htmlFor="fullName">Full Name</label>
-        <input
-          type="text"
-          id="fullName"
-          name="fullName"
-          value={formData.fullName}
-          onChange={handleChange}
-          required
-        />
-      </div>
-      <div className="form-group">
-        <label htmlFor="email">Email Address</label>
-        <input
-          type="email"
-          id="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          required
-        />
-      </div>
-      <div className="form-group">
-        <label htmlFor="role">Role</label>
-        <select
-          id="role"
-          name="role"
-          value={formData.role}
-          onChange={handleChange}
-          required
+    <Dialog open={true} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Create New User</DialogTitle>
+      <DialogContent>
+        <Box component="form" id="create-user-form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <TextField
+            autoFocus
+            required
+            margin="dense"
+            id="fullName"
+            name="fullName"
+            label="Full Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={formData.fullName}
+            onChange={handleChange}
+          />
+          <TextField
+            required
+            margin="dense"
+            id="email"
+            name="email"
+            label="Email Address"
+            type="email"
+            fullWidth
+            variant="outlined"
+            value={formData.email}
+            onChange={handleChange}
+          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel id="role-select-label">Role</InputLabel>
+            <Select
+              labelId="role-select-label"
+              id="role"
+              name="role"
+              value={formData.role}
+              label="Role"
+              onChange={handleChange}
+            >
+              <MenuItem value="Clerk">Clerk</MenuItem>
+              <MenuItem value="Mechanic">Mechanic</MenuItem>
+              {/* Owner role is not assignable here */}
+            </Select>
+          </FormControl>
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button 
+          type="submit" 
+          form="create-user-form" 
+          variant="contained" 
+          disabled={isLoading}
         >
-          <option value="Clerk">Clerk</option>
-          <option value="Mechanic">Mechanic</option>
-          {/* Owner role should not be assignable here */}
-        </select>
-      </div>
-      <div className="form-actions">
-        <button type="button" className="btn btn-secondary" onClick={onClose}>
-          Cancel
-        </button>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create User'}
-        </button>
-      </div>
-    </form>
+          {isLoading ? <CircularProgress size={24} /> : 'Create User'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 

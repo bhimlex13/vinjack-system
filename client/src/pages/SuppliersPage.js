@@ -1,10 +1,23 @@
 // client/src/pages/SuppliersPage.js
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import '../styles/InventoryPage.css';
-import Modal from '../components/Modal';
 import SupplierForm from '../components/SupplierForm';
-import RecordDeliveryForm from '../components/RecordDeliveryForm'; 
+import RecordDeliveryForm from '../components/RecordDeliveryForm';
+
+// MUI Imports
+import { 
+  Box, 
+  Button, 
+  Typography, 
+  Paper, 
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent
+} from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
+import AddIcon from '@mui/icons-material/Add';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 
 const SuppliersPage = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -18,6 +31,7 @@ const SuppliersPage = () => {
   }, []);
 
   const fetchSuppliers = async () => {
+    setIsLoading(true);
     try {
       const response = await api.get('/suppliers');
       setSuppliers(response.data);
@@ -28,12 +42,8 @@ const SuppliersPage = () => {
     }
   };
 
-  const handleFormSubmit = (newSupplierData) => {
-    if (editingSupplier) {
-      setSuppliers(suppliers.map(s => s._id === newSupplierData._id ? newSupplierData : s));
-    } else {
-      setSuppliers([...suppliers, newSupplierData]);
-    }
+  const handleFormSubmit = () => {
+    fetchSuppliers(); // Refetch all suppliers to ensure data is fresh
   };
 
   const openSupplierModalForAdd = () => {
@@ -47,90 +57,93 @@ const SuppliersPage = () => {
   };
 
   const handleDelete = async (supplierId) => {
+    // A confirmation context/modal would be better than window.confirm
     if (window.confirm('Are you sure you want to delete this supplier?')) {
       try {
         await api.delete(`/suppliers/${supplierId}`);
-        setSuppliers(suppliers.filter(s => s._id !== supplierId));
+        fetchSuppliers(); // Refetch to update the list
       } catch (err) {
         console.error('Failed to delete supplier', err);
       }
     }
   };
 
-  if (isLoading) return <div className="loading">Loading suppliers...</div>;
+  const columns = [
+    { field: 'name', headerName: 'Supplier Name', flex: 1 },
+    { field: 'contactPerson', headerName: 'Contact Person', flex: 1, valueGetter: (params) => params.value || 'N/A' },
+    { field: 'contactNumber', headerName: 'Contact Number', flex: 1, valueGetter: (params) => params.value || 'N/A' },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 200,
+      sortable: false,
+      renderCell: (params) => (
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" size="small" onClick={() => openSupplierModalForEdit(params.row)}>Edit</Button>
+          <Button variant="outlined" size="small" color="error" onClick={() => handleDelete(params.row._id)}>Delete</Button>
+        </Stack>
+      )
+    }
+  ];
 
   return (
-    <div className="inventory-container">
-      {/* Modal for adding/editing a supplier */}
-      <Modal 
-        isOpen={isSupplierModalOpen} 
+    <>
+      {/* Dialog for adding/editing a supplier */}
+      <Dialog 
+        open={isSupplierModalOpen} 
         onClose={() => setIsSupplierModalOpen(false)} 
-        title={editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
+        fullWidth
+        maxWidth="sm"
       >
+        <DialogTitle>{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</DialogTitle>
         <SupplierForm
           onFormSubmit={handleFormSubmit}
           supplierToEdit={editingSupplier}
           onClose={() => setIsSupplierModalOpen(false)}
         />
-      </Modal>
+      </Dialog>
 
-      {/* New Modal for recording a delivery */}
-      <Modal
-        isOpen={isDeliveryModalOpen}
+      {/* Dialog for recording a delivery */}
+      <Dialog
+        open={isDeliveryModalOpen}
         onClose={() => setIsDeliveryModalOpen(false)}
-        title="Record New Delivery"
+        fullWidth
+        maxWidth="md"
       >
-        <RecordDeliveryForm onClose={() => setIsDeliveryModalOpen(false)} />
-      </Modal>
+        <DialogTitle>Record New Delivery</DialogTitle>
+        <DialogContent>
+          <RecordDeliveryForm onClose={() => setIsDeliveryModalOpen(false)} />
+        </DialogContent>
+      </Dialog>
 
-      <div className="inventory-header">
-        <h1>Supplier Management</h1>
-        <div>
-          <button className="add-product-btn" onClick={openSupplierModalForAdd} style={{ marginRight: '1rem' }}>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          Supplier Management
+        </Typography>
+        <Stack direction="row" spacing={2}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openSupplierModalForAdd}>
             Add Supplier
-          </button>
-          <button 
-            className="add-product-btn" 
-            onClick={() => setIsDeliveryModalOpen(true)} // <-- This opens the delivery modal
-            style={{ backgroundColor: '#28a745' }}
+          </Button>
+          <Button 
+            variant="contained" 
+            color="success"
+            startIcon={<LocalShippingIcon />}
+            onClick={() => setIsDeliveryModalOpen(true)}
           >
             Record Delivery
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Box>
 
-      <table className="products-table">
-        <thead>
-          <tr>
-            <th>Supplier Name</th>
-            <th>Contact Person</th>
-            <th>Contact Number</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {suppliers.length > 0 ? (
-            suppliers.map((supplier) => (
-              <tr key={supplier._id}>
-                <td>{supplier.name}</td>
-                <td>{supplier.contactPerson || 'N/A'}</td>
-                <td>{supplier.contactNumber || 'N/A'}</td>
-                <td className="actions">
-                  <button className="btn-edit" onClick={() => openSupplierModalForEdit(supplier)}>Edit</button>
-                  <button className="btn-delete" onClick={() => handleDelete(supplier._id)}>Delete</button>
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="4" className="no-products">
-                No suppliers found. Add one to get started.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+      <Paper sx={{ height: '75vh', width: '100%' }}>
+        <DataGrid
+          rows={suppliers}
+          columns={columns}
+          loading={isLoading}
+          getRowId={(row) => row._id}
+        />
+      </Paper>
+    </>
   );
 };
 
