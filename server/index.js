@@ -5,6 +5,7 @@ const cors = require('cors');
 const connectDB = require('./config/db');
 const startLowStockCheck = require('./jobs/cronJobs');
 
+
 // --- ADDED: Imports for Socket.IO ---
 const http = require('http');
 const { Server } = require("socket.io");
@@ -77,6 +78,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/movements', movementRoutes);
 app.use('/api/app-settings', appSettingsRoutes);
 app.use('/api/notifications', notificationRoutes);
+
 
 // Start the scheduled jobs
 startLowStockCheck();

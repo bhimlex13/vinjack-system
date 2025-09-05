@@ -7,7 +7,12 @@ const { createNotification } = require('../utils/notificationManager');
 
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.find({}).populate('category').populate('brand');
+    // UPDATED QUERY: Explicitly select all fields AND populate them
+    const products = await Product.find({})
+      .select('itemCode name category brand cost price quantity reorderLevel image')
+      .populate('category', 'name') // Populate category and only get its 'name'
+      .populate('brand', 'name');    // Populate brand and only get its 'name'
+      
     res.status(200).json(products);
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
