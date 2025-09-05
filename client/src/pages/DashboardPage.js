@@ -1,24 +1,59 @@
 // client/src/pages/DashboardPage.js
 import React, { useEffect, useState } from 'react';
 import api from '../api/axios';
-import '../styles/DashboardPage.css';
 import { Bar } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
+// MUI Imports
+import {
+  Box,
+  Grid,
+  Paper,
+  Typography,
+  ToggleButton,
+  ToggleButtonGroup,
+  CircularProgress,
+  Container
+} from '@mui/material';
+import { FaMoneyBillWave, FaShoppingCart, FaBoxOpen, FaWarehouse } from 'react-icons/fa';
+
+
 Chart.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+
+// Helper component for Stat Cards
+const StatCard = ({ title, value, icon, color }) => (
+  <Paper 
+    elevation={3} 
+    sx={{ 
+      p: 2.5, 
+      display: 'flex', 
+      alignItems: 'center', 
+      borderLeft: 5, 
+      borderColor: `${color}.main` 
+    }}
+  >
+    <Box sx={{ color: `${color}.main`, fontSize: '3rem', mr: 2 }}>{icon}</Box>
+    <Box>
+      <Typography color="textSecondary" variant="subtitle1" gutterBottom>
+        {title}
+      </Typography>
+      <Typography variant="h4" component="p" sx={{ fontWeight: 'bold' }}>
+        {value}
+      </Typography>
+    </Box>
+  </Paper>
+);
+
 
 const DashboardPage = () => {
   const [summary, setSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  // NEW: State to manage the selected time range filter
   const [timeRange, setTimeRange] = useState('all');
 
-  // MODIFIED: useEffect now depends on timeRange to refetch data
   useEffect(() => {
     const fetchSummary = async () => {
       setIsLoading(true);
       try {
-        // Pass the selected timeRange as a query parameter to the API
         const response = await api.get(`/reports/summary?range=${timeRange}`);
         setSummary(response.data);
       } catch (error) {
@@ -29,6 +64,12 @@ const DashboardPage = () => {
     };
     fetchSummary();
   }, [timeRange]);
+
+  const handleTimeRangeChange = (event, newTimeRange) => {
+    if (newTimeRange !== null) {
+      setTimeRange(newTimeRange);
+    }
+  };
 
   const chartData = {
     labels: summary?.topSellingProducts.map(p => p.productInfo.name) || [],
@@ -45,62 +86,67 @@ const DashboardPage = () => {
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: { position: 'top' },
-      title: { display: true, text: `Top 5 Selling Products (${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)})` },
+      title: { display: true, text: `Top 5 Selling Products`, font: { size: 18 } },
     },
     scales: { y: { beginAtZero: true } }
   };
-
-  const renderContent = () => {
-    if (isLoading) {
-      return <div className="loading">Loading dashboard...</div>;
-    }
+  
+  if (isLoading) {
     return (
-      <>
-        <div className="stats-cards">
-          <div className="stat-card">
-            <h3>Total Revenue</h3>
-            <p>₱{summary?.totalRevenue.toFixed(2) || '0.00'}</p>
-          </div>
-          <div className="stat-card">
-            <h3>Total Sales</h3>
-            <p>{summary?.totalSales || 0}</p>
-          </div>
-          <div className="stat-card">
-            <h3>Product Varieties</h3>
-            <p>{summary?.totalProducts || 0}</p>
-          </div>
-          <div className="stat-card">
-            <h3>Total Units in Stock</h3>
-            <p>{summary?.totalStock || 0}</p>
-          </div>
-        </div>
-        <div className="chart-container">
-          {summary?.topSellingProducts && summary.topSellingProducts.length > 0 ? (
-              <Bar options={chartOptions} data={chartData} />
-          ) : (
-              <p>No sales data available for the selected period.</p>
-          )}
-        </div>
-      </>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress />
+      </Box>
     );
-  };
+  }
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h1>Dashboard</h1>
-        {/* NEW: Filter buttons */}
-        <div className="dashboard-filters">
-          <button className={`filter-btn ${timeRange === 'all' ? 'active' : ''}`} onClick={() => setTimeRange('all')}>All Time</button>
-          <button className={`filter-btn ${timeRange === 'month' ? 'active' : ''}`} onClick={() => setTimeRange('month')}>This Month</button>
-          <button className={`filter-btn ${timeRange === 'week' ? 'active' : ''}`} onClick={() => setTimeRange('week')}>This Week</button>
-          <button className={`filter-btn ${timeRange === 'today' ? 'active' : ''}`} onClick={() => setTimeRange('today')}>Today</button>
-        </div>
-      </div>
-      {renderContent()}
-    </div>
+    <Container maxWidth={false} sx={{ mt: 4, mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          Dashboard
+        </Typography>
+        <ToggleButtonGroup
+          color="primary"
+          value={timeRange}
+          exclusive
+          onChange={handleTimeRangeChange}
+          aria-label="Time range"
+        >
+          <ToggleButton value="all">All Time</ToggleButton>
+          <ToggleButton value="month">Month</ToggleButton>
+          <ToggleButton value="week">Week</ToggleButton>
+          <ToggleButton value="today">Today</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="Total Revenue" value={`₱${summary?.totalRevenue.toFixed(2) || '0.00'}`} icon={<FaMoneyBillWave />} color="primary" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="Total Sales" value={summary?.totalSales || 0} icon={<FaShoppingCart />} color="success" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="Product Varieties" value={summary?.totalProducts || 0} icon={<FaBoxOpen />} color="warning" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="Total Units in Stock" value={summary?.totalStock || 0} icon={<FaWarehouse />} color="error" />
+        </Grid>
+
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2, height: '60vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            {summary?.topSellingProducts && summary.topSellingProducts.length > 0 ? (
+                <Bar options={chartOptions} data={chartData} />
+            ) : (
+                <Typography align="center">No sales data available for the selected period.</Typography>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+    </Container>
   );
 };
 

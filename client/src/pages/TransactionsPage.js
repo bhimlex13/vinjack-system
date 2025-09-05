@@ -2,7 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import ReceiptModal from '../components/ReceiptModal';
-import '../styles/TransactionsPage.css'; // We will create this next
+
+// MUI Imports
+import { Box, Button, Typography, Paper } from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
 
 const TransactionsPage = () => {
   const [sales, setSales] = useState([]);
@@ -25,43 +28,78 @@ const TransactionsPage = () => {
     fetchSales();
   }, []);
 
-  if (isLoading) return <div className="loading">Loading transactions...</div>;
-  if (error) return <div className="error">{error}</div>;
+  const columns = [
+    {
+      field: 'createdAt',
+      headerName: 'Date',
+      flex: 1,
+      minWidth: 200,
+      type: 'dateTime',
+      valueGetter: (params) => new Date(params.value),
+    },
+    { field: '_id', headerName: 'Sale ID', flex: 1, minWidth: 220 },
+    {
+      field: 'recordedBy',
+      headerName: 'Cashier',
+      flex: 1,
+      minWidth: 180,
+      valueGetter: (params) => params.row?.recordedBy?.fullName || 'N/A'
+    },
+    {
+      field: 'totalAmount',
+      headerName: 'Total Amount',
+      flex: 1,
+      minWidth: 150,
+      type: 'number',
+      // --- FIX IS HERE ---
+      valueFormatter: (params) =>
+        typeof params.value === 'number'
+        ? `₱${params.value.toFixed(2)}`
+        : '₱0.00',
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 150,
+      sortable: false,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <Button
+          variant="contained"
+          size="small"
+          onClick={() => setSelectedSale(params.row)}
+        >
+          View Receipt
+        </Button>
+      )
+    }
+  ];
+
+  if (error) return <Typography color="error" sx={{ p: 3 }}>{error}</Typography>;
 
   return (
-    <div className="transactions-container">
-      <h1>Transaction Log</h1>
-      <p>A log of all completed sales. Click "View Receipt" to see details.</p>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+        Transaction Log
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        A log of all completed sales. Click "View Receipt" to see details.
+      </Typography>
 
-      <table className="transactions-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Sale ID</th>
-            <th>Cashier</th>
-            <th>Total Amount</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sales.map((sale) => (
-            <tr key={sale._id}>
-              <td>{new Date(sale.createdAt).toLocaleString()}</td>
-              <td>{sale._id}</td>
-              <td>{sale.recordedBy?.fullName || 'N/A'}</td>
-              <td>₱{sale.totalAmount.toFixed(2)}</td>
-              <td className="actions">
-                <button 
-                  className="btn-view"
-                  onClick={() => setSelectedSale(sale)}
-                >
-                  View Receipt
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Paper sx={{ height: '75vh', width: '100%' }}>
+        <DataGrid
+          rows={sales}
+          columns={columns}
+          loading={isLoading}
+          getRowId={(row) => row._id}
+          initialState={{
+            sorting: {
+              sortModel: [{ field: 'createdAt', sort: 'desc' }],
+            },
+          }}
+        />
+      </Paper>
 
       {selectedSale && (
         <ReceiptModal
@@ -69,7 +107,7 @@ const TransactionsPage = () => {
           onClose={() => setSelectedSale(null)}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

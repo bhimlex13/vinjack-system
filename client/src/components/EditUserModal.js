@@ -1,13 +1,17 @@
 // client/src/components/EditUserModal.js
-import React, { useState, useContext } from 'react'; 
+import React, { useState, useContext } from 'react';
 import api from '../api/axios';
-import '../styles/UserManagementPage.css';
 import ConfirmationContext from '../context/ConfirmationContext';
 
-const EditUserModal = ({ user, onClose, onUserUpdate, onUserDelete }) => {
+import {
+  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  Button, FormControl, InputLabel, Select, MenuItem, Stack, Box
+} from '@mui/material';
+
+const EditUserModal = ({ user, open, onClose, onUserUpdate }) => {
   const [role, setRole] = useState(user.role);
   const [status, setStatus] = useState(user.status);
-  const { confirm } = useContext(ConfirmationContext); // Get the confirm function
+  const { confirm } = useContext(ConfirmationContext);
 
   const handleUpdate = async () => {
     const isConfirmed = await confirm('Are you sure you want to save these changes?');
@@ -17,46 +21,72 @@ const EditUserModal = ({ user, onClose, onUserUpdate, onUserDelete }) => {
         onUserUpdate();
         onClose();
       } catch (error) {
+        // You can add a snackbar or alert here for better UX
+        console.error('Failed to update user.', error);
         alert('Failed to update user.');
       }
     }
   };
 
   const handleDelete = async () => {
-    const isConfirmed = await confirm('Are you sure you want to permanently delete this user? This cannot be undone.');
+    const isConfirmed = await confirm(`DELETE USER: ${user.fullName}. This action is permanent and cannot be undone.`);
     if (isConfirmed) {
-      onUserDelete(user._id);
-      onClose();
+      try {
+        await api.delete(`/users/${user._id}`);
+        onUserUpdate(); // Refreshes the user list
+        onClose();
+      } catch (error) {
+        console.error('Failed to delete user.', error);
+        alert('Failed to delete user.');
+      }
     }
   };
-
+  
   return (
-    <div className="edit-user-modal">
-      <h4>Editing: {user.fullName}</h4>
-      <div className="form-group">
-        <label htmlFor="role-select">Role</label>
-        <select id="role-select" value={role} onChange={(e) => setRole(e.target.value)}>
-          <option value="Mechanic">Mechanic</option>
-          <option value="Clerk">Clerk</option>
-          <option value="Owner">Owner</option>
-        </select>
-      </div>
-      <div className="form-group">
-        <label htmlFor="status-select">Account Status</label>
-        <select id="status-select" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="active">Active</option>
-          <option value="inactive">Archived (Inactive)</option>
-        </select>
-      </div>
-      <div className="modal-actions">
-        {/* New Delete Button */}
-        <button className="action-btn delete-btn" onClick={handleDelete}>Delete User</button>
-        <div className="modal-actions-right">
-            <button className="action-btn" onClick={onClose}>Cancel</button>
-            <button className="action-btn save-btn" onClick={handleUpdate}>Save Changes</button>
-        </div>
-      </div>
-    </div>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Editing: {user.fullName}</DialogTitle>
+      <DialogContent>
+        <DialogContentText sx={{ mb: 2 }}>
+          Modify the user's role and account status.
+        </DialogContentText>
+        <Stack spacing={3} sx={{ mt: 2 }}>
+          <FormControl fullWidth>
+            <InputLabel id="role-select-label">Role</InputLabel>
+            <Select
+              labelId="role-select-label"
+              id="role-select"
+              value={role}
+              label="Role"
+              onChange={(e) => setRole(e.target.value)}
+            >
+              <MenuItem value="Mechanic">Mechanic</MenuItem>
+              <MenuItem value="Clerk">Clerk</MenuItem>
+              <MenuItem value="Owner">Owner</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth>
+            <InputLabel id="status-select-label">Account Status</InputLabel>
+            <Select
+              labelId="status-select-label"
+              id="status-select"
+              value={status}
+              label="Account Status"
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Archived (Inactive)</MenuItem>
+            </Select>
+          </FormControl>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ p: '16px 24px', justifyContent: 'space-between' }}>
+        <Button color="error" onClick={handleDelete}>Delete User</Button>
+        <Box>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="contained" onClick={handleUpdate}>Save Changes</Button>
+        </Box>
+      </DialogActions>
+    </Dialog>
   );
 };
 

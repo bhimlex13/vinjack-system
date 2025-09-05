@@ -1,7 +1,20 @@
 // client/src/components/ProductMovementHistory.js
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import '../styles/ProductMovementHistory.css'; // We will create this next
+
+// MUI Imports
+import {
+  Box,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  CircularProgress
+} from '@mui/material';
 
 const ProductMovementHistory = ({ productId }) => {
   const [movements, setMovements] = useState([]);
@@ -24,38 +37,72 @@ const ProductMovementHistory = ({ productId }) => {
     }
   }, [productId]);
 
-  if (isLoading) return <p>Loading history...</p>;
-  if (movements.length === 0) return <p>No movement history found for this product.</p>;
+  const getChipColor = (type) => {
+    switch (type.toLowerCase()) {
+      case 'delivery':
+        return 'success';
+      case 'sale':
+        return 'error';
+      case 'adjustment':
+        return 'warning';
+      case 'return':
+        return 'info';
+      default:
+        return 'default';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (movements.length === 0) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography>No movement history found for this product.</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <div className="movement-history-container">
-      <table className="movement-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Change</th>
-            <th>Stock After</th>
-            <th>User</th>
-            <th>Reference/Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {movements.map(move => (
-            <tr key={move._id}>
-              <td>{new Date(move.createdAt).toLocaleString()}</td>
-              <td><span className={`move-type-badge move-type-${move.type.toLowerCase()}`}>{move.type}</span></td>
-              <td className={move.quantityChange > 0 ? 'qty-in' : 'qty-out'}>
+    <TableContainer sx={{ maxHeight: 440 }}>
+      <Table stickyHeader aria-label="product movement history table">
+        <TableHead>
+          <TableRow>
+            <TableCell>Date</TableCell>
+            <TableCell>Type</TableCell>
+            <TableCell>Change</TableCell>
+            <TableCell>Stock After</TableCell>
+            <TableCell>User</TableCell>
+            <TableCell>Reference/Notes</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {movements.map((move) => (
+            <TableRow key={move._id}>
+              <TableCell>{new Date(move.createdAt).toLocaleString()}</TableCell>
+              <TableCell>
+                <Chip
+                  label={move.type}
+                  size="small"
+                  color={getChipColor(move.type)}
+                />
+              </TableCell>
+              <TableCell sx={{ color: move.quantityChange > 0 ? 'success.main' : 'error.main', fontWeight: 'bold' }}>
                 {move.quantityChange > 0 ? `+${move.quantityChange}` : move.quantityChange}
-              </td>
-              <td>{move.stockAfter}</td>
-              <td>{move.recordedBy?.fullName || 'N/A'}</td>
-              <td>{move.referenceId || move.notes || 'N/A'}</td>
-            </tr>
+              </TableCell>
+              <TableCell>{move.stockAfter}</TableCell>
+              <TableCell>{move.recordedBy?.fullName || 'N/A'}</TableCell>
+              <TableCell>{move.referenceId || move.notes || 'N/A'}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 };
 

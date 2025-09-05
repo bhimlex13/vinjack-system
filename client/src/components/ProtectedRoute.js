@@ -3,15 +3,26 @@ import React, { useContext } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 
+// MUI Imports
+import { Box, CircularProgress } from '@mui/material';
+
 const ProtectedRoute = () => {
-  // MODIFIED: Get the isInitializing flag from the context
   const { user, isInitializing } = useContext(AuthContext);
 
-  // ADDED: New loading check
-  // If the app is still checking for the user, show a loading screen.
-  // This prevents the premature redirect.
+  // If the app is still checking for the user, show a centered spinner.
   if (isInitializing) {
-    return <div>Loading...</div>; // Or a spinner component
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
   }
 
   // This part now only runs AFTER the initialization is complete

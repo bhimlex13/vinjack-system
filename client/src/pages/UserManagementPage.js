@@ -2,12 +2,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
 import { approveUserUpdate, rejectUserUpdate } from '../api/userApi';
-import '../styles/UserManagementPage.css';
-import Modal from '../components/Modal';
 import EditUserModal from '../components/EditUserModal';
-// ADDED: Import new modals
 import CreateUserModal from '../components/CreateUserModal'; 
 import CredentialsDisplayModal from '../components/CredentialsDisplayModal';
+
+// MUI Imports
+import { Box, Button, Typography, Paper, Stack, Chip, Alert } from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
+import AddIcon from '@mui/icons-material/Add';
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
@@ -16,8 +18,6 @@ const UserManagementPage = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-
-  // ADDED: State for the new user creation flow
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newCredentials, setNewCredentials] = useState(null);
 
@@ -26,6 +26,7 @@ const UserManagementPage = () => {
   }, []);
 
   const fetchUsers = async () => {
+    setIsLoading(true);
     try {
       const response = await api.get('/users');
       setUsers(response.data);
@@ -38,170 +39,170 @@ const UserManagementPage = () => {
   };
 
   const profileUpdateRequests = useMemo(() => users.filter(u => u.hasPendingChanges), [users]);
-  // MODIFIED: managedUsers now filters 'Owner' role as well for display
   const managedUsers = useMemo(() => users.filter(u => u.role !== 'Owner'), [users]);
 
-
-  // Handler for when user creation is successful
   const handleUserCreated = (credentials) => {
     setIsCreateModalOpen(false);
-    setNewCredentials(credentials); // This will trigger the credentials display modal
-    fetchUsers(); // Refresh the user list
-  };
-
-  const handleApproveProfile = async (userId) => {
-    try {
-      await approveUserUpdate(userId);
-      setMessage('Profile update approved successfully!');
-      fetchUsers();
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Failed to approve profile update.';
-      setError(errorMessage);
-    } finally {
-      setTimeout(() => {
-        setMessage('');
-        setError('');
-      }, 5000);
-    }
-  };
-
-  const handleRejectProfile = async (userId) => {
-    try {
-      await rejectUserUpdate(userId);
-      setMessage('Profile update request rejected.');
-      fetchUsers();
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Failed to reject profile update.';
-      setError(errorMessage);
-    } finally {
-      setTimeout(() => {
-        setMessage('');
-        setError('');
-      }, 5000);
-    }
+    setNewCredentials(credentials);
+    fetchUsers();
   };
   
+  const handleApiResponse = async (apiCall) => {
+    try {
+      const response = await apiCall();
+      setMessage(response.message || 'Action completed successfully!');
+      fetchUsers();
+    } catch (err) {
+      setError(err.response?.data?.message || 'An error occurred.');
+    } finally {
+      setTimeout(() => {
+        setMessage('');
+        setError('');
+      }, 5000);
+    }
+  };
+
   const openEditModal = (user) => {
     setEditingUser(user);
     setIsEditModalOpen(true);
   };
 
-  if (isLoading) return <div className="loading">Loading users...</div>;
+  const requestColumns = [
+    {
+      field: 'currentInfo',
+      headerName: 'Current Info',
+      flex: 1,
+      renderCell: (params) => (
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{params.row.fullName}</Typography>
+          <Typography variant="caption" display="block">{params.row.username}</Typography>
+          <Typography variant="caption">{params.row.email}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'requestedChanges',
+      headerName: 'Requested Changes',
+      flex: 1,
+      renderCell: (params) => (
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{params.row.pendingChanges?.fullName || params.row.fullName}</Typography>
+          <Typography variant="caption" display="block">{params.row.pendingChanges?.username || params.row.username}</Typography>
+          <Typography variant="caption">{params.row.pendingChanges?.email || params.row.email}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 200,
+      sortable: false,
+      renderCell: (params) => (
+        <Stack direction="row" spacing={1}>
+          <Button size="small" variant="contained" color="success" onClick={() => handleApiResponse(() => approveUserUpdate(params.row._id))}>Approve</Button>
+          <Button size="small" variant="contained" color="error" onClick={() => handleApiResponse(() => rejectUserUpdate(params.row._id))}>Reject</Button>
+        </Stack>
+      )
+    }
+  ];
+
+  const employeeColumns = [
+    { field: 'fullName', headerName: 'Full Name', flex: 1 },
+    { field: 'username', headerName: 'Username', flex: 1 },
+    { field: 'email', headerName: 'Email', flex: 1 },
+    { field: 'role', headerName: 'Role', width: 150 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 150,
+      renderCell: (params) => (
+        <Chip 
+          label={params.value}
+          color={params.value === 'active' ? 'success' : 'error'}
+          size="small"
+          sx={{ textTransform: 'capitalize' }}
+        />
+      )
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 120,
+      sortable: false,
+      renderCell: (params) => (
+        <Button 
+          variant="outlined" 
+          size="small" 
+          onClick={() => openEditModal(params.row)}
+          disabled={params.row.role === 'Owner'}
+        >
+          Edit
+        </Button>
+      )
+    }
+  ];
 
   return (
-    <div className="user-management-container">
+    <Box>
       {/* --- MODALS --- */}
       {isEditModalOpen && (
-        <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit User">
-          <EditUserModal 
-            user={editingUser}
-            onClose={() => setIsEditModalOpen(false)}
-            onUserUpdate={fetchUsers}
-          />
-        </Modal>
-      )}
-
-      {isCreateModalOpen && (
-        <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create New Employee">
-          <CreateUserModal 
-            onClose={() => setIsCreateModalOpen(false)}
-            onUserCreated={handleUserCreated}
-          />
-        </Modal>
-      )}
-
-      {newCredentials && (
-        <CredentialsDisplayModal
-          credentials={newCredentials}
-          onClose={() => setNewCredentials(null)}
+        <EditUserModal 
+          open={isEditModalOpen} 
+          user={editingUser} 
+          onClose={() => setIsEditModalOpen(false)} 
+          onUserUpdate={fetchUsers} 
         />
       )}
+      {isCreateModalOpen && (
+        <CreateUserModal 
+          open={isCreateModalOpen} 
+          onClose={() => setIsCreateModalOpen(false)} 
+          onUserCreated={handleUserCreated} 
+        />
+      )}
+      {newCredentials && <CredentialsDisplayModal credentials={newCredentials} onClose={() => setNewCredentials(null)} />}
 
-      {message && <p className="success-message">{message}</p>}
-      {error && <p className="error-message">{error}</p>}
+      <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 2 }}>
+        User Management
+      </Typography>
 
-      <section className="user-section">
-        <h2>Profile Update Requests</h2>
-        {profileUpdateRequests.length > 0 ? (
-          <table className="user-table">
-            <thead>
-              <tr>
-                <th>Current Info</th>
-                <th>Requested Changes</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profileUpdateRequests.map(user => (
-                <tr key={user._id}>
-                  <td>
-                    <strong>{user.fullName}</strong> ({user.username})<br/>
-                    {user.email}
-                  </td>
-                  <td>
-                    <strong>{user.pendingChanges?.fullName || user.fullName}</strong> ({user.pendingChanges?.username || user.username})<br/>
-                    {user.pendingChanges?.email || user.email}
-                  </td>
-                  <td className="actions">
-                    <button className="action-btn approve-btn" onClick={() => handleApproveProfile(user._id)}>Approve</button>
-                    <button className="action-btn delete-btn" onClick={() => handleRejectProfile(user._id)}>Reject</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p>No profile update requests.</p>
-        )}
-      </section>
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        {message && <Alert severity="success">{message}</Alert>}
+        {error && <Alert severity="error">{error}</Alert>}
+      </Stack>
 
-      {/* REMOVED: Pending Registrations Section */}
+      <Paper sx={{ mb: 4, p: 2 }}>
+        <Typography variant="h5" gutterBottom>Profile Update Requests</Typography>
+        <Box sx={{ height: 'auto', width: '100%' }}>
+          <DataGrid
+            rows={profileUpdateRequests}
+            columns={requestColumns}
+            loading={isLoading}
+            getRowId={(row) => row._id}
+            autoHeight
+            rowHeight={80}
+          />
+        </Box>
+      </Paper>
 
-      <section className="user-section">
-        <div className="section-header">
-            <h2>Manage Employees</h2>
-            <button className="add-employee-btn" onClick={() => setIsCreateModalOpen(true)}>
-              + Add New Employee
-            </button>
-        </div>
-        <table className="user-table">
-          <thead>
-            <tr>
-              <th>Full Name</th>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {managedUsers.map(user => (
-              <tr key={user._id}>
-                <td>{user.fullName}</td>
-                <td>{user.username}</td>
-                <td>{user.email}</td>
-                <td>{user.role}</td>
-                <td>
-                  <span className={`status-badge status-${user.status}`}>
-                    {user.status}
-                  </span>
-                </td>
-                <td className="actions">
-                  <button 
-                    className="action-btn edit-btn" 
-                    onClick={() => openEditModal(user)}
-                    disabled={user.role === 'Owner'}
-                  >
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-    </div>
+      <Paper sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h5">Manage Employees</Typography>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateModalOpen(true)}>
+              Add New Employee
+            </Button>
+        </Box>
+        <Box sx={{ height: 'auto', width: '100%' }}>
+            <DataGrid
+              rows={managedUsers}
+              columns={employeeColumns}
+              loading={isLoading}
+              getRowId={(row) => row._id}
+              autoHeight
+            />
+        </Box>
+      </Paper>
+    </Box>
   );
 };
 

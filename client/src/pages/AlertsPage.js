@@ -1,45 +1,71 @@
 // client/src/pages/AlertsPage.js
 import React, { useContext } from 'react';
 import AuthContext from '../context/AuthContext';
-import '../styles/AlertsPage.css';
+
+// MUI Imports
+import {
+  Box,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Alert,
+  AlertTitle
+} from '@mui/material';
 
 const AlertsPage = () => {
   const { lowStockItems = [] } = useContext(AuthContext);
 
   return (
-    <div className="alerts-container">
-      <h1>Low Stock Alerts</h1>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
+        Low Stock Alerts
+      </Typography>
       
       {lowStockItems.length > 0 ? (
         <>
-          <p>The following items are at or below their designated reorder level.</p>
-          <table className="alerts-table">
-            <thead>
-              <tr>
-                <th>Item Code</th>
-                <th>Product Name</th>
-                <th>Current Quantity</th>
-                <th>Reorder Level</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lowStockItems.map((item) => (
-                <tr key={item._id} className="alert-item">
-                  <td>{item.itemCode}</td>
-                  <td>{item.name}</td>
-                  <td className="quantity-low">{item.quantity}</td>
-                  <td>{item.reorderLevel}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            The following items are at or below their designated reorder level.
+          </Typography>
+          <TableContainer component={Paper}>
+            <Table sx={{ minWidth: 650 }} aria-label="low stock alerts table">
+              <TableHead sx={{ backgroundColor: 'action.hover' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Item Code</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Product Name</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Current Quantity</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Reorder Level</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {lowStockItems.map((item) => (
+                  <TableRow
+                    key={item._id}
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  >
+                    <TableCell component="th" scope="row">{item.itemCode}</TableCell>
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell sx={{ color: 'warning.main', fontWeight: 'bold' }}>
+                      {item.quantity}
+                    </TableCell>
+                    <TableCell>{item.reorderLevel}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </>
       ) : (
-        <div className="no-alerts">
-          <p>✅ All inventory levels are healthy. There are no low stock alerts.</p>
-        </div>
+        <Alert severity="success" variant="outlined">
+          <AlertTitle>All Good!</AlertTitle>
+          All inventory levels are healthy. There are no low stock alerts at this time.
+        </Alert>
       )}
-    </div>
+    </Box>
   );
 };
 
