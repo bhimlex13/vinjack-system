@@ -1,12 +1,12 @@
 // server/controllers/userController.js
 const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
-const jwt =require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto'); // --- FIX IS HERE: Import the crypto module ---
 const { sendVerificationEmail } = require('../utils/emailService');
 const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
 
-// MODIFIED: This function replaces the public 'registerUser'
 const createUserByAdmin = async (req, res) => {
   try {
     const { fullName, email, role } = req.body;
@@ -18,7 +18,7 @@ const createUserByAdmin = async (req, res) => {
     if (emailExists) {
       return res.status(400).json({ message: 'Email is already in use.' });
     }
-    
+
     // Generate username from email, ensuring uniqueness
     let username = email.split('@')[0];
     const userExists = await User.findOne({ username });
@@ -67,7 +67,6 @@ const loginUser = async (req, res) => {
           return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
         }
         
-        // MODIFIED: Respond with all user data and the password change flag
         res.json({
           _id: user._id,
           fullName: user.fullName,
@@ -75,7 +74,7 @@ const loginUser = async (req, res) => {
           email: user.email,
           role: user.role,
           token: generateToken(user._id),
-          mustChangePassword: user.mustChangePassword || false, // Send the flag to the client
+          mustChangePassword: user.mustChangePassword || false,
         });
       } else {
         res.status(401).json({ message: 'Invalid username or password.' });
@@ -88,7 +87,6 @@ const loginUser = async (req, res) => {
   }
 };
 
-// ADDED: New controller for forcing password change
 const forceChangePassword = async (req, res) => {
     try {
         const { newPassword, confirmPassword } = req.body;
@@ -105,8 +103,8 @@ const forceChangePassword = async (req, res) => {
             return res.status(404).json({ message: 'User not found.' });
         }
         
-        user.password = newPassword; // The pre-save hook will hash it
-        user.mustChangePassword = false; // The flag is now cleared
+        user.password = newPassword;
+        user.mustChangePassword = false;
         await user.save();
 
         logAction(req.user, 'FORCE_PASSWORD_CHANGE', `User successfully changed their temporary password.`);
@@ -116,7 +114,6 @@ const forceChangePassword = async (req, res) => {
         res.status(500).json({ message: 'Server error while updating password.', error: error.message });
     }
 };
-
 
 const getMe = async (req, res) => {
   try {
@@ -129,7 +126,6 @@ const getMe = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 
 const requestProfileUpdate = async (req, res) => {
   const io = req.app.get('socketio');
@@ -241,7 +237,6 @@ const verifyOwnerUpdate = async (req, res) => {
 const approveUserUpdate = async (req, res) => {
   const io = req.app.get('socketio');
   try {
-    // --- FINAL FIX: Using req.params.id to match the route definition ---
     const user = await User.findById(req.params.id); 
     
     if (!user || !user.hasPendingChanges) {
@@ -281,7 +276,6 @@ const approveUserUpdate = async (req, res) => {
 const rejectUserUpdate = async (req, res) => {
     const io = req.app.get('socketio');
     try {
-        // --- FINAL FIX: Using req.params.id to match the route definition ---
         const user = await User.findById(req.params.id);
 
         if (!user || !user.hasPendingChanges) {
@@ -314,7 +308,6 @@ const rejectUserUpdate = async (req, res) => {
     }
 };
 
-// ... (getAllUsers, updateUser, deleteUser, generateToken functions are unchanged) ...
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({}).select('-password');
