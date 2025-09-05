@@ -52,18 +52,24 @@ const InventoryPage = () => {
   }, []);
 
   const filteredProducts = useMemo(() => {
+    // This logic now correctly handles filtering whether category/brand is populated or just an ID
     return products.filter(product => {
       if (!product || !product.name || !product.itemCode) {
         return false;
       }
-
       const searchMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           product.itemCode.toLowerCase().includes(searchTerm.toLowerCase());
-      const categoryMatch = filterCategory ? product.category?._id === filterCategory : true;
-      const brandMatch = filterBrand ? product.brand?._id === filterBrand : true;
+      
+      const categoryId = typeof product.category === 'object' ? product.category?._id : product.category;
+      const brandId = typeof product.brand === 'object' ? product.brand?._id : product.brand;
+
+      const categoryMatch = filterCategory ? categoryId === filterCategory : true;
+      const brandMatch = filterBrand ? brandId === filterBrand : true;
+      
       return searchMatch && categoryMatch && brandMatch;
     });
   }, [products, searchTerm, filterCategory, filterBrand]);
+
 
   const handleFormSubmit = () => fetchInitialData();
 
@@ -87,6 +93,7 @@ const InventoryPage = () => {
   };
 
   const getStatusChip = (params) => {
+    if (!params.row) return null; 
     const { quantity, reorderLevel } = params.row;
     if (quantity === 0) {
       return <Chip label="Out of Stock" color="error" size="small" />;
@@ -100,7 +107,7 @@ const InventoryPage = () => {
   const columns = [
     {
       field: 'image', headerName: 'Image', width: 80,
-      renderCell: (params) => <Avatar variant="rounded" src={params.value || 'https://placehold.co/60x40'} />,
+      renderCell: (params) => <Avatar variant="rounded" src={params.row?.image || 'https://placehold.co/60x40'} />,
       sortable: false,
     },
     { field: 'itemCode', headerName: 'Item Code', width: 130 },
@@ -109,27 +116,45 @@ const InventoryPage = () => {
       field: 'category',
       headerName: 'Category',
       width: 150,
-      renderCell: (params) => params.row.category ? params.row.category.name : 'N/A'
+      // --- FIX IS HERE: Manual lookup for category name ---
+      renderCell: (params) => {
+        const categoryId = typeof params.row.category === 'object' ? params.row.category?._id : params.row.category;
+        const category = categories.find(c => c._id === categoryId);
+        return category ? category.name : 'N/A';
+      }
     },
     {
       field: 'brand',
       headerName: 'Brand',
       width: 150,
-      renderCell: (params) => params.row.brand ? params.row.brand.name : 'N/A'
+      // --- FIX IS HERE: Manual lookup for brand name ---
+      renderCell: (params) => {
+        const brandId = typeof params.row.brand === 'object' ? params.row.brand?._id : params.row.brand;
+        const brand = brands.find(b => b._id === brandId);
+        return brand ? brand.name : 'N/A';
+      }
     },
     {
       field: 'price', headerName: 'Price', width: 120,
-      valueFormatter: (params) => typeof params.value === 'number' ? `₱${params.value.toFixed(2)}` : 'N/A'
+      renderCell: (params) => {
+        const price = params.row?.price;
+        return typeof price === 'number' ? `₱${price.toFixed(2)}` : 'N/A';
+      }
     },
     { field: 'quantity', headerName: 'Quantity', width: 120 },
-    { field: 'reorderLevel', headerName: 'Reorder Lvl', width: 120, valueGetter: (params) => params.value || 0 },
+    { 
+      field: 'reorderLevel', headerName: 'Reorder Lvl', width: 120, 
+      renderCell: (params) => {
+        return params.row?.reorderLevel || 0;
+      }
+    },
     {
       field: 'status', headerName: 'Status', width: 150, renderCell: getStatusChip,
     },
     {
       field: 'actions', headerName: 'Actions', width: 120, sortable: false,
       renderCell: (params) => (
-        user && (user.role === 'Owner' || user.role === 'Clerk') && (
+        user && user.role === 'Owner' && (
           <Button variant="outlined" size="small" onClick={() => openModalForEdit(params.row)}>
             Edit
           </Button>
