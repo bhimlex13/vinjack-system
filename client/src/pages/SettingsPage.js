@@ -25,8 +25,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Divider,
-  CircularProgress
+  Divider
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
