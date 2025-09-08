@@ -2,9 +2,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path'); // <-- ADD THIS LINE
 const connectDB = require('./config/db');
 const startLowStockCheck = require('./jobs/cronJobs');
-
 
 // --- ADDED: Imports for Socket.IO ---
 const http = require('http');
@@ -25,7 +25,7 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const movementRoutes = require('./routes/movementRoutes'); 
 const appSettingsRoutes = require('./routes/appSettingsRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
-const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes'); // <-- ADD THIS LINE
+const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 
 // Connect to Database
 connectDB();
@@ -79,7 +79,23 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/movements', movementRoutes);
 app.use('/api/app-settings', appSettingsRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/purchase-orders', purchaseOrderRoutes); // <-- ADD THIS LINE
+app.use('/api/purchase-orders', purchaseOrderRoutes);
+
+// =================== PRODUCTION DEPLOYMENT CODE ===================
+// This section should be AFTER your API routes
+
+if (process.env.NODE_ENV === 'production') {
+  // Serve static files from the React app's build directory
+  // The '..' is to go up one level from 'server' to the root, then into 'client/build'
+  app.use(express.static(path.join(__dirname, '..', 'client', 'build')));
+
+  // The "catchall" handler: for any request that doesn't match one above,
+  // send back React's index.html file.
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'client', 'build', 'index.html'));
+  });
+}
+// =================================================================
 
 
 // Start the scheduled jobs
