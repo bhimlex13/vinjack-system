@@ -70,8 +70,20 @@ const SuppliersPage = () => {
 
   const columns = [
     { field: 'name', headerName: 'Supplier Name', flex: 1 },
-    { field: 'contactPerson', headerName: 'Contact Person', flex: 1, valueGetter: (params) => params.value || 'N/A' },
-    { field: 'contactNumber', headerName: 'Contact Number', flex: 1, valueGetter: (params) => params.value || 'N/A' },
+    // --- FIX IS HERE (Changed . to ?.) ---
+    { 
+      field: 'contactPerson', 
+      headerName: 'Contact Person', 
+      flex: 1, 
+      valueGetter: (params) => params.row?.contactPerson || 'N/A' 
+    },
+    // --- AND HERE (Changed . to ?.) ---
+    { 
+      field: 'contactNumber', 
+      headerName: 'Contact Number', 
+      flex: 1, 
+      valueGetter: (params) => params.row?.contactNumber || 'N/A' 
+    },
     {
       field: 'actions',
       headerName: 'Actions',
