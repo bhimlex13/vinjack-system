@@ -1,4 +1,6 @@
 // server/index.js
+throw new Error('--- DEPLOYMENT TEST V1: If you see this, the deploy is working. ---');
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -82,14 +84,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 
 // =================== PRODUCTION DEPLOYMENT CODE ===================
-// This section should be AFTER your API routes
-
 if (process.env.NODE_ENV === 'production') {
-  // Serve static files from the React app's build directory
   app.use(express.static(path.join(__dirname, '..', 'client', 'build')));
-
-  // FIXED: use '/*' instead of '*' for Express v5 compatibility
-  app.get('/*', (req, res) => {
+  app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'client', 'build', 'index.html'));
   });
 }
