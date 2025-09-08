@@ -7,7 +7,7 @@ import AuthContext from '../context/AuthContext';
 // MUI Imports
 import {
   Box, Button, Typography, TextField, Select, MenuItem, FormControl,
-  InputLabel, Chip, Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent
+  InputLabel, Chip, Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent, Container // <-- Import Container
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
@@ -116,7 +116,6 @@ const InventoryPage = () => {
       field: 'category',
       headerName: 'Category',
       width: 150,
-      // --- FIX IS HERE: Manual lookup for category name ---
       renderCell: (params) => {
         const categoryId = typeof params.row.category === 'object' ? params.row.category?._id : params.row.category;
         const category = categories.find(c => c._id === categoryId);
@@ -127,7 +126,6 @@ const InventoryPage = () => {
       field: 'brand',
       headerName: 'Brand',
       width: 150,
-      // --- FIX IS HERE: Manual lookup for brand name ---
       renderCell: (params) => {
         const brandId = typeof params.row.brand === 'object' ? params.row.brand?._id : params.row.brand;
         const brand = brands.find(b => b._id === brandId);
@@ -166,7 +164,7 @@ const InventoryPage = () => {
   if (error) return <Typography color="error">{error}</Typography>;
 
   return (
-    <>
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} maxWidth="md">
         <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
         <DialogContent>
@@ -223,7 +221,7 @@ const InventoryPage = () => {
           }}
         />
       </Paper>
-    </>
+    </Container>
   );
 };
 
