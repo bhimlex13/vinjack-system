@@ -2,8 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const { getProductMovements } = require('../controllers/movementController');
-const { protect } = require('../middleware/authMiddleware');
+// --- ADDED authorize middleware ---
+const { protect, authorize } = require('../middleware/authMiddleware');
 
-router.get('/:productId', protect, getProductMovements);
+// --- UPDATED: Restricted access to Owner and Admin ---
+router.get('/:productId', protect, authorize('Owner', 'Admin'), getProductMovements);
 
 module.exports = router;

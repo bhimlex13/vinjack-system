@@ -1,20 +1,25 @@
 // server/routes/reportRoutes.js
 const express = require('express');
 const router = express.Router();
-// --- MODIFIED START ---
-const { getDashboardSummary, getSalesReport, getLowStockProducts, getSalesTrend, getRecentTransactions, getPendingPurchaseOrders } = require('../controllers/reportController');
-// --- MODIFIED END ---
+const { 
+    getDashboardSummary, 
+    getSalesReport, 
+    getLowStockProducts, 
+    getSalesTrend, 
+    getRecentTransactions, 
+    getPendingPurchaseOrders 
+} = require('../controllers/reportController');
+// --- ADDED middleware ---
+const { protect, authorize } = require('../middleware/authMiddleware');
 
+// --- UPDATED: All routes are now protected and restricted to Owner/Admin ---
+const adminOnly = [protect, authorize('Owner', 'Admin')];
 
-// We can add role-based protection here later
-router.get('/summary', getDashboardSummary);
-router.get('/sales', getSalesReport);
-router.get('/low-stock', getLowStockProducts);
-router.get('/sales-trend', getSalesTrend);
-router.get('/recent-transactions', getRecentTransactions);
-// --- ADDED START ---
-router.get('/pending-pos', getPendingPurchaseOrders);
-// --- ADDED END ---
-
+router.get('/summary', adminOnly, getDashboardSummary);
+router.get('/sales', adminOnly, getSalesReport);
+router.get('/low-stock', adminOnly, getLowStockProducts);
+router.get('/sales-trend', adminOnly, getSalesTrend);
+router.get('/recent-transactions', adminOnly, getRecentTransactions);
+router.get('/pending-pos', adminOnly, getPendingPurchaseOrders);
 
 module.exports = router;
