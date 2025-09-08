@@ -1,35 +1,48 @@
 // client/src/pages/DeliveriesPage.js
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getDeliveries } from '../api/deliveryApi';
+import RecordDeliveryForm from '../components/RecordDeliveryForm';
 
 // MUI Imports
 import { 
   Box, Button, Typography, Paper, Dialog, DialogTitle, DialogContent,
   DialogActions, Table, TableBody, TableCell, TableHead, TableRow, Chip,
-  Grid, Divider // <-- Added Grid and Divider
+  Grid, Divider, Stack
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
+import AddIcon from '@mui/icons-material/Add';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 
 const DeliveriesPage = () => {
   const [deliveries, setDeliveries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDelivery, setSelectedDelivery] = useState(null);
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const fetchDeliveries = async () => {
+    try {
+      setIsLoading(true);
+      const response = await getDeliveries();
+      setDeliveries(response);
+    } catch (err) {
+      setError('Failed to fetch delivery data.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchDeliveries = async () => {
-      try {
-        const response = await getDeliveries();
-        setDeliveries(response);
-      } catch (err) {
-        setError('Failed to fetch delivery data.');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchDeliveries();
   }, []);
+
+  const handleDeliveryFormClose = () => {
+    setIsDeliveryModalOpen(false);
+    fetchDeliveries();
+  };
 
   const columns = [
     {
@@ -66,12 +79,33 @@ const DeliveriesPage = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-        Deliveries Log
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        A log of all incoming stock from suppliers.
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+                Deliveries Hub
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+                Log direct deliveries or create new purchase orders.
+            </Typography>
+        </Box>
+        <Stack direction="row" spacing={2}>
+            <Button 
+                variant="contained" 
+                color="success"
+                startIcon={<LocalShippingIcon />}
+                onClick={() => setIsDeliveryModalOpen(true)}
+            >
+                Record Direct Delivery
+            </Button>
+            <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => navigate('/purchase-orders/new')}
+            >
+                Create Purchase Order
+            </Button>
+        </Stack>
+      </Box>
 
       <Paper sx={{ height: '75vh', width: '100%' }}>
         <DataGrid
@@ -85,13 +119,11 @@ const DeliveriesPage = () => {
         />
       </Paper>
 
-      {/* Details Modal */}
       <Dialog open={!!selectedDelivery} onClose={() => setSelectedDelivery(null)} fullWidth maxWidth="md">
         <DialogTitle>Delivery Details</DialogTitle>
         <DialogContent>
             {selectedDelivery && (
               <>
-                {/* --- NEW: Added Supplier and Origin details --- */}
                 <Box sx={{ mb: 2 }}>
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
@@ -103,15 +135,13 @@ const DeliveriesPage = () => {
                       <Typography variant="h6" component="p">
                         {selectedDelivery.purchaseOrder
                           ? `Purchase Order #${selectedDelivery.purchaseOrder.poNumber}`
-                          : 'Direct Delivery'
+                          : 'Direct Delivery' // <-- FIX: Changed hyphen (-) to a colon (:)
                         }
                       </Typography>
                     </Grid>
                   </Grid>
                 </Box>
                 <Divider sx={{ mb: 2 }} />
-                {/* --- End of new section --- */}
-                
                 <Typography variant="h6" gutterBottom>Products Received</Typography>
                 <Table>
                     <TableHead>
@@ -137,6 +167,18 @@ const DeliveriesPage = () => {
         <DialogActions>
             <Button onClick={() => setSelectedDelivery(null)}>Close</Button>
         </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={isDeliveryModalOpen}
+        onClose={() => setIsDeliveryModalOpen(false)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>Record New Direct Delivery</DialogTitle>
+        <DialogContent>
+          <RecordDeliveryForm onClose={handleDeliveryFormClose} />
+        </DialogContent>
       </Dialog>
     </Box>
   );
