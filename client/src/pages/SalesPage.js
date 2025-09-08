@@ -24,8 +24,7 @@ import {
   ListItemText,
   IconButton,
   Divider,
-  Button,
-  Chip
+  Button
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -172,115 +171,131 @@ const SalesPage = () => {
   };
 
   return (
-    <Box sx={{ p: 2, height: 'calc(100vh - 80px)' }}>
-      <Grid container spacing={2} sx={{ height: '100%' }}>
-        
-        {/* Left Column: Product Selection */}
-        <Grid item xs={12} md={7} lg={8} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-            <TextField
-              fullWidth
-              label="Search Products"
-              variant="outlined"
-              size="small"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
-              sx={{ mb: 2 }}
-            />
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="caption" color="text.secondary">Categories</Typography>
-              <ToggleButtonGroup value={selectedCategory} exclusive onChange={handleFilterChange(setSelectedCategory)} size="small" fullWidth>
-                <ToggleButton value={null}>All</ToggleButton>
-                {categories.map(cat => <ToggleButton key={cat._id} value={cat._id}>{cat.name}</ToggleButton>)}
-              </ToggleButtonGroup>
-            </Box>
-            <Box sx={{ mb: 2 }}>
-                <Typography variant="caption" color="text.secondary">Brands</Typography>
-                <ToggleButtonGroup value={selectedBrand} exclusive onChange={handleFilterChange(setSelectedBrand)} size="small" fullWidth>
-                    <ToggleButton value={null}>All</ToggleButton>
-                    {brands.map(brand => <ToggleButton key={brand._id} value={brand._id}>{brand.name}</ToggleButton>)}
-                </ToggleButtonGroup>
-            </Box>
-            <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-              <Grid container spacing={2}>
-                {filteredProducts.map(product => (
-                  <Grid item key={product._id} xs={6} sm={4} md={4} lg={3}>
-                    <Card sx={{ height: '100%', position: 'relative' }}>
-                      <CardActionArea onClick={() => addProductToCart(product)} disabled={product.quantity === 0}>
-                        <CardMedia
-                          component="img"
-                          height="100"
-                          image={product.image || 'https://placehold.co/300x200'}
-                          alt={product.name}
-                          sx={{ objectFit: 'cover' }}
-                        />
-                        {product.quantity === 0 && (
-                          <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100px', backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Typography variant="button" color="error">Out of Stock</Typography>
-                          </Box>
-                        )}
-                        <CardContent sx={{ p: 1 }}>
-                          <Typography gutterBottom variant="body2" component="div" sx={{ fontWeight: 'bold', height: '40px', overflow: 'hidden' }}>{product.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">Stock: {product.quantity}</Typography>
-                          <Typography variant="h6" color="primary.main">₱{product.price.toFixed(2)}</Typography>
-                        </CardContent>
-                      </CardActionArea>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Right Column: Current Sale */}
-        <Grid item xs={12} md={5} lg={4} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-            <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale</Typography>
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 2 }}>
-              {cartItems.length === 0 ? (
-                <Typography color="text.secondary" align="center" sx={{ mt: 4 }}>Cart is empty</Typography>
-              ) : (
-                <List>
-                  {cartItems.map(item => (
-                    <ListItem key={item._id} disablePadding secondaryAction={
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <IconButton size="small" onClick={() => updateQuantity(item, -1)}><RemoveIcon fontSize="small"/></IconButton>
-                        <Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography>
-                        <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton>
-                      </Box>
-                    }>
-                      <ListItemText 
-                        primary={item.name} 
-                        secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`} 
+    // --- LAYOUT FIX #1: Main container uses flexbox to manage its children correctly ---
+    <Box sx={{ display: 'flex', height: '100%', gap: 2 }}>
+      
+      {/* Left Column: Product Selection */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <TextField
+            fullWidth
+            label="Search Products"
+            variant="outlined"
+            size="small"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
+            sx={{ mb: 1 }}
+          />
+          <Box sx={{ mb: 1 }}>
+            {/* --- BUTTONS FIX #1: Added sx prop to ToggleButtonGroup to make buttons equal width --- */}
+            <ToggleButtonGroup value={selectedCategory} exclusive onChange={handleFilterChange(setSelectedCategory)} size="small" fullWidth sx={{ display: 'flex' }}>
+              <ToggleButton value={null} sx={{ flex: 1 }}>All</ToggleButton>
+              {categories.map(cat => <ToggleButton key={cat._id} value={cat._id} sx={{ flex: 1 }}>{cat.name}</ToggleButton>)}
+            </ToggleButtonGroup>
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            <ToggleButtonGroup value={selectedBrand} exclusive onChange={handleFilterChange(setSelectedBrand)} size="small" fullWidth sx={{ display: 'flex' }}>
+                <ToggleButton value={null} sx={{ flex: 1 }}>All</ToggleButton>
+                {brands.map(brand => <ToggleButton key={brand._id} value={brand._id} sx={{ flex: 1 }}>{brand.name}</ToggleButton>)}
+            </ToggleButtonGroup>
+          </Box>
+          <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
+            <Grid container spacing={2}>
+              {filteredProducts.map(product => (
+                // --- CARD FIX #1: Make the Grid item a flex container ---
+                <Grid item key={product._id} xs={6} sm={4} md={4} lg={3} sx={{ display: 'flex' }}>
+                  {/* --- CARD FIX #2: Make the Card a flex column that fills the available height --- */}
+                  <Card sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <CardActionArea 
+                      onClick={() => addProductToCart(product)} 
+                      disabled={product.quantity === 0}
+                      // Make the clickable area also a flex column that grows
+                      sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }} 
+                    >
+                      <CardMedia
+                        component="img"
+                        height="120"
+                        image={product.image || 'https://placehold.co/300x200'}
+                        alt={product.name}
+                        sx={{ objectFit: 'contain', p: 1 }}
                       />
-                    </ListItem>
-                  ))}
-                </List>
-              )}
+                      {product.quantity === 0 && (
+                        <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '120px', backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Typography variant="button" color="error" sx={{ fontWeight: 'bold' }}>Out of Stock</Typography>
+                        </Box>
+                      )}
+                      {/* --- CARD FIX #3: Make the content area grow to push the price to the bottom --- */}
+                      <CardContent sx={{ p: 1, flexGrow: 1, width: '100%' }}>
+                        <Typography gutterBottom variant="body2" component="div" sx={{ fontWeight: 'bold', minHeight: '40px' }}>
+                          {product.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Stock: {product.quantity}
+                        </Typography>
+                      </CardContent>
+                      {/* --- CARD FIX #4: Price is now at the bottom, ensuring alignment --- */}
+                      <Box sx={{ p: 1, pt: 0, width: '100%', mt: 'auto' }}>
+                         <Typography variant="h6" color="primary.main">
+                          ₱{product.price.toFixed(2)}
+                        </Typography>
+                      </Box>
+                    </CardActionArea>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* --- LAYOUT FIX #2: The cart is now explicitly defined in the right column --- */}
+      <Box sx={{ width: '380px', display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+          <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale</Typography>
+          <Divider sx={{ mb: 1 }} />
+          <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+            {cartItems.length === 0 ? (
+              <Typography color="text.secondary" align="center" sx={{ mt: 4 }}>Cart is empty</Typography>
+            ) : (
+              <List>
+                {cartItems.map(item => (
+                  <ListItem key={item._id} disablePadding secondaryAction={
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <IconButton size="small" onClick={() => updateQuantity(item, -1)}><RemoveIcon fontSize="small"/></IconButton>
+                      <Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography>
+                      <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton>
+                    </Box>
+                  }>
+                    <ListItemText 
+                      primary={item.name} 
+                      secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`} 
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Box>
+          <Divider sx={{ my: 1 }} />
+          <Box sx={{ mt: 'auto' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Total</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 'bold' }}>₱{calculateTotal.toFixed(2)}</Typography>
             </Box>
-            <Divider sx={{ my: 1 }} />
-            <Box sx={{ mt: 'auto' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Total</Typography>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>₱{calculateTotal.toFixed(2)}</Typography>
-              </Box>
-              <Button 
-                variant="contained" 
-                color="success" 
-                fullWidth 
-                size="large"
-                startIcon={<PointOfSaleIcon />}
-                onClick={handleCompleteSale}
-                disabled={cartItems.length === 0}
-              >
-                Complete Sale
-              </Button>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
+            <Button 
+              variant="contained" 
+              color="success" 
+              fullWidth 
+              size="large"
+              startIcon={<PointOfSaleIcon />}
+              onClick={handleCompleteSale}
+              disabled={cartItems.length === 0}
+            >
+              Complete Sale
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
 
       {showReceiptModal && lastSaleData && (
         <ReceiptModal 

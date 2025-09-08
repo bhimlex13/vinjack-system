@@ -136,15 +136,22 @@ const DashboardPage = () => {
           <StatCard title="Total Units in Stock" value={summary?.totalStock || 0} icon={<FaWarehouse />} color="error" />
         </Grid>
 
+        {/* --- FIX START --- */}
         <Grid item xs={12}>
-          <Paper sx={{ p: 2, height: '60vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {/* 1. Adjusted Paper styling for better flexibility */}
+          <Paper sx={{ p: 2, height: { xs: '50vh', md: '60vh' } }}>
             {summary?.topSellingProducts && summary.topSellingProducts.length > 0 ? (
-                <Bar options={chartOptions} data={chartData} />
+                // 2. Added a wrapper Box for the chart component
+                <Box sx={{ position: 'relative', height: '100%', width: '100%' }}>
+                  <Bar options={chartOptions} data={chartData} />
+                </Box>
             ) : (
                 <Typography align="center">No sales data available for the selected period.</Typography>
             )}
           </Paper>
         </Grid>
+        {/* --- FIX END --- */}
+
       </Grid>
     </Container>
   );
