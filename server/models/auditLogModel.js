@@ -19,9 +19,8 @@ const auditLogSchema = new mongoose.Schema({
       'CREATE_USER',
       'FORCE_PASSWORD_CHANGE',
       'REJECT_PROFILE_UPDATE',
-      
-      // --- ADDED PURCHASE ORDER ACTIONS ---
       'CREATE_PO', 'RECEIVE_PO', 'CANCEL_PO',
+      'STOCK_ADJUSTMENT'
     ]
   },
   details: {

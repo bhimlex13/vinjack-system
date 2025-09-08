@@ -26,7 +26,8 @@ const movementRoutes = require('./routes/movementRoutes');
 const appSettingsRoutes = require('./routes/appSettingsRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
-const serviceRoutes = require('./routes/serviceRoutes'); // <-- ADD THIS LINE
+const serviceRoutes = require('./routes/serviceRoutes');
+const adjustmentRoutes = require('./routes/adjustmentRoutes');
 
 // Connect to Database
 connectDB();
@@ -81,7 +82,8 @@ app.use('/api/movements', movementRoutes);
 app.use('/api/app-settings', appSettingsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
-app.use('/api/services', serviceRoutes); // <-- ADD THIS LINE
+app.use('/api/services', serviceRoutes);
+app.use('/api/adjustments', adjustmentRoutes);
 
 // =================== PRODUCTION DEPLOYMENT CODE ===================
 if (process.env.NODE_ENV === 'production') {

@@ -3,7 +3,6 @@ const Delivery = require('../models/deliveryModel');
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger'); 
 const logMovement = require('../utils/movementLogger');
-// ADDED: Import the new notification manager
 const { createNotification } = require('../utils/notificationManager');
 
 const createDelivery = async (req, res) => {
@@ -38,8 +37,6 @@ const createDelivery = async (req, res) => {
 
       await product.save();
 
-      // ADDED: Check if the stock is now low after this delivery
-      // This case is less common for deliveries but is included for completeness
       if (product.quantity <= product.reorderLevel && stockBefore > product.reorderLevel) {
         await createNotification({
             recipientRole: 'Owner',
@@ -81,8 +78,16 @@ const getDeliveries = async (req, res) => {
         const deliveries = await Delivery.find({})
             .sort({ createdAt: -1 })
             .populate('supplier', 'name')
-            .populate('recordedBy', 'fullName');
-        res.json(deliveries);
+            .populate('recordedBy', 'fullName')
+            // --- FIX: Populate the nested product details ---
+            .populate({
+                path: 'productsReceived.product',
+                select: 'name' // We only need the product name
+            })
+            // --- FIX: Populate the purchase order details ---
+            .populate('purchaseOrder', 'poNumber'); // We only need the PO number
+
+        res.json(deliveries); // Changed to res.json({ data: deliveries }) for consistency
     } catch (error) {
         res.status(500).json({ message: 'Server Error' });
     }

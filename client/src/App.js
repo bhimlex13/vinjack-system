@@ -27,10 +27,10 @@ import DataManagementPage from './pages/DataManagementPage';
 import TransactionsPage from './pages/TransactionsPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import CreatePurchaseOrderPage from './pages/CreatePurchaseOrderPage';
-import PurchaseOrderDetailPage from './pages/PurchaseOrderDetailPage'; // <-- ADD THIS LINE
+import PurchaseOrderDetailPage from './pages/PurchaseOrderDetailPage'; 
+import DeliveriesPage from './pages/DeliveriesPage';
 
 
-// This InnerApp component handles the logic after AuthProvider is initialized
 const InnerApp = () => {
   const { user, mustChangePassword, isInitializing } = useContext(AuthContext);
 
@@ -56,10 +56,8 @@ const InnerApp = () => {
         theme="colored"
       />
       <Routes>
-        {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -72,6 +70,7 @@ const InnerApp = () => {
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/deliveries" element={<DeliveriesPage />} /> {/* <-- CORRECTED LINE */}
             <Route path="/audit-log" element={<AuditLogPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/user-management" element={<UserManagementPage />} />
@@ -83,7 +82,6 @@ const InnerApp = () => {
     </Router>
   );
 }
-
 
 function App() {
   return (
