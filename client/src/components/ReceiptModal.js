@@ -32,6 +32,9 @@ const ReceiptModal = ({ saleData, onClose }) => {
     window.location.reload(); 
   };
 
+  // Check if there are any services in the sale
+  const hasServices = saleData.services && saleData.services.length > 0;
+
   return (
     <Dialog open={true} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogContent sx={{ p: 0 }}>
@@ -66,14 +69,15 @@ const ReceiptModal = ({ saleData, onClose }) => {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ p: '4px 0', borderBottom: '1px solid #666' }}>Item</TableCell>
+                  <TableCell sx={{ p: '4px 0', borderBottom: '1px solid #666' }}>Item / Service</TableCell>
                   <TableCell align="center" sx={{ p: '4px 0', borderBottom: '1px solid #666' }}>Qty</TableCell>
                   <TableCell align="right" sx={{ p: '4px 0', borderBottom: '1px solid #666' }}>Subtotal</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
+                {/* Section for Products */}
                 {saleData.items.map((item) => (
-                  <TableRow key={item._id}>
+                  <TableRow key={`prod-${item._id}`}>
                     <TableCell sx={{ p: '4px 0', border: 'none' }}>
                       {item.product?.name || 'N/A'}
                       <br />
@@ -87,6 +91,25 @@ const ReceiptModal = ({ saleData, onClose }) => {
                     </TableCell>
                   </TableRow>
                 ))}
+
+                {/* --- NEW: Section for Services --- */}
+                {hasServices && saleData.services.map((service) => (
+                  <TableRow key={`serv-${service._id}`}>
+                    <TableCell sx={{ p: '4px 0', border: 'none' }}>
+                      {service.service?.name || 'N/A'}
+                      <br />
+                      <Typography variant="caption">
+                        (Service Charge)
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center" sx={{ p: '4px 0', border: 'none' }}>1</TableCell>
+                    <TableCell align="right" sx={{ p: '4px 0', border: 'none' }}>
+                      {service.priceAtTime.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {/* --- END of new section --- */}
+
               </TableBody>
             </Table>
           </TableContainer>
