@@ -1,6 +1,4 @@
 // server/index.js
-throw new Error('--- DEPLOYMENT TEST V1: If you see this, the deploy is working. ---');
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
