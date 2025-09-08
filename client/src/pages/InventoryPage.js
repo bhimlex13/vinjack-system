@@ -3,19 +3,21 @@ import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../api/axios';
 import ProductForm from '../components/ProductForm';
 import AuthContext from '../context/AuthContext';
-import StockAdjustmentModal from '../components/StockAdjustmentModal'; // <-- NEW: Import the modal
+import StockAdjustmentModal from '../components/StockAdjustmentModal';
+import MovementHistoryModal from '../components/MovementHistoryModal';
 
 // MUI Imports
 import {
-  Box, Button, Typography, TextField, Select, MenuItem, FormControl, InputLabel, 
-  Chip, Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent, 
+  Box, Button, Typography, TextField, Select, MenuItem, FormControl, InputLabel,
+  Chip, Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent,
   Container, Tooltip, IconButton
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
-import TuneIcon from '@mui/icons-material/Tune'; // Icon for Adjust Stock
+import TuneIcon from '@mui/icons-material/Tune';
+import HistoryIcon from '@mui/icons-material/History';
 
 const InventoryPage = () => {
   const { user } = useContext(AuthContext);
@@ -27,10 +29,8 @@ const InventoryPage = () => {
   const [error, setError] = useState(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-
-  // --- NEW: State for the adjustment modal ---
   const [adjustmentProduct, setAdjustmentProduct] = useState(null);
-
+  const [historyProduct, setHistoryProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
@@ -72,10 +72,9 @@ const InventoryPage = () => {
 
   const handleProductFormSubmit = () => fetchInitialData();
 
-  // --- NEW: Handler for when an adjustment is successfully submitted ---
   const handleAdjustmentSuccess = () => {
-    setAdjustmentProduct(null); // Close the modal
-    fetchInitialData(); // Refresh the inventory list
+    setAdjustmentProduct(null);
+    fetchInitialData();
   };
 
   const openProductModalForEdit = (product) => {
@@ -98,7 +97,7 @@ const InventoryPage = () => {
   };
 
   const getStatusChip = (params) => {
-    if (!params.row) return null; 
+    if (!params.row) return null;
     const { quantity, reorderLevel } = params.row;
     if (quantity === 0) return <Chip label="Out of Stock" color="error" size="small" />;
     if (reorderLevel && quantity <= reorderLevel) return <Chip label="Low Stock" color="warning" size="small" />;
@@ -115,10 +114,16 @@ const InventoryPage = () => {
     { field: 'quantity', headerName: 'Quantity', width: 120 },
     { field: 'status', headerName: 'Status', width: 150, renderCell: getStatusChip },
     {
-      field: 'actions', headerName: 'Actions', width: 150, sortable: false, align: 'center', headerAlign: 'center',
+      field: 'actions', headerName: 'Actions', width: 180, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => (
-        user?.role === 'Owner' && (
+        // --- THIS IS THE FIX: Show buttons for both Owner and Admin roles ---
+        (user?.role === 'Owner' || user?.role === 'Admin') && (
           <Box>
+            <Tooltip title="View History">
+              <IconButton size="small" color="info" onClick={() => setHistoryProduct(params.row)}>
+                <HistoryIcon />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Edit Product">
               <IconButton size="small" onClick={() => openProductModalForEdit(params.row)}>
                 <EditIcon />
@@ -151,12 +156,18 @@ const InventoryPage = () => {
         </DialogContent>
       </Dialog>
       
-      {/* --- NEW: Render the Stock Adjustment Modal when a product is selected --- */}
       {adjustmentProduct && (
         <StockAdjustmentModal
           product={adjustmentProduct}
           onClose={() => setAdjustmentProduct(null)}
           onSuccess={handleAdjustmentSuccess}
+        />
+      )}
+
+      {historyProduct && (
+        <MovementHistoryModal
+          product={historyProduct}
+          onClose={() => setHistoryProduct(null)}
         />
       )}
 
