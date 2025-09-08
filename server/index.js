@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path'); // <-- ADD THIS LINE
+const path = require('path');
 const connectDB = require('./config/db');
 const startLowStockCheck = require('./jobs/cronJobs');
 
@@ -86,17 +86,14 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   // Serve static files from the React app's build directory
-  // The '..' is to go up one level from 'server' to the root, then into 'client/build'
   app.use(express.static(path.join(__dirname, '..', 'client', 'build')));
 
-  // The "catchall" handler: for any request that doesn't match one above,
-  // send back React's index.html file.
-  app.get('*', (req, res) => {
+  // FIXED: use '/*' instead of '*' for Express v5 compatibility
+  app.get('/*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'client', 'build', 'index.html'));
   });
 }
 // =================================================================
-
 
 // Start the scheduled jobs
 startLowStockCheck();
