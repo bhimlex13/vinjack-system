@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import SupplierForm from '../components/SupplierForm';
-import RecordDeliveryForm from '../components/RecordDeliveryForm';
 
 // MUI Imports
 import { 
@@ -12,18 +11,15 @@ import {
   Paper, 
   Stack,
   Dialog,
-  DialogTitle,
-  DialogContent
+  DialogTitle
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 
 const SuppliersPage = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
-  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false); 
   const [editingSupplier, setEditingSupplier] = useState(null);
 
   useEffect(() => {
@@ -43,7 +39,7 @@ const SuppliersPage = () => {
   };
 
   const handleFormSubmit = () => {
-    fetchSuppliers(); // Refetch all suppliers to ensure data is fresh
+    fetchSuppliers();
   };
 
   const openSupplierModalForAdd = () => {
@@ -57,11 +53,10 @@ const SuppliersPage = () => {
   };
 
   const handleDelete = async (supplierId) => {
-    // A confirmation context/modal would be better than window.confirm
     if (window.confirm('Are you sure you want to delete this supplier?')) {
       try {
         await api.delete(`/suppliers/${supplierId}`);
-        fetchSuppliers(); // Refetch to update the list
+        fetchSuppliers();
       } catch (err) {
         console.error('Failed to delete supplier', err);
       }
@@ -70,14 +65,12 @@ const SuppliersPage = () => {
 
   const columns = [
     { field: 'name', headerName: 'Supplier Name', flex: 1 },
-    // --- FIX IS HERE: Replaced valueGetter with renderCell for reliability ---
     { 
       field: 'contactPerson', 
       headerName: 'Contact Person', 
       flex: 1, 
       renderCell: (params) => params.row.contactPerson || 'N/A' 
     },
-    // --- AND HERE: Replaced valueGetter with renderCell for reliability ---
     { 
       field: 'contactNumber', 
       headerName: 'Contact Number', 
@@ -99,8 +92,8 @@ const SuppliersPage = () => {
   ];
 
   return (
-    <>
-      {/* Dialog for adding/editing a supplier */}
+    // Use a Box instead of a Fragment to apply padding
+    <Box sx={{ p: 3 }}>
       <Dialog 
         open={isSupplierModalOpen} 
         onClose={() => setIsSupplierModalOpen(false)} 
@@ -115,19 +108,6 @@ const SuppliersPage = () => {
         />
       </Dialog>
 
-      {/* Dialog for recording a delivery */}
-      <Dialog
-        open={isDeliveryModalOpen}
-        onClose={() => setIsDeliveryModalOpen(false)}
-        fullWidth
-        maxWidth="md"
-      >
-        <DialogTitle>Record New Delivery</DialogTitle>
-        <DialogContent>
-          <RecordDeliveryForm onClose={() => setIsDeliveryModalOpen(false)} />
-        </DialogContent>
-      </Dialog>
-
       <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
           Supplier Management
@@ -135,14 +115,6 @@ const SuppliersPage = () => {
         <Stack direction="row" spacing={2}>
           <Button variant="contained" startIcon={<AddIcon />} onClick={openSupplierModalForAdd}>
             Add Supplier
-          </Button>
-          <Button 
-            variant="contained" 
-            color="success"
-            startIcon={<LocalShippingIcon />}
-            onClick={() => setIsDeliveryModalOpen(true)}
-          >
-            Record Delivery
           </Button>
         </Stack>
       </Box>
@@ -155,7 +127,7 @@ const SuppliersPage = () => {
           getRowId={(row) => row._id}
         />
       </Paper>
-    </>
+    </Box>
   );
 };
 

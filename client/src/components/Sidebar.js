@@ -15,7 +15,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import {
   FaTachometerAlt, FaBoxOpen, FaShoppingCart, FaTruck, FaChartBar,
   FaUsersCog, FaDatabase, FaFileAlt, FaReceipt, FaFileInvoice,
-  FaTruckLoading // <-- FaTools icon removed from this list
+  FaTruckLoading
 } from 'react-icons/fa';
 
 const drawerWidth = 250;
@@ -71,14 +71,23 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
     { text: 'Sales (POS)', to: '/sales', icon: <FaShoppingCart /> },
   ];
 
-  const managementNav = [
-    { text: 'Inventory', to: '/inventory', icon: <FaBoxOpen /> },
+  // --- REORGANIZED NAVIGATION ---
+  const inventoryNav = [
+    { text: 'Inventory', to: '/inventory', icon: <FaBoxOpen /> }
+  ];
+
+  const purchasingNav = [
+    { text: 'Deliveries', to: '/deliveries', icon: <FaTruckLoading /> },
     { text: 'Purchase Orders', to: '/purchase-orders', icon: <FaFileInvoice /> },
     { text: 'Suppliers', to: '/suppliers', icon: <FaTruck /> },
-    { text: 'Deliveries', to: '/deliveries', icon: <FaTruckLoading /> },
+  ];
+
+  const reportingNav = [
     { text: 'Reports', to: '/reports', icon: <FaChartBar /> },
     { text: 'Transactions', to: '/transactions', icon: <FaReceipt /> },
   ];
+  // --- END OF REORGANIZATION ---
+
 
   const adminNav = [
     { text: 'User Management', to: '/user-management', icon: <FaUsersCog /> },
@@ -102,7 +111,15 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
         
         <Divider sx={{ my: 1 }} />
         <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Management</ListSubheader>
-        {managementNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
+        {inventoryNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
+
+        {/* --- ADDED PURCHASING SUBHEADER --- */}
+        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1, lineHeight: '30px', mt: 1 }}>Purchasing</ListSubheader>
+        {purchasingNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
+
+        {/* --- ADDED REPORTING SUBHEADER --- */}
+        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1, lineHeight: '30px', mt: 1 }}>Logs & Reports</ListSubheader>
+        {reportingNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
 
         {user && user.role === 'Owner' && (
           <>
