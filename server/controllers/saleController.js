@@ -1,22 +1,28 @@
 // server/controllers/saleController.js
 const Sale = require('../models/saleModel');
 const Product = require('../models/productModel');
+const Service = require('../models/serviceModel'); // <-- ADD THIS LINE
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
 const { createNotification } = require('../utils/notificationManager');
 
 const createSale = async (req, res) => {
   const io = req.app.get('socketio');
-  const { items, services, totalAmount } = req.body;
+  // We no longer trust totalAmount from the client. We will calculate it.
+  const { items, services } = req.body;
 
   if ((!items || items.length === 0) && (!services || services.length === 0)) {
     return res.status(400).json({ message: 'Sale must include at least one item or service.' });
   }
 
   try {
+    let calculatedTotal = 0; // This will be our trusted total
     const processedItems = [];
+    const processedServices = []; // For storing services with trusted prices
     const movementsToLog = [];
 
+    // --- Process Items and Calculate their Subtotal ---
+    // Use a for...of loop to handle async operations correctly
     for (const item of items) {
       const product = await Product.findById(item.product);
       if (!product) {
@@ -38,6 +44,9 @@ const createSale = async (req, res) => {
       });
       
       await product.save();
+
+      // Accumulate the total based on the DATABASE price, not the client price
+      calculatedTotal += item.quantity * product.price;
       
       const warningPayload = {
         productName: product.name,
@@ -46,63 +55,59 @@ const createSale = async (req, res) => {
       };
 
       if (product.quantity === 0 && stockBefore > 0) {
-        // --- For Admins: Create a persistent notification ---
         const newNotifications = await createNotification({
             recipientRole: 'Owner',
             message: `${product.name} is now OUT OF STOCK.`,
             type: 'OUT_OF_STOCK',
             link: '/inventory'
         });
-
         if (newNotifications && newNotifications.length) {
-            newNotifications.forEach(notification => {
-                io.to(notification.user.toString()).emit('new_notification', notification);
-            });
+            newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification));
         }
-
-        // --- MODIFIED: Broadcast the warning to EVERYONE connected ---
-        io.emit('stock_level_warning', {
-          ...warningPayload,
-          type: 'OUT_OF_STOCK',
-          message: `${product.name} is now OUT OF STOCK.`
-        });
-
+        io.emit('stock_level_warning', { ...warningPayload, type: 'OUT_OF_STOCK', message: `${product.name} is now OUT OF STOCK.` });
       } 
       else if (product.quantity <= product.reorderLevel && stockBefore > product.reorderLevel) {
-        // --- For Admins: Create a persistent notification ---
         const newNotifications = await createNotification({
             recipientRole: 'Owner',
             message: `${product.name} is low on stock (${product.quantity} remaining).`,
             type: 'LOW_STOCK',
             link: '/inventory'
         });
-        
         if (newNotifications && newNotifications.length) {
-            newNotifications.forEach(notification => {
-                io.to(notification.user.toString()).emit('new_notification', notification);
-            });
+            newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification));
         }
-        
-        // --- MODIFIED: Broadcast the warning to EVERYONE connected ---
-        io.emit('stock_level_warning', {
-          ...warningPayload,
-          type: 'LOW_STOCK',
-          message: `${product.name} is low on stock (${product.quantity} remaining).`
-        });
+        io.emit('stock_level_warning', { ...warningPayload, type: 'LOW_STOCK', message: `${product.name} is low on stock (${product.quantity} remaining).` });
       }
       
       processedItems.push({
         product: item.product,
         quantity: item.quantity,
-        priceAtTime: item.priceAtTime,
+        priceAtTime: product.price, // Use trusted price
         costAtTime: product.cost
       });
     }
 
+    // --- Process Services and Calculate their Subtotal ---
+    if (services && services.length > 0) {
+      for (const serviceItem of services) {
+        const service = await Service.findById(serviceItem.service);
+        if (!service || service.status !== 'active') {
+          throw new Error(`Service with ID ${serviceItem.service} not found or is inactive.`);
+        }
+        // Add the service's charge from the DATABASE to our total
+        calculatedTotal += service.charge;
+        processedServices.push({
+          service: service._id,
+          priceAtTime: service.charge // Use trusted charge
+        });
+      }
+    }
+
+    // --- Finalize and Save the Sale ---
     const sale = new Sale({
       items: processedItems,
-      services,
-      totalAmount,
+      services: processedServices,
+      totalAmount: calculatedTotal, // Use our securely calculated total
       recordedBy: req.user.id,
     });
     const createdSale = await sale.save();
@@ -115,12 +120,13 @@ const createSale = async (req, res) => {
     logAction(
       req.user, 
       'PROCESS_SALE', 
-      `Processed sale #${createdSale._id} with ${items.length} item type(s) for a total of ₱${totalAmount.toFixed(2)}.`
+      `Processed sale #${createdSale._id} with a total of ₱${calculatedTotal.toFixed(2)}.`
     );
 
     const populatedSale = await Sale.findById(createdSale._id)
       .populate('recordedBy', 'fullName')
-      .populate('items.product', 'name');
+      .populate('items.product', 'name')
+      .populate('services.service', 'name'); // Populate service name
 
     res.status(201).json(populatedSale);
 
@@ -134,7 +140,8 @@ const getAllSales = async (req, res) => {
         const sales = await Sale.find({})
             .sort({ createdAt: -1 })
             .populate('recordedBy', 'fullName')
-            .populate('items.product', 'name');
+            .populate('items.product', 'name')
+            .populate('services.service', 'name'); // Populate service name here too
         
         res.json(sales);
     } catch (error) {

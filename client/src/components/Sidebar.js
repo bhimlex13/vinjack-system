@@ -14,7 +14,8 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 // React Icons
 import {
   FaTachometerAlt, FaBoxOpen, FaShoppingCart, FaTruck, FaChartBar,
-  FaUsersCog, FaDatabase, FaFileAlt, FaReceipt, FaFileInvoice // <-- ADD FaFileInvoice
+  FaUsersCog, FaDatabase, FaFileAlt, FaReceipt, FaFileInvoice,
+  FaTools // <-- ADD FaTools ICON FOR SERVICES
 } from 'react-icons/fa';
 
 const drawerWidth = 250;
@@ -74,7 +75,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
 
   const managementNav = [
     { text: 'Inventory', to: '/inventory', icon: <FaBoxOpen /> },
-    { text: 'Purchase Orders', to: '/purchase-orders', icon: <FaFileInvoice /> }, // <-- ADD THIS LINE
+    { text: 'Purchase Orders', to: '/purchase-orders', icon: <FaFileInvoice /> },
     { text: 'Suppliers', to: '/suppliers', icon: <FaTruck /> },
     { text: 'Reports', to: '/reports', icon: <FaChartBar /> },
     { text: 'Transactions', to: '/transactions', icon: <FaReceipt /> },

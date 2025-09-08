@@ -15,7 +15,15 @@ const auditLogSchema = new mongoose.Schema({
       'PROCESS_SALE',
       'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER',
       'RECORD_DELIVERY',
-      // Add other action types as you build more features
+      
+      // --- ADDED SERVICE ACTIONS ---
+      'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
+
+      // Other existing actions
+      'CREATE_USER',
+      'FORCE_PASSWORD_CHANGE',
+      'REJECT_PROFILE_UPDATE',
+      'UPDATE_SUPPLIER'
     ]
   },
   details: { // A human-readable description of the action
