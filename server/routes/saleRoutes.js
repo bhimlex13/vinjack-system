@@ -1,13 +1,14 @@
 // server/routes/saleRoutes.js
 const express = require('express');
 const router = express.Router();
-// MODIFIED: Import the new getAllSales function
 const { createSale, getAllSales } = require('../controllers/saleController');
-const { protect } = require('../middleware/authMiddleware');
+// --- ADDED authorize middleware ---
+const { protect, authorize } = require('../middleware/authMiddleware');
 
-// MODIFIED: This route now handles both GET and POST requests
 router.route('/')
-    .post(protect, createSale)
-    .get(protect, getAllSales);
+    // --- UPDATED: Creating a sale is a staff-level action ---
+    .post(protect, authorize('Owner', 'Admin', 'Clerk'), createSale)
+    // --- UPDATED: Viewing all sales is a management-level action ---
+    .get(protect, authorize('Owner', 'Admin'), getAllSales);
 
 module.exports = router;
