@@ -15,12 +15,11 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import {
   FaTachometerAlt, FaBoxOpen, FaShoppingCart, FaTruck, FaChartBar,
   FaUsersCog, FaDatabase, FaFileAlt, FaReceipt, FaFileInvoice,
-  FaTools // <-- ADD FaTools ICON FOR SERVICES
+  FaTruckLoading // <-- FaTools icon removed from this list
 } from 'react-icons/fa';
 
 const drawerWidth = 250;
 
-// Custom styled Drawer to handle the collapsed/expanded transition
 const StyledDrawer = styled(Drawer, { shouldForwardProp: (prop) => prop !== 'open' })(
   ({ theme, open }) => ({
     '& .MuiDrawer-paper': {
@@ -47,7 +46,6 @@ const StyledDrawer = styled(Drawer, { shouldForwardProp: (prop) => prop !== 'ope
   }),
 );
 
-// Helper component for NavLink integration
 const NavListItem = ({ to, icon, text, isCollapsed }) => (
   <ListItem disablePadding component={NavLink} to={to}
     style={({ isActive }) => ({
@@ -77,6 +75,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
     { text: 'Inventory', to: '/inventory', icon: <FaBoxOpen /> },
     { text: 'Purchase Orders', to: '/purchase-orders', icon: <FaFileInvoice /> },
     { text: 'Suppliers', to: '/suppliers', icon: <FaTruck /> },
+    { text: 'Deliveries', to: '/deliveries', icon: <FaTruckLoading /> },
     { text: 'Reports', to: '/reports', icon: <FaChartBar /> },
     { text: 'Transactions', to: '/transactions', icon: <FaReceipt /> },
   ];
@@ -89,43 +88,26 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
 
   return (
     <StyledDrawer variant="permanent" open={!isCollapsed}>
-      <Toolbar
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          px: [1],
-        }}
-      >
+      <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: [1] }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mr: 'auto', pl: 1 }}>
           <img src="/assets/vinjack_logo.png" alt="VinJack Logo" style={{ width: 40, height: 40, marginRight: 12 }} />
-          <Typography component="h1" variant="h6" noWrap>
-            VinJack MS
-          </Typography>
+          <Typography component="h1" variant="h6" noWrap>VinJack MS</Typography>
         </Box>
-        <IconButton onClick={toggleSidebar}>
-          <ChevronLeftIcon />
-        </IconButton>
+        <IconButton onClick={toggleSidebar}><ChevronLeftIcon /></IconButton>
       </Toolbar>
       <Divider />
       <List component="nav">
-        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>
-          Main
-        </ListSubheader>
+        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Main</ListSubheader>
         {mainNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
         
         <Divider sx={{ my: 1 }} />
-        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>
-          Management
-        </ListSubheader>
+        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Management</ListSubheader>
         {managementNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
 
         {user && user.role === 'Owner' && (
           <>
             <Divider sx={{ my: 1 }} />
-            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>
-              Administration
-            </ListSubheader>
+            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Administration</ListSubheader>
             {adminNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
           </>
         )}
