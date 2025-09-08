@@ -25,6 +25,12 @@ export const receivePurchaseOrder = async (id) => {
   return response.data;
 };
 
+// --- NEW: Cancel a purchase order ---
+export const cancelPurchaseOrder = async (id) => {
+  const response = await api.post(`/purchase-orders/${id}/cancel`);
+  return response.data;
+};
+
 // Fetch all suppliers (for the dropdown in the form)
 export const getSuppliers = async () => {
     const response = await api.get('/suppliers');
