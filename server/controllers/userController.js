@@ -2,7 +2,7 @@
 const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto'); // --- FIX IS HERE: Import the crypto module ---
+const crypto = require('crypto');
 const { sendVerificationEmail } = require('../utils/emailService');
 const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
@@ -357,7 +357,7 @@ const deleteUser = async (req, res) => {
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '1d',
+    expiresIn: '7d', // <-- CHANGED FROM '1d' TO '7d'
   });
 };
 

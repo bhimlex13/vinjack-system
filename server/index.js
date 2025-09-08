@@ -25,6 +25,7 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const movementRoutes = require('./routes/movementRoutes'); 
 const appSettingsRoutes = require('./routes/appSettingsRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes'); // <-- ADD THIS LINE
 
 // Connect to Database
 connectDB();
@@ -78,6 +79,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/movements', movementRoutes);
 app.use('/api/app-settings', appSettingsRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/purchase-orders', purchaseOrderRoutes); // <-- ADD THIS LINE
 
 
 // Start the scheduled jobs
