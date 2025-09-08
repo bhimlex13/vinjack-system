@@ -73,13 +73,15 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/suppliers', supplierRoutes);
-app.use('/api/deliveries', deliveryRoutes);
-app.use('/api/audit-logs', auditLogRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/movements', movementRoutes);
-app.use('/api/app-settings', appSettingsRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/purchase-orders', purchaseOrderRoutes);
+
+// --- TEMPORARILY DISABLED FOR DEBUGGING ---
+// app.use('/api/deliveries', deliveryRoutes);
+// app.use('/api/audit-logs', auditLogRoutes);
+// app.use('/api/settings', settingsRoutes);
+// app.use('/api/movements', movementRoutes);
+// app.use('/api/app-settings', appSettingsRoutes);
+// app.use('/api/notifications', notificationRoutes);
+// app.use('/api/purchase-orders', purchaseOrderRoutes);
 
 // =================== PRODUCTION DEPLOYMENT CODE ===================
 if (process.env.NODE_ENV === 'production') {
