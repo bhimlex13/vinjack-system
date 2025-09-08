@@ -70,19 +70,19 @@ const SuppliersPage = () => {
 
   const columns = [
     { field: 'name', headerName: 'Supplier Name', flex: 1 },
-    // --- FIX IS HERE (Changed . to ?.) ---
+    // --- FIX IS HERE: Replaced valueGetter with renderCell for reliability ---
     { 
       field: 'contactPerson', 
       headerName: 'Contact Person', 
       flex: 1, 
-      valueGetter: (params) => params.row?.contactPerson || 'N/A' 
+      renderCell: (params) => params.row.contactPerson || 'N/A' 
     },
-    // --- AND HERE (Changed . to ?.) ---
+    // --- AND HERE: Replaced valueGetter with renderCell for reliability ---
     { 
       field: 'contactNumber', 
       headerName: 'Contact Number', 
       flex: 1, 
-      valueGetter: (params) => params.row?.contactNumber || 'N/A' 
+      renderCell: (params) => params.row.contactNumber || 'N/A' 
     },
     {
       field: 'actions',

@@ -34,8 +34,16 @@ const TransactionsPage = () => {
       headerName: 'Date',
       flex: 1,
       minWidth: 200,
-      type: 'dateTime',
-      valueGetter: (params) => new Date(params.value),
+      renderCell: (params) => {
+        const date = new Date(params.value);
+        return date.toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      },
     },
     { field: '_id', headerName: 'Sale ID', flex: 1, minWidth: 220 },
     {
@@ -43,7 +51,7 @@ const TransactionsPage = () => {
       headerName: 'Cashier',
       flex: 1,
       minWidth: 180,
-      valueGetter: (params) => params.row?.recordedBy?.fullName || 'N/A'
+      renderCell: (params) => params.row?.recordedBy?.fullName || 'N/A'
     },
     {
       field: 'totalAmount',
@@ -51,11 +59,19 @@ const TransactionsPage = () => {
       flex: 1,
       minWidth: 150,
       type: 'number',
-      // --- FIX IS HERE ---
-      valueFormatter: (params) =>
-        typeof params.value === 'number'
-        ? `₱${params.value.toFixed(2)}`
-        : '₱0.00',
+      align: 'right',
+      headerAlign: 'right',
+      // --- THE FINAL FIX IS HERE: Replaced valueFormatter with the more reliable renderCell ---
+      renderCell: (params) => {
+        const amount = parseFloat(params.row.totalAmount);
+        if (isNaN(amount)) {
+          return '₱0.00';
+        }
+        return new Intl.NumberFormat('en-PH', {
+          style: 'currency',
+          currency: 'PHP',
+        }).format(amount);
+      },
     },
     {
       field: 'actions',
