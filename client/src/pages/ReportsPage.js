@@ -16,7 +16,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  CircularProgress,
   Alert,
   List,
   ListItem,
@@ -24,9 +23,13 @@ import {
 } from '@mui/material';
 
 const ReportsPage = () => {
+  // --- CHANGE: Get today's date in YYYY-MM-DD format ---
+  const today = new Date().toISOString().split('T')[0];
+
   const [reportData, setReportData] = useState([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  // --- CHANGE: Initialize startDate and endDate with today's date ---
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [wasGenerated, setWasGenerated] = useState(false); // Track if a report has been generated

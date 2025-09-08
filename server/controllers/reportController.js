@@ -1,6 +1,7 @@
 // server/controllers/reportController.js
 const Sale = require('../models/saleModel');
 const Product = require('../models/productModel');
+const PurchaseOrder = require('../models/purchaseOrderModel'); // --- ADDED
 
 // @desc    Get dashboard summary statistics
 // @route   GET /api/reports/summary
@@ -31,19 +32,47 @@ const getDashboardSummary = async (req, res) => {
         break;
     }
 
-    // 1. Get total revenue and sales, applying the date filter
-    const salesData = await Sale.aggregate([
-      { $match: dateFilter }, // MODIFIED: Filter by date range first
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$totalAmount' },
-          totalSales: { $sum: 1 }
+    // 1. Calculate Total Revenue and Sales in parallel with Total COGS
+    const [salesData, cogsData] = await Promise.all([
+      // Aggregation for Revenue and Sales Count
+      Sale.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$totalAmount' },
+            totalSales: { $sum: 1 }
+          }
         }
-      }
+      ]),
+      // Aggregation for Total Cost of Goods Sold (COGS)
+      Sale.aggregate([
+        { $match: dateFilter },
+        { $unwind: '$items' },
+        {
+          $lookup: {
+            from: 'products',
+            localField: 'items.product',
+            foreignField: '_id',
+            as: 'productInfo'
+          }
+        },
+        { $unwind: '$productInfo' },
+        {
+          $group: {
+            _id: null,
+            totalCOGS: { $sum: { $multiply: ['$items.quantity', '$productInfo.cost'] } }
+          }
+        }
+      ])
     ]);
 
-    // 2. Product stats are not time-sensitive, so no filter is applied
+    // Calculate profit
+    const totalRevenue = salesData[0]?.totalRevenue || 0;
+    const totalCOGS = cogsData[0]?.totalCOGS || 0;
+    const totalProfit = totalRevenue - totalCOGS;
+
+    // 2. Product stats are not time-sensitive
     const productStats = await Product.aggregate([
       {
         $group: {
@@ -56,7 +85,7 @@ const getDashboardSummary = async (req, res) => {
 
     // 3. Top selling products, applying the date filter
     const topSellingProducts = await Sale.aggregate([
-      { $match: dateFilter }, // MODIFIED: Filter by date range first
+      { $match: dateFilter },
       { $unwind: '$items' },
       { 
         $group: {
@@ -78,7 +107,8 @@ const getDashboardSummary = async (req, res) => {
     ]);
     
     res.json({
-      totalRevenue: salesData[0]?.totalRevenue || 0,
+      totalRevenue: totalRevenue,
+      totalProfit: totalProfit,
       totalSales: salesData[0]?.totalSales || 0,
       totalProducts: productStats[0]?.totalProducts || 0,
       totalStock: productStats[0]?.totalStock || 0,
@@ -96,25 +126,111 @@ const getDashboardSummary = async (req, res) => {
 const getSalesReport = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-
     if (!startDate || !endDate) {
       return res.status(400).json({ message: 'Please provide a start and end date.' });
     }
 
+    // --- CHANGE START ---
+    // Create a date object from the endDate string
+    const endOfDay = new Date(endDate);
+    // Set the date to the next day to include the entire endDate
+    endOfDay.setDate(endOfDay.getDate() + 1);
+    // --- CHANGE END ---
+
     const sales = await Sale.find({
       createdAt: {
-        $gte: new Date(startDate), // Greater than or equal to start date
-        $lte: new Date(endDate),   // Less than or equal to end date
+        $gte: new Date(startDate),
+        $lt: endOfDay, // Use $lt (less than) the start of the next day
       },
     })
-    .sort({ createdAt: -1 }) // Show most recent first
-    .populate('recordedBy', 'fullName') // Get the full name of the user who recorded it
-    .populate('items.product', 'name'); // Get the name of each product sold
-
+    .sort({ createdAt: -1 })
+    .populate('recordedBy', 'fullName')
+    .populate('items.product', 'name');
     res.json(sales);
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
-module.exports = { getDashboardSummary, getSalesReport };
+// @desc    Get products that are low in stock
+// @route   GET /api/reports/low-stock
+const getLowStockProducts = async (req, res) => {
+  try {
+    const lowStockProducts = await Product.find({
+      reorderLevel: { $gt: 0 },
+      $expr: { $lte: ["$quantity", "$reorderLevel"] }
+    })
+    .sort({ quantity: 'asc' })
+    .limit(10);
+
+    res.json(lowStockProducts);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Get sales trend data for the last 30 days
+// @route   GET /api/reports/sales-trend
+const getSalesTrend = async (req, res) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const salesTrend = await Sale.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: thirtyDaysAgo }
+        }
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          totalSales: { $sum: '$totalAmount' }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
+    ]);
+    res.json(salesTrend);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Get the 5 most recent transactions
+// @route   GET /api/reports/recent-transactions
+const getRecentTransactions = async (req, res) => {
+  try {
+    const recentSales = await Sale.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('recordedBy', 'fullName');
+
+    res.json(recentSales);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// --- ADDED START ---
+// @desc    Get pending purchase orders
+// @route   GET /api/reports/pending-pos
+const getPendingPurchaseOrders = async (req, res) => {
+  try {
+    const pendingPOs = await PurchaseOrder.find({
+      status: { $in: ['Pending', 'Approved', 'Partially Received'] }
+    })
+    .sort({ orderDate: 'asc' }) // Show oldest first
+    .limit(5)
+    .populate('supplier', 'name');
+
+    res.json(pendingPOs);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+// --- ADDED END ---
+
+
+module.exports = { getDashboardSummary, getSalesReport, getLowStockProducts, getSalesTrend, getRecentTransactions, getPendingPurchaseOrders }; // <-- Added getPendingPurchaseOrders
