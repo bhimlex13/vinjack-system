@@ -1,19 +1,27 @@
 // server/routes/purchaseOrderRoutes.js
 const express = require('express');
 const router = express.Router();
-const {
-  createPurchaseOrder,
-  getAllPurchaseOrders,
-  getPurchaseOrderById,
-  receivePurchaseOrder, // <-- ADD THIS
+const { 
+  createPurchaseOrder, 
+  getAllPurchaseOrders, 
+  getPurchaseOrderById, 
+  receivePurchaseOrder,
+  cancelPurchaseOrder
 } = require('../controllers/purchaseOrderController');
 
-// We will add auth middleware here later
-// const { protect, admin } = require('../middleware/authMiddleware');
+// We must use 'authorize' here, not 'admin'
+const { protect, authorize } = require('../middleware/authMiddleware');
 
-// Routes
-router.route('/').post(createPurchaseOrder).get(getAllPurchaseOrders);
-router.route('/:id').get(getPurchaseOrderById);
-router.route('/:id/receive').post(receivePurchaseOrder); // <-- ADD THIS LINE
+// Using the correct authorize('Owner', 'Admin') middleware
+router.route('/')
+  .post(protect, authorize('Owner', 'Admin'), createPurchaseOrder)
+  .get(protect, authorize('Owner', 'Admin'), getAllPurchaseOrders);
+
+router.route('/:id')
+  .get(protect, authorize('Owner', 'Admin'), getPurchaseOrderById);
+
+router.post('/:id/receive', protect, authorize('Owner', 'Admin'), receivePurchaseOrder);
+
+router.post('/:id/cancel', protect, authorize('Owner', 'Admin'), cancelPurchaseOrder);
 
 module.exports = router;

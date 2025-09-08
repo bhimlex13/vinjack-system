@@ -10,26 +10,24 @@ const auditLogSchema = new mongoose.Schema({
   action: {
     type: String,
     required: true,
-    enum: [ // A list of possible actions for consistency
+    enum: [
       'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT',
       'PROCESS_SALE',
       'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER',
       'RECORD_DELIVERY',
-      
-      // --- ADDED SERVICE ACTIONS ---
       'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
-
-      // Other existing actions
       'CREATE_USER',
       'FORCE_PASSWORD_CHANGE',
       'REJECT_PROFILE_UPDATE',
-      'UPDATE_SUPPLIER'
+      
+      // --- ADDED PURCHASE ORDER ACTIONS ---
+      'CREATE_PO', 'RECEIVE_PO', 'CANCEL_PO',
     ]
   },
-  details: { // A human-readable description of the action
+  details: {
     type: String,
     required: true,
   }
-}, { timestamps: true }); // The `createdAt` field will serve as our log timestamp
+}, { timestamps: true });
 
 module.exports = mongoose.model('AuditLog', auditLogSchema);
