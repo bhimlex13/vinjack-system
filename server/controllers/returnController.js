@@ -58,7 +58,8 @@ const createReturn = async (req, res) => {
         
         movementsToLog.push({
           product: product._id,
-          type: 'SALE_RETURN',
+          // --- MODIFIED: Changed type to match your existing model ---
+          type: 'RETURN', 
           quantityChange: returnedItem.quantity, // Positive change
           stockBefore,
           recordedBy: req.user.id
@@ -104,7 +105,8 @@ const createReturn = async (req, res) => {
     const populatedReturn = await Return.findById(savedReturn._id)
         .populate('recordedBy', 'fullName')
         .populate('itemsReturned.product', 'name')
-        .populate('servicesReturned.service', 'name');
+        .populate('servicesReturned.service', 'name')
+        .populate('originalSale', '_id createdAt totalAmount');
 
     res.status(201).json(populatedReturn);
 

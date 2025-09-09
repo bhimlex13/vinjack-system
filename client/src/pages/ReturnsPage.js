@@ -1,6 +1,6 @@
 // client/src/pages/ReturnsPage.js
 import React, { useState, useEffect } from 'react';
-import { getReturns } from '../api/returnApi';
+import api from '../api/axios';
 import CreateReturnModal from '../components/CreateReturnModal';
 import { toast } from 'react-toastify';
 
@@ -18,8 +18,9 @@ const ReturnsPage = () => {
   const fetchReturns = async () => {
     setIsLoading(true);
     try {
-      const data = await getReturns();
-      setReturns(data);
+      const response = await api.get('/returns');
+      const validReturns = Array.isArray(response.data) ? response.data.filter(item => item != null) : [];
+      setReturns(validReturns);
     } catch (err) {
       toast.error('Failed to fetch returns.');
       console.error(err);
@@ -33,30 +34,38 @@ const ReturnsPage = () => {
   }, []);
 
   const columns = [
-    { 
-      field: 'createdAt', 
-      headerName: 'Return Date', 
+    {
+      field: 'createdAt',
+      headerName: 'Return Date',
       width: 200,
-      valueFormatter: (params) => new Date(params.value).toLocaleString()
+      // FIX: Switched to renderCell for direct display control
+      renderCell: (params) => (params.row.createdAt ? new Date(params.row.createdAt).toLocaleString() : 'N/A')
     },
-    { 
-      field: 'originalSale', 
-      headerName: 'Original Sale ID', 
+    {
+      field: 'originalSaleId', // Field can be a unique name now
+      headerName: 'Original Sale ID',
       width: 250,
-      valueGetter: (params) => params.row.originalSale?._id
+      // FIX: Switched to renderCell and accessing the nested property
+      renderCell: (params) => params.row.originalSale?._id || 'N/A'
     },
-    { 
-      field: 'totalRefundAmount', 
-      headerName: 'Refund Amount', 
+    {
+      field: 'totalRefundAmount',
+      headerName: 'Refund Amount',
       width: 150,
-      valueFormatter: (params) => `₱${params.value.toFixed(2)}`
+      // FIX: Switched to renderCell for direct formatting
+      renderCell: (params) => (typeof params.row.totalRefundAmount === 'number' ? `₱${params.row.totalRefundAmount.toFixed(2)}` : 'N/A')
     },
-    { field: 'reason', headerName: 'Reason', flex: 1 },
     { 
-      field: 'recordedBy', 
-      headerName: 'Processed By', 
+      field: 'reason', 
+      headerName: 'Reason', 
+      flex: 1 
+    },
+    {
+      field: 'recordedByFullName', // Field can be a unique name now
+      headerName: 'Processed By',
       width: 180,
-      valueGetter: (params) => params.row.recordedBy?.fullName || 'N/A'
+      // FIX: Switched to renderCell and accessing the nested property
+      renderCell: (params) => params.row.recordedBy?.fullName || 'N/A'
     }
   ];
 
