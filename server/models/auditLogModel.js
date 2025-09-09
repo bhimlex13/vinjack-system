@@ -13,7 +13,13 @@ const auditLogSchema = new mongoose.Schema({
     enum: [
       'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT',
       'PROCESS_SALE',
+      'PROCESS_RETURN', // --- ADDED
+      
       'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER',
+      
+      // --- ADDED CUSTOMER ACTIONS ---
+      'CREATE_CUSTOMER', 'UPDATE_CUSTOMER', 'DELETE_CUSTOMER',
+
       'RECORD_DELIVERY',
       'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
       'CREATE_USER',

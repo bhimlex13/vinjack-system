@@ -47,6 +47,13 @@ const saleSchema = new mongoose.Schema({
     required: true
   },
 
+  // --- NEW FIELD ADDED HERE ---
+  customer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Customer' 
+  },
+  // --------------------------
+
   motorcycle: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Motorcycle' 

@@ -28,11 +28,9 @@ const ReceiptModal = ({ saleData, onClose }) => {
     document.body.innerHTML = printContents;
     window.print();
     document.body.innerHTML = originalContents;
-    // We reload to make sure the app state is correctly restored after printing.
     window.location.reload(); 
   };
 
-  // Check if there are any services in the sale
   const hasServices = saleData.services && saleData.services.length > 0;
 
   return (
@@ -64,6 +62,21 @@ const ReceiptModal = ({ saleData, onClose }) => {
             <Typography variant="body2">
               <strong>Cashier:</strong> {saleData.recordedBy?.fullName || 'N/A'}
             </Typography>
+            
+            {saleData.customer && (
+              <Typography variant="body2">
+                <strong>Customer:</strong> {saleData.customer.name}
+              </Typography>
+            )}
+
+            {/* --- ADDED: Display Motorcycle Details --- */}
+            {saleData.motorcycle && (
+              <Typography variant="body2">
+                <strong>Vehicle:</strong> {`${saleData.motorcycle.make} ${saleData.motorcycle.model} (${saleData.motorcycle.plateNumber || 'No Plate'})`}
+              </Typography>
+            )}
+            {/* --- END ADDED --- */}
+
           </Box>
           <TableContainer>
             <Table size="small">
@@ -75,7 +88,6 @@ const ReceiptModal = ({ saleData, onClose }) => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {/* Section for Products */}
                 {saleData.items.map((item) => (
                   <TableRow key={`prod-${item._id}`}>
                     <TableCell sx={{ p: '4px 0', border: 'none' }}>
@@ -92,7 +104,6 @@ const ReceiptModal = ({ saleData, onClose }) => {
                   </TableRow>
                 ))}
 
-                {/* --- NEW: Section for Services --- */}
                 {hasServices && saleData.services.map((service) => (
                   <TableRow key={`serv-${service._id}`}>
                     <TableCell sx={{ p: '4px 0', border: 'none' }}>
@@ -108,7 +119,6 @@ const ReceiptModal = ({ saleData, onClose }) => {
                     </TableCell>
                   </TableRow>
                 ))}
-                {/* --- END of new section --- */}
 
               </TableBody>
             </Table>

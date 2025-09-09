@@ -6,12 +6,14 @@ const path = require('path');
 const connectDB = require('./config/db');
 const startLowStockCheck = require('./jobs/cronJobs');
 
-// --- ADDED: Imports for Socket.IO ---
 const http = require('http');
 const { Server } = require("socket.io");
-// ---
 
-// Import Routes
+const customerRoutes = require('./routes/customerRoutes');
+const returnRoutes = require('./routes/returnRoutes');
+const motorcycleRoutes = require('./routes/motorcycleRoutes'); // --- ADDED ---
+
+// Import Existing Routes
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
@@ -39,23 +41,19 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// --- MODIFIED: Create HTTP server and integrate Socket.IO ---
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // In production, restrict this to your frontend's URL
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
 
-// --- ADDED: Make `io` accessible to our controllers ---
 app.set('socketio', io);
 
-// --- ADDED: Socket.IO connection handling ---
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
-  // Listen for a user to join their private room
   socket.on('joinRoom', (userId) => {
     socket.join(userId);
     console.log(`User with ID: ${userId} joined room.`);
@@ -65,9 +63,13 @@ io.on('connection', (socket) => {
     console.log('User disconnected:', socket.id);
   });
 });
-// ---
 
-// API Routes
+// Use new API routes
+app.use('/api/customers', customerRoutes);
+app.use('/api/returns', returnRoutes);
+app.use('/api/motorcycles', motorcycleRoutes); // --- ADDED ---
+
+// Existing API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -99,5 +101,4 @@ startLowStockCheck();
 
 const PORT = process.env.PORT || 5000;
 
-// MODIFIED: The http server listens, not the Express app
 server.listen(PORT, () => console.log(`Server is running on port ${PORT}`));

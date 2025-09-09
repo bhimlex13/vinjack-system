@@ -4,29 +4,48 @@ import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
 import ReceiptModal from '../components/ReceiptModal';
 import ConfirmationContext from '../context/ConfirmationContext';
-import { getServices } from '../api/serviceApi'; // --- MODIFIED: Import service API
-import AddServiceModal from '../components/AddServiceModal'; // --- NEW: Import the service modal
+import { getServices } from '../api/serviceApi';
+import { getCustomers, createCustomer } from '../api/customerApi';
+import { getMotorcyclesByCustomer, createMotorcycle } from '../api/motorcycleApi'; // --- MODIFIED ---
+import AddServiceModal from '../components/AddServiceModal';
+import CustomerForm from '../components/CustomerForm';
+import MotorcycleForm from '../components/MotorcycleForm'; // --- ADDED ---
 
 // MUI Imports
 import {
   Box, Grid, Paper, TextField, InputAdornment, Typography, Card, CardActionArea,
   CardMedia, CardContent, ToggleButtonGroup, ToggleButton, List, ListItem,
-  ListItemText, IconButton, Divider, Button, Tooltip // Added Tooltip
+  ListItemText, IconButton, Divider, Button, Tooltip, Autocomplete, Stack,
+  Dialog, DialogTitle, CircularProgress
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
+// ... (rest of imports remain the same)
 import RemoveIcon from '@mui/icons-material/Remove';
-import DeleteIcon from '@mui/icons-material/Delete'; // --- NEW: Icon for removing services
+import DeleteIcon from '@mui/icons-material/Delete';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
-import DesignServicesIcon from '@mui/icons-material/DesignServices'; // --- NEW: Icon for services button
+import DesignServicesIcon from '@mui/icons-material/DesignServices';
+import { FaUserTag } from 'react-icons/fa';
 
 
 const SalesPage = () => {
+  // Customer State
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  
+  // Motorcycle State
+  const [customerMotorcycles, setCustomerMotorcycles] = useState([]);
+  const [selectedMotorcycle, setSelectedMotorcycle] = useState(null);
+  const [isFetchingMotorcycles, setIsFetchingMotorcycles] = useState(false);
+  const [isMotorcycleModalOpen, setIsMotorcycleModalOpen] = useState(false); // --- ADDED ---
+  
+  // Existing state
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [services, setServices] = useState([]); // --- NEW: State for services
+  const [services, setServices] = useState([]);
   const [cartItems, setCartItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState(null);
@@ -36,7 +55,41 @@ const SalesPage = () => {
 
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [lastSaleData, setLastSaleData] = useState(null);
-  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false); // --- NEW: State for service modal
+  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+
+  // --- ADDED: Reusable function to fetch motorcycles for a customer ---
+  const fetchMotorcycles = async (customerId) => {
+    setIsFetchingMotorcycles(true);
+    try {
+      const data = await getMotorcyclesByCustomer(customerId);
+      setCustomerMotorcycles(data);
+      return data; // Return data for chaining
+    } catch (err) {
+      console.error("Failed to fetch motorcycles", err);
+      setCustomerMotorcycles([]);
+    } finally {
+      setIsFetchingMotorcycles(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedCustomer) {
+      fetchMotorcycles(selectedCustomer._id);
+    } else {
+      setCustomerMotorcycles([]);
+      setSelectedMotorcycle(null);
+    }
+  }, [selectedCustomer]);
+
+  const fetchCustomers = async () => {
+    try {
+      const customersRes = await getCustomers();
+      setCustomers(customersRes);
+      return customersRes;
+    } catch (error) {
+      console.error("Failed to fetch customers", error);
+    }
+  };
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -45,12 +98,13 @@ const SalesPage = () => {
           api.get('/products'),
           api.get('/categories'),
           api.get('/brands'),
-          getServices('active'), // --- MODIFIED: Fetch active services
+          getServices('active'),
         ]);
         setProducts(productsRes.data);
         setCategories(categoriesRes.data);
         setBrands(brandsRes.data);
-        setServices(servicesRes); // --- NEW: Set services in state
+        setServices(servicesRes);
+        fetchCustomers();
       } catch (error) {
         console.error("Failed to fetch initial data", error);
       }
@@ -58,8 +112,32 @@ const SalesPage = () => {
     fetchInitialData();
   }, []);
 
-  // --- MODIFIED: Add a 'type' property to distinguish products from services
+  const handleNewCustomerSubmit = async (newCustomerData) => {
+    try {
+      const newCustomer = await createCustomer(newCustomerData);
+      await fetchCustomers();
+      setSelectedCustomer(newCustomer);
+      setIsCustomerModalOpen(false);
+    } catch (error) {
+      console.error("Failed to create new customer", error);
+    }
+  };
+  
+  // --- ADDED: Handler for new motorcycle form submission ---
+  const handleNewMotorcycleSubmit = async (newMotorcycleData) => {
+    try {
+        const newMotorcycle = await createMotorcycle(newMotorcycleData);
+        await fetchMotorcycles(selectedCustomer._id);
+        setSelectedMotorcycle(newMotorcycle);
+        setIsMotorcycleModalOpen(false);
+    } catch (error) {
+        console.error("Failed to create new motorcycle", error);
+    }
+  };
+
+
   const addProductToCart = (product) => {
+    // ... (this function remains the same)
     const productInState = products.find(p => p._id === product._id);
     if (!productInState || productInState.quantity <= 0) return;
 
@@ -84,25 +162,26 @@ const SalesPage = () => {
     );
   };
 
-  // --- NEW: Function to add a service to the cart ---
   const addServiceToCart = (service) => {
+    // ... (this function remains the same)
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item.type === 'service' && item._id === service._id);
       if (existingItem) {
-        return prevCart; // Prevent adding the same service twice
+        return prevCart;
       }
       return [...prevCart, { ...service, type: 'service' }];
     });
-    setIsServiceModalOpen(false); // Close modal after adding
+    setIsServiceModalOpen(false);
   };
 
-  // --- NEW: Function to remove a service from the cart ---
   const removeServiceFromCart = (serviceId) => {
+    // ... (this function remains the same)
     setCartItems(prevCart => prevCart.filter(item => item._id !== serviceId));
   };
 
 
   const updateQuantity = (product, amount) => {
+    // ... (this function remains the same)
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item.type === 'product' && item._id === product._id);
       if (!existingItem) return prevCart;
@@ -135,8 +214,8 @@ const SalesPage = () => {
     });
   };
 
-  // --- MODIFIED: Total calculation now handles both products and services ---
   const calculateTotal = useMemo(() => {
+    // ... (this function remains the same)
     return cartItems.reduce((total, item) => {
       if (item.type === 'product') {
         return total + item.price * item.cartQuantity;
@@ -148,7 +227,6 @@ const SalesPage = () => {
     }, 0);
   }, [cartItems]);
 
-  // --- MODIFIED: Sale completion now sends separate arrays for items and services ---
   const handleCompleteSale = async () => {
     if (cartItems.length === 0) return;
 
@@ -162,9 +240,9 @@ const SalesPage = () => {
         services: cartItems
           .filter(item => item.type === 'service')
           .map(item => ({ service: item._id, priceAtTime: item.charge })),
-        // totalAmount is now calculated on the backend for security, but we can send it for reference
-        // totalAmount: calculateTotal,
         recordedBy: user._id,
+        customerId: selectedCustomer ? selectedCustomer._id : undefined,
+        motorcycleId: selectedMotorcycle ? selectedMotorcycle._id : undefined,
       };
       
       try {
@@ -172,12 +250,13 @@ const SalesPage = () => {
         setLastSaleData(response.data);
         setShowReceiptModal(true);
         setCartItems([]);
-        // Refetch products to get updated stock
+        setSelectedCustomer(null); 
+        setSelectedMotorcycle(null);
+        setCustomerMotorcycles([]);
         const productsResponse = await api.get('/products');
         setProducts(productsResponse.data);
       } catch (error) {
         alert(`Sale failed: ${error.response?.data?.message || error.message}`);
-        // On failure, refetch products to revert optimistic stock updates
         const productsResponse = await api.get('/products');
         setProducts(productsResponse.data);
       }
@@ -185,6 +264,7 @@ const SalesPage = () => {
   };
 
   const filteredProducts = useMemo(() => {
+    // ... (this function remains the same)
     return products.filter(product => {
         const searchMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
         const brandMatch = selectedBrand ? product.brand._id === selectedBrand : true;
@@ -194,13 +274,14 @@ const SalesPage = () => {
   }, [products, searchTerm, selectedBrand, selectedCategory]);
 
   const handleFilterChange = (setter) => (event, newValue) => {
+    // ... (this function remains the same)
     setter(newValue);
   };
 
   return (
     <Box sx={{ display: 'flex', height: '100%', gap: 2 }}>
       
-      {/* Left Column: Product Selection */}
+      {/* Left Column: Product Selection (remains the same) */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <TextField
@@ -265,7 +346,70 @@ const SalesPage = () => {
       {/* Right Column: Cart */}
       <Box sx={{ width: '380px', display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-          {/* --- NEW: Header with Add Service Button --- */}
+          
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <FaUserTag style={{ marginRight: '8px' }} /> Customer Details
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Autocomplete
+                sx={{ flexGrow: 1 }}
+                options={customers}
+                getOptionLabel={(option) => option.name}
+                value={selectedCustomer}
+                onChange={(event, newValue) => {
+                  setSelectedCustomer(newValue);
+                }}
+                isOptionEqualToValue={(option, value) => option._id === value._id}
+                renderInput={(params) => <TextField {...params} label="Select a Customer (Optional)" size="small" />}
+              />
+              <Button variant="outlined" size="small" onClick={() => setIsCustomerModalOpen(true)}>
+                New
+              </Button>
+            </Stack>
+            
+            {selectedCustomer && (
+              <Box sx={{ mt: 2 }}>
+                {/* --- MODIFIED: Motorcycle Autocomplete with "New" button --- */}
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Autocomplete
+                    sx={{ flexGrow: 1 }}
+                    options={customerMotorcycles}
+                    loading={isFetchingMotorcycles}
+                    getOptionLabel={(option) => `${option.make} ${option.model} (${option.plateNumber || 'No Plate'})`}
+                    value={selectedMotorcycle}
+                    onChange={(event, newValue) => {
+                      setSelectedMotorcycle(newValue);
+                    }}
+                    isOptionEqualToValue={(option, value) => option._id === value._id}
+                    renderInput={(params) => (
+                      <TextField 
+                        {...params} 
+                        label="Select Motorcycle (Optional)" 
+                        size="small"
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {isFetchingMotorcycles ? <CircularProgress color="inherit" size={20} /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                  />
+                  <Button variant="outlined" size="small" onClick={() => setIsMotorcycleModalOpen(true)}>
+                    New
+                  </Button>
+                </Stack>
+              </Box>
+            )}
+
+          </Box>
+          <Divider sx={{ mb: 1 }} />
+
+          {/* ... (rest of the cart UI remains the same) ... */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale</Typography>
               <Button variant="outlined" size="small" startIcon={<DesignServicesIcon />} onClick={() => setIsServiceModalOpen(true)}>
@@ -278,7 +422,6 @@ const SalesPage = () => {
               <Typography color="text.secondary" align="center" sx={{ mt: 4 }}>Cart is empty</Typography>
             ) : (
               <List>
-                {/* --- MODIFIED: Cart rendering logic to handle both types --- */}
                 {cartItems.map(item => (
                   <ListItem key={item._id} disablePadding>
                     {item.type === 'product' ? (
@@ -293,7 +436,7 @@ const SalesPage = () => {
                           <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton>
                         </Box>
                       </>
-                    ) : ( // This is a service
+                    ) : (
                       <>
                         <ListItemText 
                           primary={item.name}
@@ -329,11 +472,29 @@ const SalesPage = () => {
         </Paper>
       </Box>
 
+      {/* --- ADDED: Dialog for creating a new motorcycle --- */}
+      {selectedCustomer && (
+        <Dialog open={isMotorcycleModalOpen} onClose={() => setIsMotorcycleModalOpen(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>Add New Motorcycle for {selectedCustomer.name}</DialogTitle>
+            <MotorcycleForm
+                customer={selectedCustomer}
+                onFormSubmit={handleNewMotorcycleSubmit}
+                onClose={() => setIsMotorcycleModalOpen(false)}
+            />
+        </Dialog>
+      )}
+
+      {/* Existing Modals */}
+      <Dialog open={isCustomerModalOpen} onClose={() => setIsCustomerModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add New Customer</DialogTitle>
+        <CustomerForm 
+          onClose={() => setIsCustomerModalOpen(false)}
+          onFormSubmit={handleNewCustomerSubmit}
+        />
+      </Dialog>
       {showReceiptModal && lastSaleData && (
         <ReceiptModal saleData={lastSaleData} onClose={() => setShowReceiptModal(false)} />
       )}
-      
-      {/* --- NEW: Render the service modal --- */}
       <AddServiceModal
         open={isServiceModalOpen}
         onClose={() => setIsServiceModalOpen(false)}

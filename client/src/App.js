@@ -29,13 +29,15 @@ import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import CreatePurchaseOrderPage from './pages/CreatePurchaseOrderPage';
 import PurchaseOrderDetailPage from './pages/PurchaseOrderDetailPage'; 
 import DeliveriesPage from './pages/DeliveriesPage';
+import CustomersPage from './pages/CustomersPage'; 
+import ReturnsPage from './pages/ReturnsPage'; 
 
 
 const InnerApp = () => {
   const { user, mustChangePassword, isInitializing } = useContext(AuthContext);
 
   if (isInitializing) {
-    return <div className="loading">Loading Application...</div>;
+    return <div>Loading Application...</div>;
   }
 
   return (
@@ -70,11 +72,13 @@ const InnerApp = () => {
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
-            <Route path="/deliveries" element={<DeliveriesPage />} /> {/* <-- CORRECTED LINE */}
+            <Route path="/deliveries" element={<DeliveriesPage />} />
             <Route path="/audit-log" element={<AuditLogPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/user-management" element={<UserManagementPage />} />
             <Route path="/data-management" element={<DataManagementPage />} /> 
+            <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/returns" element={<ReturnsPage />} />
             <Route path="/" element={<Navigate to="/dashboard" />} />
           </Route>
         </Route>
