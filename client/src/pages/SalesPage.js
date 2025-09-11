@@ -6,10 +6,11 @@ import ReceiptModal from '../components/ReceiptModal';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { getServices } from '../api/serviceApi';
 import { getCustomers, createCustomer } from '../api/customerApi';
-import { getMotorcyclesByCustomer, createMotorcycle } from '../api/motorcycleApi'; // --- MODIFIED ---
+import { getMotorcyclesByCustomer, createMotorcycle } from '../api/motorcycleApi';
 import AddServiceModal from '../components/AddServiceModal';
 import CustomerForm from '../components/CustomerForm';
-import MotorcycleForm from '../components/MotorcycleForm'; // --- ADDED ---
+import MotorcycleForm from '../components/MotorcycleForm';
+import { grey } from '@mui/material/colors';
 
 // MUI Imports
 import {
@@ -20,7 +21,6 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
-// ... (rest of imports remain the same)
 import RemoveIcon from '@mui/icons-material/Remove';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
@@ -39,7 +39,7 @@ const SalesPage = () => {
   const [customerMotorcycles, setCustomerMotorcycles] = useState([]);
   const [selectedMotorcycle, setSelectedMotorcycle] = useState(null);
   const [isFetchingMotorcycles, setIsFetchingMotorcycles] = useState(false);
-  const [isMotorcycleModalOpen, setIsMotorcycleModalOpen] = useState(false); // --- ADDED ---
+  const [isMotorcycleModalOpen, setIsMotorcycleModalOpen] = useState(false);
   
   // Existing state
   const [products, setProducts] = useState([]);
@@ -57,13 +57,12 @@ const SalesPage = () => {
   const [lastSaleData, setLastSaleData] = useState(null);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
 
-  // --- ADDED: Reusable function to fetch motorcycles for a customer ---
   const fetchMotorcycles = async (customerId) => {
     setIsFetchingMotorcycles(true);
     try {
       const data = await getMotorcyclesByCustomer(customerId);
       setCustomerMotorcycles(data);
-      return data; // Return data for chaining
+      return data;
     } catch (err) {
       console.error("Failed to fetch motorcycles", err);
       setCustomerMotorcycles([]);
@@ -123,7 +122,6 @@ const SalesPage = () => {
     }
   };
   
-  // --- ADDED: Handler for new motorcycle form submission ---
   const handleNewMotorcycleSubmit = async (newMotorcycleData) => {
     try {
         const newMotorcycle = await createMotorcycle(newMotorcycleData);
@@ -137,7 +135,6 @@ const SalesPage = () => {
 
 
   const addProductToCart = (product) => {
-    // ... (this function remains the same)
     const productInState = products.find(p => p._id === product._id);
     if (!productInState || productInState.quantity <= 0) return;
 
@@ -163,7 +160,6 @@ const SalesPage = () => {
   };
 
   const addServiceToCart = (service) => {
-    // ... (this function remains the same)
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item.type === 'service' && item._id === service._id);
       if (existingItem) {
@@ -175,13 +171,11 @@ const SalesPage = () => {
   };
 
   const removeServiceFromCart = (serviceId) => {
-    // ... (this function remains the same)
     setCartItems(prevCart => prevCart.filter(item => item._id !== serviceId));
   };
 
 
   const updateQuantity = (product, amount) => {
-    // ... (this function remains the same)
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item.type === 'product' && item._id === product._id);
       if (!existingItem) return prevCart;
@@ -215,7 +209,6 @@ const SalesPage = () => {
   };
 
   const calculateTotal = useMemo(() => {
-    // ... (this function remains the same)
     return cartItems.reduce((total, item) => {
       if (item.type === 'product') {
         return total + item.price * item.cartQuantity;
@@ -264,7 +257,6 @@ const SalesPage = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    // ... (this function remains the same)
     return products.filter(product => {
         const searchMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
         const brandMatch = selectedBrand ? product.brand._id === selectedBrand : true;
@@ -274,16 +266,15 @@ const SalesPage = () => {
   }, [products, searchTerm, selectedBrand, selectedCategory]);
 
   const handleFilterChange = (setter) => (event, newValue) => {
-    // ... (this function remains the same)
     setter(newValue);
   };
 
   return (
-    <Box sx={{ display: 'flex', height: '100%', gap: 2 }}>
-      
-      {/* Left Column: Product Selection (remains the same) */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <Box sx={{ display: 'flex', height: '100%', gap: 2}}>
+    
+      {/* Left Column: Product Selection */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column'}}>
+        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%'}}>
           <TextField
             fullWidth label="Search Products" variant="outlined" size="small" value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -305,20 +296,35 @@ const SalesPage = () => {
           <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
             <Grid container spacing={2}>
               {filteredProducts.map(product => (
-                <Grid item key={product._id} xs={6} sm={4} md={4} lg={3} sx={{ display: 'flex' }}>
-                  <Card sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Grid item key={product._id} size={{ xs: 12, sm: 4, md: 3, lg: 2 }}>
+                  <Card sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%',
+                    ...(product.quantity === 0 && {
+                      backgroundColor: grey[300],
+                      cursor: 'not-allowed'
+                    })
+                  }}>
                     <CardActionArea 
                       onClick={() => addProductToCart(product)} 
                       disabled={product.quantity === 0}
-                      sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }} 
+                      sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1}} 
                     >
                       <CardMedia
                         component="img" height="120" image={product.image || 'https://placehold.co/300x200'}
-                        alt={product.name} sx={{ objectFit: 'contain', p: 1 }}
+                        alt={product.name}
+                        sx={{
+                          objectFit: 'contain',
+                          p: 1,
+                          ...(product.quantity === 0 && {
+                            filter: 'grayscale(100%)'
+                          })
+                        }}
                       />
                       {product.quantity === 0 && (
-                        <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '120px', backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Typography variant="button" color="error" sx={{ fontWeight: 'bold' }}>Out of Stock</Typography>
+                        <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '120px', backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                          <Typography variant="button" color="error" sx={{ fontWeight: 'bold'}}>Out of Stock</Typography>
                         </Box>
                       )}
                       <CardContent sx={{ p: 1, flexGrow: 1, width: '100%' }}>
@@ -370,7 +376,6 @@ const SalesPage = () => {
             
             {selectedCustomer && (
               <Box sx={{ mt: 2 }}>
-                {/* --- MODIFIED: Motorcycle Autocomplete with "New" button --- */}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Autocomplete
                     sx={{ flexGrow: 1 }}
@@ -409,7 +414,6 @@ const SalesPage = () => {
           </Box>
           <Divider sx={{ mb: 1 }} />
 
-          {/* ... (rest of the cart UI remains the same) ... */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale</Typography>
               <Button variant="outlined" size="small" startIcon={<DesignServicesIcon />} onClick={() => setIsServiceModalOpen(true)}>
@@ -472,7 +476,6 @@ const SalesPage = () => {
         </Paper>
       </Box>
 
-      {/* --- ADDED: Dialog for creating a new motorcycle --- */}
       {selectedCustomer && (
         <Dialog open={isMotorcycleModalOpen} onClose={() => setIsMotorcycleModalOpen(false)} maxWidth="sm" fullWidth>
             <DialogTitle>Add New Motorcycle for {selectedCustomer.name}</DialogTitle>
@@ -484,7 +487,6 @@ const SalesPage = () => {
         </Dialog>
       )}
 
-      {/* Existing Modals */}
       <Dialog open={isCustomerModalOpen} onClose={() => setIsCustomerModalOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Add New Customer</DialogTitle>
         <CustomerForm 
