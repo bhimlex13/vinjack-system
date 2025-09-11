@@ -70,7 +70,7 @@ const LoginPage = () => {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          backgroundColor: 'rgba(116, 119, 136, 0.35)', 
+          backgroundColor: 'rgba(24, 34, 92, 0.35)', 
           backdropFilter: 'blur(10px)',
           borderRadius: '15px',
           color: 'white',
