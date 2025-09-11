@@ -137,7 +137,7 @@ const DashboardPage = () => {
 
   return (
     // --- CHANGE: Use a standard Container with maxWidth for better spacing on large screens ---
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="lx" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
           Dashboard
@@ -153,21 +153,21 @@ const DashboardPage = () => {
       {/* --- NEW LAYOUT STRUCTURE START --- */}
       <Grid container spacing={3}>
         {/* Row 1: Stat Cards */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatCard title="Total Revenue" value={`₱${(summary?.totalRevenue)?.toFixed(2) || '0.00'}`} icon={<FaMoneyBillWave />} color="primary" />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatCard title="Total Profit" value={`₱${(summary?.totalProfit)?.toFixed(2) || '0.00'}`} icon={<MonetizationOnIcon />} color="info" />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatCard title="Total Sales" value={summary?.totalSales || 0} icon={<FaShoppingCart />} color="success" />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatCard title="Total Units in Stock" value={summary?.totalStock || 0} icon={<FaWarehouse />} color="error" />
         </Grid>
 
         {/* Row 2: Main Chart */}
-        <Grid item xs={12}>
+        <Grid item size= {{xs:12}}>
           <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: 350 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <ShowChartIcon color="action" sx={{ mr: 1 }}/>
@@ -184,10 +184,10 @@ const DashboardPage = () => {
             </Box>
           </Paper>
         </Grid>
+
+        {/* Row 3: Other Charts */}
         
-        {/* Row 3: A balanced 2x2 grid for the remaining panels */}
-        {/* The key is setting a consistent height on the parent Grid item and making the Paper fill it */}
-        <Grid item xs={12} md={6} sx={{ height: '420px' }}>
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <BarChartIcon color="action" sx={{ mr: 1 }}/>
@@ -199,7 +199,7 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
         
-        <Grid item xs={12} md={6} sx={{ height: '420px' }}>
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <WarningAmberIcon color="warning" sx={{ mr: 1 }}/>
@@ -223,7 +223,7 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6} sx={{ height: '420px' }}>
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
               <ReceiptLongIcon color="primary" sx={{ mr: 1 }} />
@@ -247,7 +247,7 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
         
-        <Grid item xs={12} md={6} sx={{ height: '420px' }}>
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
               <AssignmentIcon color="secondary" sx={{ mr: 1 }} />
@@ -270,6 +270,8 @@ const DashboardPage = () => {
             </TableContainer>
           </Paper>
         </Grid>
+
+
       </Grid>
       {/* --- NEW LAYOUT STRUCTURE END --- */}
     </Container>

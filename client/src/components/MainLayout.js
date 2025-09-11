@@ -5,7 +5,7 @@ import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 
 // MUI Imports
-import { Box, Toolbar } from '@mui/material'; // <-- Container is no longer needed here
+import { Box, Toolbar, Container } from '@mui/material'; // <-- Re-added Container
 
 const MainLayout = () => {
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -29,16 +29,16 @@ const MainLayout = () => {
           flexGrow: 1,
           height: '100vh',
           overflow: 'auto',
-          p: 3, // <-- ADDED: Consistent padding for all pages
         }}
       >
         {/* Toolbar acts as a spacer for the fixed AppBar */}
         <Toolbar />
         
-        {/* --- REMOVED the restrictive Container that was wrapping the Outlet --- */}
-        
-        {/* The Outlet now renders directly into the full-width Box */}
-        <Outlet />
+        {/* --- THIS IS THE KEY CHANGE --- */}
+        {/* The Container now wraps the Outlet, providing consistent layout for all pages */}
+        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+            <Outlet />
+        </Container>
 
       </Box>
     </Box>
