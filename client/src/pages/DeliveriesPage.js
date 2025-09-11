@@ -8,7 +8,7 @@ import RecordDeliveryForm from '../components/RecordDeliveryForm';
 import { 
   Box, Button, Typography, Paper, Dialog, DialogTitle, DialogContent,
   DialogActions, Table, TableBody, TableCell, TableHead, TableRow, Chip,
-  Grid, Divider, Stack
+  Grid, Divider, Stack, Container // <-- IMPORTED CONTAINER
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
@@ -78,7 +78,8 @@ const DeliveriesPage = () => {
   if (error) return <Typography color="error" sx={{ p: 3 }}>{error}</Typography>;
 
   return (
-    <Box sx={{ p: 3 }}>
+    // --- THIS IS THE KEY CHANGE ---
+    <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>
             <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
@@ -135,7 +136,7 @@ const DeliveriesPage = () => {
                       <Typography variant="h6" component="p">
                         {selectedDelivery.purchaseOrder
                           ? `Purchase Order #${selectedDelivery.purchaseOrder.poNumber}`
-                          : 'Direct Delivery' // <-- FIX: Changed hyphen (-) to a colon (:)
+                          : 'Direct Delivery'
                         }
                       </Typography>
                     </Grid>
@@ -180,7 +181,7 @@ const DeliveriesPage = () => {
           <RecordDeliveryForm onClose={handleDeliveryFormClose} />
         </DialogContent>
       </Dialog>
-    </Box>
+    </Container>
   );
 };
 

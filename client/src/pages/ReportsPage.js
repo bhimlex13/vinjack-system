@@ -4,7 +4,6 @@ import api from '../api/axios';
 
 // MUI Imports
 import {
-  Box,
   Typography,
   Paper,
   TextField,
@@ -19,20 +18,19 @@ import {
   Alert,
   List,
   ListItem,
-  ListItemText
+  ListItemText,
+  Container 
 } from '@mui/material';
 
 const ReportsPage = () => {
-  // --- CHANGE: Get today's date in YYYY-MM-DD format ---
   const today = new Date().toISOString().split('T')[0];
 
   const [reportData, setReportData] = useState([]);
-  // --- CHANGE: Initialize startDate and endDate with today's date ---
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [wasGenerated, setWasGenerated] = useState(false); // Track if a report has been generated
+  const [wasGenerated, setWasGenerated] = useState(false);
 
   const reportSummary = useMemo(() => {
     if (reportData.length === 0) {
@@ -80,7 +78,8 @@ const ReportsPage = () => {
   );
 
   return (
-    <Box sx={{ p: 3 }}>
+    // --- THIS IS THE KEY CHANGE ---
+    <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
         Sales & Profitability Report
       </Typography>
@@ -162,7 +161,7 @@ const ReportsPage = () => {
           )}
         </>
       )}
-    </Box>
+    </Container>
   );
 };
 

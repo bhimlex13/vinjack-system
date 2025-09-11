@@ -2,21 +2,21 @@
 import React, { useState, useEffect } from 'react';
 import { getCustomers, deleteCustomer } from '../api/customerApi';
 import CustomerForm from '../components/CustomerForm';
-import CustomerMotorcyclesModal from '../components/CustomerMotorcyclesModal'; // --- ADDED ---
+import CustomerMotorcyclesModal from '../components/CustomerMotorcyclesModal';
 import { useWarning } from '../context/WarningContext';
 
 // MUI Imports
-import { Box, Button, Typography, Paper, Stack, Dialog, DialogTitle } from '@mui/material';
+import { Box, Button, Typography, Paper, Stack, Dialog, DialogTitle, Container } from '@mui/material'; // <-- IMPORTED CONTAINER
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
-import { FaUserFriends, FaMotorcycle } from 'react-icons/fa'; // --- MODIFIED ---
+import { FaUserFriends, FaMotorcycle } from 'react-icons/fa';
 
 const CustomersPage = () => {
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
-  const [managingCustomer, setManagingCustomer] = useState(null); // --- ADDED: State for motorcycle modal
+  const [managingCustomer, setManagingCustomer] = useState(null);
   const showWarning = useWarning();
 
   useEffect(() => {
@@ -70,11 +70,10 @@ const CustomersPage = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 300, // --- MODIFIED: Increased width for new button
+      width: 300,
       sortable: false,
       renderCell: (params) => (
         <Stack direction="row" spacing={1}>
-          {/* --- ADDED: "Vehicles" button --- */}
           <Button 
             variant="outlined" 
             size="small" 
@@ -91,7 +90,8 @@ const CustomersPage = () => {
   ];
 
   return (
-    <Box sx={{ p: 3 }}>
+    // --- THIS IS THE KEY CHANGE ---
+    <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       {/* Modal for Adding/Editing Customers */}
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
@@ -102,7 +102,6 @@ const CustomersPage = () => {
         />
       </Dialog>
       
-      {/* --- ADDED: Modal for Managing Motorcycles --- */}
       {managingCustomer && (
           <CustomerMotorcyclesModal 
             open={Boolean(managingCustomer)}
@@ -131,7 +130,7 @@ const CustomersPage = () => {
           getRowId={(row) => row._id}
         />
       </Paper>
-    </Box>
+    </Container>
   );
 };
 
