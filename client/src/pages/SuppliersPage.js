@@ -4,14 +4,15 @@ import api from '../api/axios';
 import SupplierForm from '../components/SupplierForm';
 
 // MUI Imports
-import { 
-  Box, 
-  Button, 
-  Typography, 
-  Paper, 
+import {
+  Box,
+  Button,
+  Typography,
+  Paper,
   Stack,
   Dialog,
-  DialogTitle
+  DialogTitle,
+  Container // <-- IMPORTED CONTAINER
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
@@ -92,8 +93,8 @@ const SuppliersPage = () => {
   ];
 
   return (
-    // Use a Box instead of a Fragment to apply padding
-    <Box sx={{ p: 3 }}>
+    // --- THIS IS THE KEY CHANGE ---
+    <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       <Dialog 
         open={isSupplierModalOpen} 
         onClose={() => setIsSupplierModalOpen(false)} 
@@ -119,7 +120,7 @@ const SuppliersPage = () => {
         </Stack>
       </Box>
 
-      <Paper sx={{ height: '75vh', width: '100%' }}>
+      <Paper sx={{ height: '75vh', width: ' ১০০%' }}>
         <DataGrid
           rows={suppliers}
           columns={columns}
@@ -127,7 +128,7 @@ const SuppliersPage = () => {
           getRowId={(row) => row._id}
         />
       </Paper>
-    </Box>
+    </Container>
   );
 };
 

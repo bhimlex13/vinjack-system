@@ -1,23 +1,29 @@
 // client/src/pages/LoginPage.js
 import React, { useState, useContext } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 
 // MUI Imports
 import {
   Box,
   Button,
-  Grid,
-  Link,
   TextField,
   Typography,
   Paper,
-  CircularProgress
+  CircularProgress,
+  FormControlLabel,
+  Checkbox,
+  InputAdornment
 } from '@mui/material';
+
+// Icon Imports
+import PersonIcon from '@mui/icons-material/Person';
+import LockIcon from '@mui/icons-material/Lock';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useContext(AuthContext);
@@ -40,111 +46,156 @@ const LoginPage = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', width: '100vw' }}>
-      {/* Left Branding Panel */}
-      <Grid
-        item
-        xs={false}
-        sm={4}
-        md={7}
+    <Box
+      sx={{
+        height: '100vh',
+        width: '100vw',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#0080ffff',
+        backgroundImage: 'url(/assets/motorcycle-bg.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        p: 2,
+      }}
+    >
+      <Paper
+        elevation={6}
         sx={{
-          backgroundImage: 'url(/assets/motorcycle-bg.jpg)',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: (t) =>
-            t.palette.mode === 'light' ? t.palette.grey[50] : t.palette.grey[900],
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          position: 'relative',
+          p: 4,
+          maxWidth: 650,
+          width: '100%',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
           alignItems: 'center',
+          backgroundColor: 'rgba(116, 119, 136, 0.35)', 
+          backdropFilter: 'blur(10px)',
+          borderRadius: '15px',
           color: 'white',
-          textAlign: 'center',
-          '&::before': { // Dark overlay
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.6)',
-          },
+          border: '1px solid rgba(8, 1, 51, 0.18)',
         }}
       >
-        <Box sx={{ position: 'relative', zIndex: 1, p: 3 }}>
-          <Typography component="h1" variant="h3" gutterBottom>
-            VinJack Motorworks
-          </Typography>
-          <Typography variant="h6">
-            Sales & Inventory Management System
-          </Typography>
-        </Box>
-      </Grid>
-
-      {/* Right Form Panel */}
-      <Grid item xs={12} sm={8} md={5} component={Paper} elevation={6} square>
+        {/* --- ADDED: Logo and System Name --- */}
         <Box
+          component="img"
           sx={{
-            my: 8,
-            mx: 4,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
+            height: 80,
+            mb: 1,
           }}
-        >
-          <Typography component="h1" variant="h5">
-            Sign In
-          </Typography>
-          <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 1 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="username"
-              label="Username"
-              name="username"
-              autoComplete="username"
-              autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            {error && (
-              <Typography color="error" variant="body2" align="center" sx={{ mt: 2 }}>
-                {error}
-              </Typography>
-            )}
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              disabled={isLoading}
-              sx={{ mt: 3, mb: 2, py: 1.5 }}
-            >
-              {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
-            </Button>
-            <Grid container justifyContent="center">
-              <Grid item>
-                <Link component={RouterLink} to="/register" variant="body2">
-                  {"Don't have an account? Create one"}
-                </Link>
-              </Grid>
-            </Grid>
-          </Box>
+          alt="VinJack Motorworks Logo"
+          src="/assets/vinjack_logo.png" 
+        />
+        <Typography component="h1" variant="h5" sx={{ fontWeight: 'bold' }}>
+          VinJack Motorworks
+        </Typography>
+        <Typography component="p" variant="subtitle1" gutterBottom>
+          Sales & Inventory System
+        </Typography>
+
+        <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 2, width: '100%' }}>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="username"
+            label="Username"
+            name="username"
+            autoComplete="username"
+            autoFocus
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                '&:hover fieldset': { borderColor: 'white' },
+                '&.Mui-focused fieldset': { borderColor: 'white' },
+              },
+              '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.7)' },
+              '& .MuiInputLabel-root.Mui-focused': { color: 'white' },
+              '& .MuiInputBase-input': { color: 'white' },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <PersonIcon sx={{ color: 'white' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="password"
+            label="Password"
+            type="password"
+            id="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.5)' },
+                '&:hover fieldset': { borderColor: 'white' },
+                '&.Mui-focused fieldset': { borderColor: 'white' },
+              },
+              '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.7)' },
+              '& .MuiInputLabel-root.Mui-focused': { color: 'white' },
+              '& .MuiInputBase-input': { color: 'white' },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <LockIcon sx={{ color: 'white' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          {/* --- REMOVED: "Forgot Password?" link and simplified "Remember Me" --- */}
+          <FormControlLabel
+            control={
+              <Checkbox
+                value="remember"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                sx={{ color: 'rgba(255, 255, 255, 0.7)', '&.Mui-checked': { color: 'white' } }}
+              />
+            }
+            label={<Typography variant="body2">Remember Me</Typography>}
+          />
+          {error && (
+            <Typography color="error" variant="body2" align="center" sx={{ mt: 1, mb: 1 }}>
+              {error}
+            </Typography>
+          )}
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            disabled={isLoading}
+            sx={{
+              mt: 3,
+              mb: 2,
+              py: 1.5,
+              fontSize: '1rem',
+              backgroundColor: 'white',
+              color: '#2c3e50',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.85)',
+              },
+            }}
+          >
+            {isLoading ? <CircularProgress size={24} sx={{ color: '#2c3e50' }} /> : 'Sign In'}
+          </Button>
+
+          {/* --- REMOVED: "Register" link section --- */}
+          
         </Box>
-      </Grid>
+      </Paper>
     </Box>
   );
 };

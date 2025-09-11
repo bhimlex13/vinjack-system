@@ -5,7 +5,7 @@ import CreateReturnModal from '../components/CreateReturnModal';
 import { toast } from 'react-toastify';
 
 // MUI Imports
-import { Box, Button, Typography, Paper, Stack } from '@mui/material';
+import { Box, Button, Typography, Paper, Stack, Container } from '@mui/material'; // <-- IMPORTED CONTAINER
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import { FaUndo } from 'react-icons/fa';
@@ -38,21 +38,18 @@ const ReturnsPage = () => {
       field: 'createdAt',
       headerName: 'Return Date',
       width: 200,
-      // FIX: Switched to renderCell for direct display control
       renderCell: (params) => (params.row.createdAt ? new Date(params.row.createdAt).toLocaleString() : 'N/A')
     },
     {
-      field: 'originalSaleId', // Field can be a unique name now
+      field: 'originalSaleId',
       headerName: 'Original Sale ID',
       width: 250,
-      // FIX: Switched to renderCell and accessing the nested property
       renderCell: (params) => params.row.originalSale?._id || 'N/A'
     },
     {
       field: 'totalRefundAmount',
       headerName: 'Refund Amount',
       width: 150,
-      // FIX: Switched to renderCell for direct formatting
       renderCell: (params) => (typeof params.row.totalRefundAmount === 'number' ? `₱${params.row.totalRefundAmount.toFixed(2)}` : 'N/A')
     },
     { 
@@ -61,16 +58,16 @@ const ReturnsPage = () => {
       flex: 1 
     },
     {
-      field: 'recordedByFullName', // Field can be a unique name now
+      field: 'recordedByFullName',
       headerName: 'Processed By',
       width: 180,
-      // FIX: Switched to renderCell and accessing the nested property
       renderCell: (params) => params.row.recordedBy?.fullName || 'N/A'
     }
   ];
 
   return (
-    <Box sx={{ p: 3 }}>
+    // --- THIS IS THE KEY CHANGE ---
+    <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       <CreateReturnModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -97,7 +94,7 @@ const ReturnsPage = () => {
           getRowId={(row) => row._id}
         />
       </Paper>
-    </Box>
+    </Container>
   );
 };
 
