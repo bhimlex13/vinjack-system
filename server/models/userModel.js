@@ -52,7 +52,6 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 userSchema.pre('save', async function(next) {
-  // Only hash the password if it has been modified and is not already a long hash
   if (this.isModified('password') && this.password.length < 50) {
       const salt = await bcrypt.genSalt(10);
       this.password = await bcrypt.hash(this.password, salt);

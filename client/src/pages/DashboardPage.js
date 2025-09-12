@@ -1,4 +1,3 @@
-// client/src/pages/DashboardPage.js
 import React, { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { Bar, Line } from 'react-chartjs-2';
@@ -74,8 +73,8 @@ const DashboardPage = () => {
         const [summaryResponse, lowStockResponse, salesTrendResponse, recentTransactionsResponse, pendingPOsResponse] = await Promise.all([
           api.get(`/reports/summary?range=${timeRange}`),
           api.get('/reports/low-stock'),
-          api.get('/reports/sales-trend'),
-          api.get('/reports/recent-transactions'),
+          api.get(`/reports/sales-trend?range=${timeRange}`),
+          api.get(`/reports/recent-transactions?range=${timeRange}`),
           api.get('/reports/pending-pos')
         ]);
         setSummary(summaryResponse.data);
@@ -98,6 +97,33 @@ const DashboardPage = () => {
     }
   };
   
+  const getTrendChartTitle = () => {
+    switch (timeRange) {
+      case 'today':
+        return 'Revenue Trend (Today)';
+      case 'week':
+        return 'Revenue Trend (This Week)';
+      case 'month':
+        return 'Revenue Trend (This Month)';
+      default:
+        return 'Revenue Trend (All Time)';
+    }
+  };
+
+  const formatTrendChartLabels = (data) => {
+    if (!data || data.length === 0) return [];
+    
+    const firstLabel = data[0]._id;
+
+    if (firstLabel.includes(':')) { // Hourly format for 'today' (e.g., "2023-10-27 14:00")
+        return data.map(d => new Date(d._id).toLocaleTimeString([], { hour: 'numeric', hour12: true }));
+    } else if (firstLabel.length === 7) { // Monthly format for 'all' (e.g., "2023-10")
+        return data.map(d => new Date(d._id + '-02').toLocaleDateString("en-US", { month: 'long', year: 'numeric' }));
+    } else { // Daily format for 'week' or 'month' (e.g., "2023-10-27")
+        return data.map(d => new Date(d._id).toLocaleDateString("en-US", { month: 'short', day: 'numeric' }));
+    }
+  };
+
   const barChartData = {
     labels: summary?.topSellingProducts.map(p => p.productInfo.name.substring(0, 15) + '...') || [],
     datasets: [{
@@ -111,10 +137,11 @@ const DashboardPage = () => {
     plugins: { legend: { display: false } },
     scales: { y: { beginAtZero: true } }
   };
+  
   const lineChartData = {
-    labels: salesTrend?.map(d => new Date(d._id).toLocaleDateString("en-US", { month: 'short', day: 'numeric' })) || [],
+    labels: formatTrendChartLabels(salesTrend),
     datasets: [{
-      label: 'Daily Revenue',
+      label: 'Revenue',
       data: salesTrend?.map(d => d.totalSales) || [],
       borderColor: 'rgb(75, 192, 192)',
       backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -136,7 +163,6 @@ const DashboardPage = () => {
   }
 
   return (
-    // --- CHANGE: Use a standard Container with maxWidth for better spacing on large screens ---
     <Container maxWidth="lx" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
@@ -150,7 +176,6 @@ const DashboardPage = () => {
         </ToggleButtonGroup>
       </Box>
 
-      {/* --- NEW LAYOUT STRUCTURE START --- */}
       <Grid container spacing={3}>
         {/* Row 1: Stat Cards */}
         <Grid item size={{ xs: 12, sm: 6, lg: 3 }}>
@@ -167,26 +192,25 @@ const DashboardPage = () => {
         </Grid>
 
         {/* Row 2: Main Chart */}
-        <Grid item size= {{xs:12}}>
+        <Grid item size={{ xs: 12 }}>
           <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: 350 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <ShowChartIcon color="action" sx={{ mr: 1 }}/>
-                <Typography variant="h6" component="h3">Daily Revenue (Last 30 Days)</Typography>
+                <Typography variant="h6" component="h3">{getTrendChartTitle()}</Typography>
             </Box>
             <Box sx={{ flexGrow: 1, position: 'relative' }}>
               {salesTrend && salesTrend.length > 0 ? (
                 <Line options={lineChartOptions} data={lineChartData} />
               ) : (
                 <Box sx={{display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center'}}>
-                  <Typography>Not enough data to display sales trend.</Typography>
+                  <Typography>Not enough data to display sales trend for this period.</Typography>
                 </Box>
               )}
             </Box>
           </Paper>
         </Grid>
 
-        {/* Row 3: Other Charts */}
-        
+        {/* Row 3: Other Widgets */}
         <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
@@ -240,7 +264,7 @@ const DashboardPage = () => {
                       <TableCell>{new Date(sale.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
                       <TableCell align="right">{`₱${sale.totalAmount.toFixed(2)}`}</TableCell>
                     </TableRow>
-                  ))) : (<TableRow><TableCell colSpan={2} align="center">No recent transactions.</TableCell></TableRow>)}
+                  ))) : (<TableRow><TableCell colSpan={2} align="center">No recent transactions for this period.</TableCell></TableRow>)}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -270,10 +294,7 @@ const DashboardPage = () => {
             </TableContainer>
           </Paper>
         </Grid>
-
-
       </Grid>
-      {/* --- NEW LAYOUT STRUCTURE END --- */}
     </Container>
   );
 };
