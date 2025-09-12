@@ -1,40 +1,51 @@
 // server/controllers/reportController.js
 const Sale = require('../models/saleModel');
 const Product = require('../models/productModel');
-const PurchaseOrder = require('../models/purchaseOrderModel'); // --- ADDED
+const PurchaseOrder = require('../models/purchaseOrderModel');
+
+// --- NEW HELPER FUNCTION ---
+// Helper to create a date filter object based on the time range query
+const createDateFilter = (range) => {
+  const dateFilter = {};
+  const now = new Date();
+
+  switch (range) {
+    case 'today':
+      // Start of today
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      dateFilter.createdAt = { $gte: today };
+      break;
+    case 'week':
+      // Start of the current week (assuming Sunday is the first day)
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      dateFilter.createdAt = { $gte: startOfWeek };
+      break;
+    case 'month':
+      // Start of the current month
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      dateFilter.createdAt = { $gte: startOfMonth };
+      break;
+    default:
+      // 'all' or no range provided, dateFilter remains empty
+      break;
+  }
+  return dateFilter;
+};
+// --- END HELPER FUNCTION ---
+
 
 // @desc    Get dashboard summary statistics
 // @route   GET /api/reports/summary
 const getDashboardSummary = async (req, res) => {
   try {
     const { range } = req.query;
-    const dateFilter = {};
-    const now = new Date();
-
-    // Set the start date based on the selected range
-    switch (range) {
-      case 'today':
-        const today = new Date(now.setHours(0, 0, 0, 0));
-        dateFilter.createdAt = { $gte: today };
-        break;
-      case 'week':
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-        dateFilter.createdAt = { $gte: startOfWeek };
-        break;
-      case 'month':
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        dateFilter.createdAt = { $gte: startOfMonth };
-        break;
-      default:
-        // 'all' or no range provided, dateFilter remains empty to fetch all data
-        break;
-    }
+    // --- CHANGE: Use helper function for consistency ---
+    const dateFilter = createDateFilter(range);
 
     // 1. Calculate Total Revenue and Sales in parallel with Total COGS
     const [salesData, cogsData] = await Promise.all([
-      // Aggregation for Revenue and Sales Count
       Sale.aggregate([
         { $match: dateFilter },
         {
@@ -45,7 +56,6 @@ const getDashboardSummary = async (req, res) => {
           }
         }
       ]),
-      // Aggregation for Total Cost of Goods Sold (COGS)
       Sale.aggregate([
         { $match: dateFilter },
         { $unwind: '$items' },
@@ -67,7 +77,6 @@ const getDashboardSummary = async (req, res) => {
       ])
     ]);
 
-    // Calculate profit
     const totalRevenue = salesData[0]?.totalRevenue || 0;
     const totalCOGS = cogsData[0]?.totalCOGS || 0;
     const totalProfit = totalRevenue - totalCOGS;
@@ -120,7 +129,6 @@ const getDashboardSummary = async (req, res) => {
   }
 };
 
-
 // @desc    Get a sales report for a given date range
 // @route   GET /api/reports/sales
 const getSalesReport = async (req, res) => {
@@ -130,17 +138,13 @@ const getSalesReport = async (req, res) => {
       return res.status(400).json({ message: 'Please provide a start and end date.' });
     }
 
-    // --- CHANGE START ---
-    // Create a date object from the endDate string
     const endOfDay = new Date(endDate);
-    // Set the date to the next day to include the entire endDate
     endOfDay.setDate(endOfDay.getDate() + 1);
-    // --- CHANGE END ---
 
     const sales = await Sale.find({
       createdAt: {
         $gte: new Date(startDate),
-        $lt: endOfDay, // Use $lt (less than) the start of the next day
+        $lt: endOfDay,
       },
     })
     .sort({ createdAt: -1 })
@@ -169,40 +173,74 @@ const getLowStockProducts = async (req, res) => {
   }
 };
 
-// @desc    Get sales trend data for the last 30 days
+// --- MODIFIED FUNCTION START ---
+// @desc    Get sales trend data
 // @route   GET /api/reports/sales-trend
 const getSalesTrend = async (req, res) => {
   try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const { range } = req.query;
+    let dateFilter = {};
+    let groupByFormat = "%Y-%m-%d"; // Group by day by default
+    const now = new Date();
+
+    if (range === 'all' || !range) {
+      // For "all time", group by month to make the chart readable
+      groupByFormat = "%Y-%m";
+    } else {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // Default to last 30 days if no specific range is matched below
+        dateFilter = { createdAt: { $gte: thirtyDaysAgo } };
+    }
+  
+    // Specific time ranges override the default
+    switch (range) {
+      case 'today':
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        dateFilter = { createdAt: { $gte: todayStart } };
+        groupByFormat = "%Y-%m-%d %H:00"; // Group by hour for today's view
+        break;
+      case 'week':
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay());
+        weekStart.setHours(0, 0, 0, 0);
+        dateFilter = { createdAt: { $gte: weekStart } };
+        groupByFormat = "%Y-%m-%d";
+        break;
+      case 'month':
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        dateFilter = { createdAt: { $gte: monthStart } };
+        groupByFormat = "%Y-%m-%d";
+        break;
+    }
 
     const salesTrend = await Sale.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: thirtyDaysAgo }
-        }
-      },
+      { $match: dateFilter },
       {
         $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          _id: { $dateToString: { format: groupByFormat, date: "$createdAt", timezone: "Asia/Manila" } },
           totalSales: { $sum: '$totalAmount' }
         }
       },
-      {
-        $sort: { _id: 1 }
-      }
+      { $sort: { _id: 1 } }
     ]);
     res.json(salesTrend);
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+// --- MODIFIED FUNCTION END ---
 
-// @desc    Get the 5 most recent transactions
+
+// --- MODIFIED FUNCTION START ---
+// @desc    Get the most recent transactions based on a time range
 // @route   GET /api/reports/recent-transactions
 const getRecentTransactions = async (req, res) => {
   try {
-    const recentSales = await Sale.find()
+    const { range } = req.query;
+    const dateFilter = createDateFilter(range); // Use the helper
+
+    const recentSales = await Sale.find(dateFilter) // Apply filter
       .sort({ createdAt: -1 })
       .limit(5)
       .populate('recordedBy', 'fullName');
@@ -212,8 +250,8 @@ const getRecentTransactions = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+// --- MODIFIED FUNCTION END ---
 
-// --- ADDED START ---
 // @desc    Get pending purchase orders
 // @route   GET /api/reports/pending-pos
 const getPendingPurchaseOrders = async (req, res) => {
@@ -221,7 +259,7 @@ const getPendingPurchaseOrders = async (req, res) => {
     const pendingPOs = await PurchaseOrder.find({
       status: { $in: ['Pending', 'Approved', 'Partially Received'] }
     })
-    .sort({ orderDate: 'asc' }) // Show oldest first
+    .sort({ orderDate: 'asc' })
     .limit(5)
     .populate('supplier', 'name');
 
@@ -230,7 +268,6 @@ const getPendingPurchaseOrders = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
-// --- ADDED END ---
 
 
-module.exports = { getDashboardSummary, getSalesReport, getLowStockProducts, getSalesTrend, getRecentTransactions, getPendingPurchaseOrders }; // <-- Added getPendingPurchaseOrders
+module.exports = { getDashboardSummary, getSalesReport, getLowStockProducts, getSalesTrend, getRecentTransactions, getPendingPurchaseOrders };

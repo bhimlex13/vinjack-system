@@ -6,7 +6,6 @@ const deliverySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Supplier'
   },
-  // --- NEW: Link to the Purchase Order that generated this delivery ---
   purchaseOrder: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'PurchaseOrder'
