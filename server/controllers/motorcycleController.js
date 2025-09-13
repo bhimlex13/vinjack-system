@@ -4,14 +4,41 @@ const Customer = require('../models/customerModel');
 const Sale = require('../models/saleModel');
 const mongoose = require('mongoose');
 
+// A helper function to parse Mongoose duplicate key errors
+const getDuplicateKeyErrorMessage = (err) => {
+    let message = 'A motorcycle with this value already exists.';
+    if (err.keyValue) {
+        const key = Object.keys(err.keyValue)[0];
+        const value = err.keyValue[key];
+        message = `A motorcycle with the ${key} '${value}' already exists.`;
+    }
+    return message;
+};
+
 // @desc    Create a new motorcycle for a customer
 // @route   POST /api/motorcycles
 const createMotorcycle = async (req, res) => {
-  const { owner, make, model, year, color, plateNumber, vin } = req.body;
+  // Destructure the new forceCreate flag
+  const { owner, make, model, year, color, plateNumber, vin, forceCreate } = req.body;
 
   if (!owner || !make || !model) {
     return res.status(400).json({ message: 'Owner, make, and model are required.' });
   }
+
+  // --- NEW: Hard check for unique Plate Number or VIN globally ---
+  if (plateNumber) {
+    const existingPlate = await Motorcycle.findOne({ plateNumber });
+    if (existingPlate) {
+      return res.status(409).json({ message: `A motorcycle with Plate Number '${plateNumber}' already exists.` });
+    }
+  }
+  if (vin) {
+    const existingVin = await Motorcycle.findOne({ vin });
+    if (existingVin) {
+      return res.status(409).json({ message: `A motorcycle with VIN '${vin}' already exists.` });
+    }
+  }
+  // --- END OF NEW HARD CHECK ---
 
   const session = await mongoose.startSession();
   try {
@@ -22,10 +49,35 @@ const createMotorcycle = async (req, res) => {
       throw new Error('Customer not found.');
     }
 
-    const newMotorcycle = new Motorcycle({ owner, make, model, year, color, plateNumber, vin });
+    // --- MODIFIED: Soft check for similar motorcycles, now skippable ---
+    if (!forceCreate) {
+      const existingMotorcycle = await Motorcycle.findOne({
+        owner,
+        make,
+        model,
+        year: year || null,
+        color: color || null,
+      }).session(session);
+
+      if (existingMotorcycle) {
+        // Return 409 Conflict with a special flag for the frontend
+        return res.status(409).json({ 
+          message: 'A motorcycle with the same make, model, year, and color already exists for this customer. Do you want to create it anyway?',
+          isSoftDuplicate: true // This flag tells the frontend it's an overridable warning
+        });
+      }
+    }
+    // --- END OF MODIFIED SOFT CHECK ---
+
+    const motorcycleData = { owner, make, model };
+    if (year) motorcycleData.year = year;
+    if (color) motorcycleData.color = color;
+    if (plateNumber) motorcycleData.plateNumber = plateNumber;
+    if (vin) motorcycleData.vin = vin;
+    
+    const newMotorcycle = new Motorcycle(motorcycleData);
     const savedMotorcycle = await newMotorcycle.save({ session });
 
-    // Add the new motorcycle's ID to the customer's list of motorcycles
     customer.motorcycles.push(savedMotorcycle._id);
     await customer.save({ session });
 
@@ -34,12 +86,19 @@ const createMotorcycle = async (req, res) => {
 
   } catch (error) {
     await session.abortTransaction();
-    res.status(400).json({ message: 'Error creating motorcycle', error: error.message });
+    let errorMessage = 'Error creating motorcycle';
+    if (error.code === 11000) {
+        errorMessage = getDuplicateKeyErrorMessage(error);
+    } else if (error.message) {
+        errorMessage = error.message;
+    }
+    res.status(400).json({ message: errorMessage });
   } finally {
     session.endSession();
   }
 };
 
+// ... (rest of the file is unchanged)
 // @desc    Get all motorcycles for a specific customer
 // @route   GET /api/motorcycles/customer/:customerId
 const getMotorcyclesByCustomer = async (req, res) => {
@@ -55,13 +114,36 @@ const getMotorcyclesByCustomer = async (req, res) => {
 // @route   PUT /api/motorcycles/:id
 const updateMotorcycle = async (req, res) => {
   try {
-    const motorcycle = await Motorcycle.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const updateData = { ...req.body };
+    const unsetData = {};
+    const optionalFields = ['plateNumber', 'vin', 'year', 'color'];
+    
+    optionalFields.forEach(field => {
+      if (updateData[field] === null || updateData[field] === '') {
+        unsetData[field] = ''; 
+        delete updateData[field];
+      }
+    });
+
+    const updateOperation = { $set: updateData };
+    if (Object.keys(unsetData).length > 0) {
+      updateOperation.$unset = unsetData;
+    }
+
+    const motorcycle = await Motorcycle.findByIdAndUpdate(req.params.id, updateOperation, { new: true, runValidators: true });
+    
     if (!motorcycle) {
       return res.status(404).json({ message: 'Motorcycle not found' });
     }
     res.json(motorcycle);
   } catch (error) {
-    res.status(400).json({ message: 'Error updating motorcycle', error: error.message });
+    let errorMessage = 'Error updating motorcycle';
+    if (error.code === 11000) {
+        errorMessage = getDuplicateKeyErrorMessage(error);
+    } else if (error.message) {
+        errorMessage = error.message;
+    }
+    res.status(400).json({ message: errorMessage });
   }
 };
 
@@ -77,13 +159,11 @@ const deleteMotorcycle = async (req, res) => {
       throw new Error('Motorcycle not found.');
     }
     
-    // Safety check: prevent deletion if linked to a sale
     const sale = await Sale.findOne({ motorcycle: motorcycle._id }).session(session);
     if (sale) {
         throw new Error('Cannot delete motorcycle. It is associated with existing sales records.');
     }
 
-    // Remove the motorcycle's ID from the owner's array
     await Customer.findByIdAndUpdate(motorcycle.owner, {
       $pull: { motorcycles: motorcycle._id }
     }).session(session);
@@ -95,7 +175,7 @@ const deleteMotorcycle = async (req, res) => {
 
   } catch (error) {
     await session.abortTransaction();
-    res.status(500).json({ message: 'Server error deleting motorcycle', error: error.message });
+    res.status(500).json({ message: error.message || 'Server error deleting motorcycle' });
   } finally {
     session.endSession();
   }

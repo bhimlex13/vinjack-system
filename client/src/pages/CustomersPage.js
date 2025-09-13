@@ -1,12 +1,12 @@
 // client/src/pages/CustomersPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Import useCallback
 import { getCustomers, deleteCustomer } from '../api/customerApi';
 import CustomerForm from '../components/CustomerForm';
 import CustomerMotorcyclesModal from '../components/CustomerMotorcyclesModal';
 import { useWarning } from '../context/WarningContext';
 
 // MUI Imports
-import { Box, Button, Typography, Paper, Stack, Dialog, DialogTitle, Container } from '@mui/material'; // <-- IMPORTED CONTAINER
+import { Box, Button, Typography, Paper, Stack, Dialog, DialogTitle, Container } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import { FaUserFriends, FaMotorcycle } from 'react-icons/fa';
@@ -19,11 +19,8 @@ const CustomersPage = () => {
   const [managingCustomer, setManagingCustomer] = useState(null);
   const showWarning = useWarning();
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
-
-  const fetchCustomers = async () => {
+  // Wrap fetchCustomers in useCallback
+  const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await getCustomers();
@@ -34,7 +31,12 @@ const CustomersPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showWarning]); // Add showWarning as a dependency
+
+  // Add fetchCustomers to the dependency array
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
 
   const handleFormSubmit = () => {
     fetchCustomers();
@@ -90,7 +92,6 @@ const CustomersPage = () => {
   ];
 
   return (
-    // --- THIS IS THE KEY CHANGE ---
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       {/* Modal for Adding/Editing Customers */}
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} fullWidth maxWidth="sm">

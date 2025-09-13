@@ -1,5 +1,5 @@
 // client/src/components/CustomerMotorcyclesModal.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Import useCallback
 import { getMotorcyclesByCustomer, deleteMotorcycle } from '../api/motorcycleApi';
 import MotorcycleForm from './MotorcycleForm';
 import { toast } from 'react-toastify';
@@ -19,7 +19,8 @@ const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingMotorcycle, setEditingMotorcycle] = useState(null);
 
-  const fetchMotorcycles = async () => {
+  // Wrap fetchMotorcycles in useCallback
+  const fetchMotorcycles = useCallback(async () => {
     if (!customer) return;
     setIsLoading(true);
     try {
@@ -30,13 +31,14 @@ const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [customer]); // Add customer as a dependency
 
+  // Add fetchMotorcycles to the dependency array
   useEffect(() => {
     if (open) {
       fetchMotorcycles();
     }
-  }, [open, customer]);
+  }, [open, fetchMotorcycles]);
   
   const handleOpenFormForAdd = () => {
     setEditingMotorcycle(null);

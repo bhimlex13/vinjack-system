@@ -1,5 +1,6 @@
 // client/src/components/MotorcycleForm.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react'; // Import useContext
+import ConfirmationContext from '../context/ConfirmationContext'; // Import the context
 import { createMotorcycle, updateMotorcycle } from '../api/motorcycleApi';
 import { toast } from 'react-toastify';
 import { Box, TextField, Button, Stack, Alert } from '@mui/material';
@@ -10,6 +11,7 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { confirm } = useContext(ConfirmationContext); // Use the confirmation context
 
   useEffect(() => {
     if (motorcycleToEdit) {
@@ -30,12 +32,47 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const getCleanedData = () => {
+    return {
+      ...formData,
+      year: formData.year || null,
+      plateNumber: formData.plateNumber.trim() === '' ? null : formData.plateNumber,
+      vin: formData.vin.trim() === '' ? null : formData.vin,
+    };
+  };
+
+  // --- NEW: Function to handle the forced creation after confirmation ---
+  const handleForceCreate = async () => {
+    setIsSubmitting(true);
+    setError('');
+    const cleanedData = getCleanedData();
+    const payload = { 
+      ...cleanedData, 
+      owner: customer._id, 
+      forceCreate: true // Add the override flag
+    };
+
+    try {
+      await createMotorcycle(payload);
+      toast.success('Motorcycle added successfully!');
+      onFormSubmit();
+      onClose();
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'An error occurred during the forced creation.';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
 
-    const payload = { ...formData, owner: customer._id };
+    const cleanedData = getCleanedData();
+    const payload = { ...cleanedData, owner: customer._id };
 
     try {
       if (motorcycleToEdit) {
@@ -49,6 +86,17 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
       onClose();
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'An error occurred.';
+      
+      // --- MODIFIED: Catch the specific soft duplicate warning ---
+      if (err.response?.status === 409 && err.response?.data?.isSoftDuplicate) {
+        const userConfirmed = await confirm(errorMsg); // Show confirmation dialog
+        if (userConfirmed) {
+          handleForceCreate(); // If confirmed, call the new function
+          return; // Stop further execution in this block
+        }
+      }
+      
+      // For all other errors, just display them
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
