@@ -103,6 +103,11 @@ const InventoryPage = () => {
     if (reorderLevel && quantity <= reorderLevel) return <Chip label="Low Stock" color="warning" size="small" />;
     return <Chip label="In Stock" color="success" size="small" />;
   };
+  
+  // 1. Function to return a class name for out-of-stock rows
+  const getRowClassName = (params) => {
+    return params.row.quantity === 0 ? 'out-of-stock-row' : '';
+  };
 
   const columns = [
     { field: 'image', headerName: 'Image', width: 80, renderCell: (params) => <Avatar variant="rounded" src={params.row?.image || 'https://placehold.co/60x40'} />, sortable: false },
@@ -143,8 +148,7 @@ const InventoryPage = () => {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      {/* --- THIS IS THE FIX: Changed maxWidth to "lg" and added fullWidth --- */}
-      <Dialog open={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} maxWidth="lg" fullWidth>
+      <Dialog open={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
         <DialogContent>
           <ProductForm
@@ -201,14 +205,26 @@ const InventoryPage = () => {
           </Select>
         </FormControl>
       </Paper>
-
-      <Paper sx={{ height: '70vh', width: '100%' }}>
+      
+      {/* 2. Style the out-of-stock-row class */}
+      <Paper sx={{
+          height: '70vh',
+          width: '100%',
+          '& .out-of-stock-row': {
+            backgroundColor: '#fafafa', // Light grey background
+            color: '#9e9e9e', // Dim the text
+          },
+          '& .out-of-stock-row:hover': {
+            backgroundColor: '#f0f0f0', // Slightly darker grey on hover
+          },
+      }}>
         <DataGrid
           rows={filteredProducts}
           columns={columns}
           loading={isLoading}
           getRowId={(row) => row._id}
           initialState={{ sorting: { sortModel: [{ field: 'status', sort: 'desc' }] }, }}
+          getRowClassName={getRowClassName} // 3. Apply the function to the DataGrid
         />
       </Paper>
     </Container>
