@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getPurchaseOrderById, receivePurchaseOrder } from '../api/purchaseOrderApi';
 import { toast } from 'react-toastify';
 import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
+import EditPurchaseOrderModal from '../components/EditPurchaseOrderModal'; // 1. IMPORT THE NEW MODAL
 
 // MUI Imports
 import {
@@ -13,6 +14,7 @@ import {
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PrintIcon from '@mui/icons-material/Print';
+import EditIcon from '@mui/icons-material/Edit'; // 2. IMPORT EDIT ICON
 
 const PurchaseOrderDetailPage = () => {
   const { id } = useParams();
@@ -22,21 +24,23 @@ const PurchaseOrderDetailPage = () => {
   const [error, setError] = useState(null);
   
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // 3. ADD STATE FOR THE EDIT MODAL
   const printoutRef = useRef();
 
+  const fetchPo = async () => {
+    try {
+      setLoading(true);
+      const data = await getPurchaseOrderById(id);
+      setPo(data);
+    } catch (err) {
+      setError('Failed to fetch purchase order details.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchPo = async () => {
-      try {
-        setLoading(true);
-        const data = await getPurchaseOrderById(id);
-        setPo(data);
-      } catch (err) {
-        setError('Failed to fetch purchase order details.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchPo();
   }, [id]);
 
@@ -68,8 +72,23 @@ const PurchaseOrderDetailPage = () => {
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!po) return <Alert severity="warning">Purchase Order not found.</Alert>;
 
+  const isEditable = po.status === 'Pending' || po.status === 'Approved';
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* 4. RENDER THE EDIT MODAL */}
+      {po && (
+        <EditPurchaseOrderModal
+          open={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          poData={po}
+          onSuccess={(updatedPO) => {
+            setPo(updatedPO); // Refresh the page data with the updated PO
+            setIsEditModalOpen(false);
+          }}
+        />
+      )}
+
       <Dialog open={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} maxWidth="md" fullWidth>
         <DialogContent>
           <PurchaseOrderPrintout poData={po} ref={printoutRef} />
@@ -87,13 +106,22 @@ const PurchaseOrderDetailPage = () => {
           <div>
             <Typography variant="h4" gutterBottom>{po.poNumber}</Typography>
             <Typography variant="subtitle1" color="textSecondary">
-              {/* --- THIS IS THE FIX: Corrected the function name --- */}
               Order Date: {new Date(po.orderDate).toLocaleDateString()}
             </Typography>
           </div>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button variant="outlined" onClick={() => navigate('/purchase-orders')}>
               Back to List
+            </Button>
+            {/* 5. ADD THE EDIT BUTTON */}
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<EditIcon />}
+              disabled={!isEditable}
+              onClick={() => setIsEditModalOpen(true)}
+            >
+              Edit Order
             </Button>
             <Button 
               variant="contained" 

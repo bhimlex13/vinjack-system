@@ -6,19 +6,19 @@ const {
   getAllPurchaseOrders, 
   getPurchaseOrderById, 
   receivePurchaseOrder,
-  cancelPurchaseOrder
+  cancelPurchaseOrder,
+  updatePurchaseOrder // 1. IMPORT THE NEW FUNCTION
 } = require('../controllers/purchaseOrderController');
 
-// We must use 'authorize' here, not 'admin'
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// Using the correct authorize('Owner', 'Admin') middleware
 router.route('/')
   .post(protect, authorize('Owner', 'Admin'), createPurchaseOrder)
   .get(protect, authorize('Owner', 'Admin'), getAllPurchaseOrders);
 
 router.route('/:id')
-  .get(protect, authorize('Owner', 'Admin'), getPurchaseOrderById);
+  .get(protect, authorize('Owner', 'Admin'), getPurchaseOrderById)
+  .put(protect, authorize('Owner', 'Admin'), updatePurchaseOrder); // 2. ADD THE PUT ROUTE
 
 router.post('/:id/receive', protect, authorize('Owner', 'Admin'), receivePurchaseOrder);
 
