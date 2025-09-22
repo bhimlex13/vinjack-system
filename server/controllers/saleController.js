@@ -9,7 +9,6 @@ const { createNotification } = require('../utils/notificationManager');
 
 const createSale = async (req, res) => {
   const io = req.app.get('socketio');
-  // --- MODIFIED: Destructure motorcycleId ---
   const { items, services, customerId, motorcycleId } = req.body;
 
   if ((!items || items.length === 0) && (!services || services.length === 0)) {
@@ -32,22 +31,15 @@ const createSale = async (req, res) => {
     if (items && items.length > 0) {
         for (const item of items) {
           const product = await Product.findById(item.product);
-          if (!product) {
-            throw new Error(`Product with ID ${item.product} not found.`);
-          }
-          if (product.quantity < item.quantity) {
-            throw new Error(`Insufficient stock for ${product.name}. Only ${product.quantity} left.`);
-          }
+          if (!product) throw new Error(`Product with ID ${item.product} not found.`);
+          if (product.quantity < item.quantity) throw new Error(`Insufficient stock for ${product.name}. Only ${product.quantity} left.`);
           
           const stockBefore = product.quantity;
           product.quantity -= item.quantity;
           
           movementsToLog.push({
-              product: product._id,
-              type: 'SALE',
-              quantityChange: -item.quantity,
-              stockBefore,
-              recordedBy: req.user.id
+              product: product._id, type: 'SALE', quantityChange: -item.quantity,
+              stockBefore, recordedBy: req.user.id
           });
           
           await product.save();
@@ -61,10 +53,8 @@ const createSale = async (req, res) => {
 
           if (product.quantity === 0 && stockBefore > 0) {
             const newNotifications = await createNotification({
-                recipientRole: 'Owner',
-                message: `${product.name} is now OUT OF STOCK.`,
-                type: 'OUT_OF_STOCK',
-                link: '/inventory'
+                recipientRole: 'Owner', message: `${product.name} is now OUT OF STOCK.`,
+                type: 'OUT_OF_STOCK', link: '/inventory'
             });
             if (newNotifications && newNotifications.length) {
                 newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification));
@@ -73,10 +63,8 @@ const createSale = async (req, res) => {
           } 
           else if (product.quantity <= product.reorderLevel && stockBefore > product.reorderLevel) {
             const newNotifications = await createNotification({
-                recipientRole: 'Owner',
-                message: `${product.name} is low on stock (${product.quantity} remaining).`,
-                type: 'LOW_STOCK',
-                link: '/inventory'
+                recipientRole: 'Owner', message: `${product.name} is low on stock (${product.quantity} remaining).`,
+                type: 'LOW_STOCK', link: '/inventory'
             });
             if (newNotifications && newNotifications.length) {
                 newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification));
@@ -85,10 +73,8 @@ const createSale = async (req, res) => {
           }
           
           processedItems.push({
-            product: item.product,
-            quantity: item.quantity,
-            priceAtTime: product.price,
-            costAtTime: product.cost
+            product: item.product, quantity: item.quantity,
+            priceAtTime: product.price, costAtTime: product.cost
           });
         }
     }
@@ -96,25 +82,16 @@ const createSale = async (req, res) => {
     if (services && services.length > 0) {
       for (const serviceItem of services) {
         const service = await Service.findById(serviceItem.service);
-        if (!service || service.status !== 'active') {
-          throw new Error(`Service with ID ${serviceItem.service} not found or is inactive.`);
-        }
+        if (!service || service.status !== 'active') throw new Error(`Service with ID ${serviceItem.service} not found or is inactive.`);
         calculatedTotal += service.charge;
-        processedServices.push({
-          service: service._id,
-          priceAtTime: service.charge
-        });
+        processedServices.push({ service: service._id, priceAtTime: service.charge });
       }
     }
 
-    // --- MODIFIED: Add motorcycleId to the new Sale object ---
     const sale = new Sale({
-      items: processedItems,
-      services: processedServices,
-      totalAmount: calculatedTotal,
-      recordedBy: req.user.id,
-      customer: customerId || undefined,
-      motorcycle: motorcycleId || undefined, // Add motorcycleId if it exists
+      items: processedItems, services: processedServices, totalAmount: calculatedTotal,
+      recordedBy: req.user.id, customer: customerId || undefined,
+      motorcycle: motorcycleId || undefined,
     });
     const createdSale = await sale.save();
     
@@ -123,18 +100,14 @@ const createSale = async (req, res) => {
         await logMovement(movement);
     }
 
-    logAction(
-      req.user, 
-      'PROCESS_SALE', 
-      `Processed sale #${createdSale._id} with a total of ₱${calculatedTotal.toFixed(2)}.`
-    );
+    logAction(req.user, 'PROCESS_SALE', `Processed sale #${createdSale._id} with a total of ₱${calculatedTotal.toFixed(2)}.`);
 
     const populatedSale = await Sale.findById(createdSale._id)
       .populate('recordedBy', 'fullName')
       .populate('items.product', 'name')
       .populate('services.service', 'name')
       .populate('customer', 'name')
-      .populate('motorcycle', 'make model plateNumber'); // Also populate motorcycle details
+      .populate('motorcycle', 'make model plateNumber');
 
     res.status(201).json(populatedSale);
 
@@ -151,15 +124,13 @@ const getAllSales = async (req, res) => {
             .populate('items.product', 'name')
             .populate('services.service', 'name')
             .populate('customer', 'name')
-            .populate('motorcycle', 'make model plateNumber'); // Also populate motorcycle details
-        
+            .populate('motorcycle', 'make model plateNumber');
         res.json(sales);
     } catch (error) {
         res.status(500).json({ message: 'Server error fetching sales.', error: error.message });
     }
 };
 
-// --- ADDED: New function to get a single sale by ID for the returns page ---
 const getSaleById = async (req, res) => {
     try {
         const sale = await Sale.findById(req.params.id)
@@ -169,13 +140,43 @@ const getSaleById = async (req, res) => {
             .populate('customer', 'name')
             .populate('motorcycle', 'make model plateNumber');
         
-        if (!sale) {
-            return res.status(404).json({ message: 'Sale not found.' });
-        }
+        if (!sale) return res.status(404).json({ message: 'Sale not found.' });
         res.json(sale);
     } catch (error) {
         res.status(500).json({ message: 'Server error fetching sale details.', error: error.message });
     }
-}
+};
 
-module.exports = { createSale, getAllSales, getSaleById }; // <-- ADDED getSaleById
+// --- NEW: Function to search for sales ---
+const searchSales = async (req, res) => {
+  try {
+    const { customerId, userId, startDate, endDate } = req.query;
+    
+    let filter = {};
+
+    if (customerId) filter.customer = customerId;
+    if (userId) filter.recordedBy = userId;
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = endOfDay;
+      }
+    }
+
+    const sales = await Sale.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(50) // Limit results to prevent performance issues
+      .populate('customer', 'name');
+
+    res.json(sales);
+
+  } catch (error) {
+    res.status(500).json({ message: 'Server error while searching sales.', error: error.message });
+  }
+};
+
+// --- EXPORT THE NEW FUNCTION ---
+module.exports = { createSale, getAllSales, getSaleById, searchSales };

@@ -1,12 +1,23 @@
 // client/src/api/userApi.js
 import api from './axios';
 
-// ADDED: For admin to create a new user
+// --- NEW: Get all users (for cashier dropdown) ---
+export const getUsers = async () => {
+    try {
+        const response = await api.get('/users');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+    }
+};
+
+// For admin to create a new user
 export const createUser = async (userData) => {
   return api.post('/users/create', userData);
 };
 
-// ADDED: For a new user to change their temporary password
+// For a new user to change their temporary password
 export const forceChangePassword = async (passwordData) => {
   return api.put('/users/force-change-password', passwordData);
 };
