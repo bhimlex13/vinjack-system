@@ -1,9 +1,10 @@
 // client/src/pages/CustomersPage.js
-import React, { useState, useEffect, useCallback } from 'react'; // Import useCallback
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { getCustomers, deleteCustomer } from '../api/customerApi';
 import CustomerForm from '../components/CustomerForm';
 import CustomerMotorcyclesModal from '../components/CustomerMotorcyclesModal';
-import { useWarning } from '../context/WarningContext';
+import ConfirmationContext from '../context/ConfirmationContext';
+import { toast } from 'react-toastify';
 
 // MUI Imports
 import { Box, Button, Typography, Paper, Stack, Dialog, DialogTitle, Container } from '@mui/material';
@@ -17,9 +18,8 @@ const CustomersPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [managingCustomer, setManagingCustomer] = useState(null);
-  const showWarning = useWarning();
+  const { confirm } = useContext(ConfirmationContext);
 
-  // Wrap fetchCustomers in useCallback
   const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -27,13 +27,12 @@ const CustomersPage = () => {
       setCustomers(data);
     } catch (err) {
       console.error("Failed to fetch customers", err);
-      showWarning('Failed to fetch customers.', 'error');
+      toast.error('Failed to fetch customers.');
     } finally {
       setIsLoading(false);
     }
-  }, [showWarning]); // Add showWarning as a dependency
+  }, []);
 
-  // Add fetchCustomers to the dependency array
   useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
@@ -52,18 +51,23 @@ const CustomersPage = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (customerId) => {
-    if (window.confirm('Are you sure you want to delete this customer?')) {
+  const handleDelete = useCallback(async (customerId) => {
+    const isConfirmed = await confirm(
+      'Are you sure you want to delete this customer?',
+      'Deleting a customer with existing sales may affect historical records. This action cannot be undone.'
+    );
+    if (isConfirmed) {
       try {
         await deleteCustomer(customerId);
-        showWarning('Customer deleted successfully.', 'success');
+        toast.success('Customer deleted successfully.');
         fetchCustomers();
-      } catch (err) {
+      } catch (err)
+      {
         console.error('Failed to delete customer', err);
-        showWarning(err.response?.data?.message || 'Failed to delete customer.', 'error');
+        toast.error(err.response?.data?.message || 'Failed to delete customer.');
       }
     }
-  };
+  }, [fetchCustomers, confirm]);
 
   const columns = [
     { field: 'name', headerName: 'Customer Name', flex: 1 },
@@ -75,25 +79,35 @@ const CustomersPage = () => {
       width: 300,
       sortable: false,
       renderCell: (params) => (
-        <Stack direction="row" spacing={1}>
-          <Button 
-            variant="outlined" 
-            size="small" 
-            startIcon={<FaMotorcycle />} 
-            onClick={() => setManagingCustomer(params.row)}
-          >
-            Vehicles
-          </Button>
-          <Button variant="outlined" size="small" onClick={() => openModalForEdit(params.row)}>Edit</Button>
-          <Button variant="outlined" size="small" color="error" onClick={() => handleDelete(params.row._id)}>Delete</Button>
-        </Stack>
+        // --- THIS IS THE FIX for vertical alignment ---
+        <Box
+          sx={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            justifyContent: "flex-start",
+            alignItems: "center",
+          }}
+        >
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<FaMotorcycle />}
+              onClick={() => setManagingCustomer(params.row)}
+            >
+              Vehicles
+            </Button>
+            <Button variant="outlined" size="small" onClick={() => openModalForEdit(params.row)}>Edit</Button>
+            <Button variant="outlined" size="small" color="error" onClick={() => handleDelete(params.row._id)}>Delete</Button>
+          </Stack>
+        </Box>
       )
     }
   ];
 
   return (
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
-      {/* Modal for Adding/Editing Customers */}
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
         <CustomerForm
@@ -102,9 +116,9 @@ const CustomersPage = () => {
           onClose={() => setIsModalOpen(false)}
         />
       </Dialog>
-      
+
       {managingCustomer && (
-          <CustomerMotorcyclesModal 
+          <CustomerMotorcyclesModal
             open={Boolean(managingCustomer)}
             onClose={() => setManagingCustomer(null)}
             customer={managingCustomer}
