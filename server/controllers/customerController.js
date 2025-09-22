@@ -14,6 +14,11 @@ const createCustomer = async (req, res) => {
     const newCustomer = new Customer({ name, email, phone, address });
     const savedCustomer = await newCustomer.save();
     logAction(req.user, 'CREATE_CUSTOMER', `Created new customer: '${savedCustomer.name}'`);
+
+    // --- ADDED: Emit a real-time event to all clients ---
+    const io = req.app.get('socketio');
+    io.emit('customer_added', savedCustomer);
+
     res.status(201).json(savedCustomer);
   } catch (error) {
     res.status(400).json({ message: 'Error creating customer', error: error.message });
@@ -64,7 +69,6 @@ const updateCustomer = async (req, res) => {
 // @route   DELETE /api/customers/:id
 const deleteCustomer = async (req, res) => {
   try {
-    // Safety check: Prevent deletion if customer is linked to a sale
     const sale = await Sale.findOne({ customer: req.params.id });
     if (sale) {
       return res.status(400).json({ message: 'Cannot delete customer. They are associated with existing sales.' });

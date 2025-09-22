@@ -4,7 +4,6 @@ const Customer = require('../models/customerModel');
 const Sale = require('../models/saleModel');
 const mongoose = require('mongoose');
 
-// A helper function to parse Mongoose duplicate key errors
 const getDuplicateKeyErrorMessage = (err) => {
     let message = 'A motorcycle with this value already exists.';
     if (err.keyValue) {
@@ -15,17 +14,13 @@ const getDuplicateKeyErrorMessage = (err) => {
     return message;
 };
 
-// @desc    Create a new motorcycle for a customer
-// @route   POST /api/motorcycles
 const createMotorcycle = async (req, res) => {
-  // Destructure the new forceCreate flag
   const { owner, make, model, year, color, plateNumber, vin, forceCreate } = req.body;
 
   if (!owner || !make || !model) {
     return res.status(400).json({ message: 'Owner, make, and model are required.' });
   }
 
-  // --- NEW: Hard check for unique Plate Number or VIN globally ---
   if (plateNumber) {
     const existingPlate = await Motorcycle.findOne({ plateNumber });
     if (existingPlate) {
@@ -38,7 +33,6 @@ const createMotorcycle = async (req, res) => {
       return res.status(409).json({ message: `A motorcycle with VIN '${vin}' already exists.` });
     }
   }
-  // --- END OF NEW HARD CHECK ---
 
   const session = await mongoose.startSession();
   try {
@@ -49,25 +43,18 @@ const createMotorcycle = async (req, res) => {
       throw new Error('Customer not found.');
     }
 
-    // --- MODIFIED: Soft check for similar motorcycles, now skippable ---
     if (!forceCreate) {
       const existingMotorcycle = await Motorcycle.findOne({
-        owner,
-        make,
-        model,
-        year: year || null,
-        color: color || null,
+        owner, make, model, year: year || null, color: color || null,
       }).session(session);
 
       if (existingMotorcycle) {
-        // Return 409 Conflict with a special flag for the frontend
         return res.status(409).json({ 
           message: 'A motorcycle with the same make, model, year, and color already exists for this customer. Do you want to create it anyway?',
-          isSoftDuplicate: true // This flag tells the frontend it's an overridable warning
+          isSoftDuplicate: true
         });
       }
     }
-    // --- END OF MODIFIED SOFT CHECK ---
 
     const motorcycleData = { owner, make, model };
     if (year) motorcycleData.year = year;
@@ -82,6 +69,11 @@ const createMotorcycle = async (req, res) => {
     await customer.save({ session });
 
     await session.commitTransaction();
+
+    // --- ADDED: Emit a real-time event to all clients ---
+    const io = req.app.get('socketio');
+    io.emit('motorcycle_added', savedMotorcycle);
+
     res.status(201).json(savedMotorcycle);
 
   } catch (error) {
@@ -98,9 +90,6 @@ const createMotorcycle = async (req, res) => {
   }
 };
 
-// ... (rest of the file is unchanged)
-// @desc    Get all motorcycles for a specific customer
-// @route   GET /api/motorcycles/customer/:customerId
 const getMotorcyclesByCustomer = async (req, res) => {
   try {
     const motorcycles = await Motorcycle.find({ owner: req.params.customerId });
@@ -110,8 +99,6 @@ const getMotorcyclesByCustomer = async (req, res) => {
   }
 };
 
-// @desc    Update a motorcycle
-// @route   PUT /api/motorcycles/:id
 const updateMotorcycle = async (req, res) => {
   try {
     const updateData = { ...req.body };
@@ -147,8 +134,6 @@ const updateMotorcycle = async (req, res) => {
   }
 };
 
-// @desc    Delete a motorcycle
-// @route   DELETE /api/motorcycles/:id
 const deleteMotorcycle = async (req, res) => {
   const session = await mongoose.startSession();
   try {

@@ -11,6 +11,7 @@ import AddServiceModal from '../components/AddServiceModal';
 import CustomerForm from '../components/CustomerForm';
 import MotorcycleForm from '../components/MotorcycleForm';
 import { grey } from '@mui/material/colors';
+import { io } from 'socket.io-client';
 
 // MUI Imports
 import {
@@ -28,14 +29,11 @@ import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import { FaUserTag } from 'react-icons/fa';
 
-
-// --- FIX 1: Create a function to get the entire initial cart state from localStorage ---
 const getInitialCartState = () => {
   try {
     const savedCart = localStorage.getItem('salesCart');
     if (savedCart) {
       const parsedCart = JSON.parse(savedCart);
-      // Ensure the parsed data has the correct structure before returning
       if (Array.isArray(parsedCart.items)) {
         return {
           items: parsedCart.items,
@@ -47,28 +45,23 @@ const getInitialCartState = () => {
   } catch (error) {
     console.error("Failed to parse cart from localStorage", error);
   }
-  // Return a default empty state if nothing is saved or an error occurs
   return { items: [], customer: null, motorcycle: null };
 };
 
 
 const SalesPage = () => {
-  // --- FIX 2: Initialize all cart-related state from the function above ---
   const [initialCart] = useState(getInitialCartState);
   const [cartItems, setCartItems] = useState(initialCart.items);
   const [selectedCustomer, setSelectedCustomer] = useState(initialCart.customer);
   const [selectedMotorcycle, setSelectedMotorcycle] = useState(initialCart.motorcycle);
 
-  // Customer State
   const [customers, setCustomers] = useState([]);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   
-  // Motorcycle State
   const [customerMotorcycles, setCustomerMotorcycles] = useState([]);
   const [isFetchingMotorcycles, setIsFetchingMotorcycles] = useState(false);
   const [isMotorcycleModalOpen, setIsMotorcycleModalOpen] = useState(false);
   
-  // Existing state
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -83,12 +76,36 @@ const SalesPage = () => {
   const [lastSaleData, setLastSaleData] = useState(null);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
 
-  // --- FIX 3: Save the entire cart object (items, customer, motorcycle) on any change ---
+  useEffect(() => {
+    const socket = io(process.env.REACT_APP_API_URL);
+
+    socket.on('customer_added', (newCustomer) => {
+      setCustomers(prevCustomers => {
+        // Prevent adding duplicates
+        if (prevCustomers.some(c => c._id === newCustomer._id)) {
+          return prevCustomers;
+        }
+        return [...prevCustomers, newCustomer];
+      });
+    });
+
+    // --- THIS IS THE FIX for real-time Motorcycle updates ---
+    socket.on('motorcycle_added', (newMotorcycle) => {
+      // If the new motorcycle belongs to the currently selected customer, re-fetch the list
+      if (selectedCustomer && selectedCustomer._id === newMotorcycle.owner) {
+        fetchMotorcycles(selectedCustomer._id);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCustomer]);
+
   useEffect(() => {
     const cartData = {
-      items: cartItems,
-      customer: selectedCustomer,
-      motorcycle: selectedMotorcycle,
+      items: cartItems, customer: selectedCustomer, motorcycle: selectedMotorcycle,
     };
     localStorage.setItem('salesCart', JSON.stringify(cartData));
   }, [cartItems, selectedCustomer, selectedMotorcycle]);
@@ -131,11 +148,8 @@ const SalesPage = () => {
     const fetchInitialData = async () => {
       try {
         const [productsRes, categoriesRes, brandsRes, servicesRes, customersRes] = await Promise.all([
-          api.get('/products'),
-          api.get('/categories'),
-          api.get('/brands'),
-          getServices('active'),
-          getCustomers(), // Fetch customers here as well
+          api.get('/products'), api.get('/categories'), api.get('/brands'),
+          getServices('active'), getCustomers(),
         ]);
         
         let productsData = productsRes.data;
@@ -153,9 +167,8 @@ const SalesPage = () => {
         setCategories(categoriesRes.data);
         setBrands(brandsRes.data);
         setServices(servicesRes);
-        setCustomers(customersRes); // Set customers state
+        setCustomers(customersRes);
 
-        // --- FIX 4: Sync restored customer/motorcycle with fresh data from the server ---
         if (selectedCustomer) {
           const freshCustomer = customersRes.find(c => c._id === selectedCustomer._id);
           if (freshCustomer) setSelectedCustomer(freshCustomer);
@@ -165,8 +178,6 @@ const SalesPage = () => {
           const freshMotorcycle = freshMotorcycles.find(m => m._id === selectedMotorcycle._id);
           if (freshMotorcycle) setSelectedMotorcycle(freshMotorcycle);
         }
-        // --- END FIX 4 ---
-
       } catch (error) {
         console.error("Failed to fetch initial data", error);
       }
@@ -177,20 +188,24 @@ const SalesPage = () => {
 
   const handleNewCustomerSubmit = async (newCustomerData) => {
     try {
-      const newCustomer = await createCustomer(newCustomerData);
-      await fetchCustomers();
-      setSelectedCustomer(newCustomer);
+      const createdCustomer = await createCustomer(newCustomerData);
+      // The socket event will update other tabs, but we update the current tab immediately.
+      setCustomers(prev => [...prev, createdCustomer]);
+      setSelectedCustomer(createdCustomer);
       setIsCustomerModalOpen(false);
     } catch (error) {
       console.error("Failed to create new customer", error);
     }
   };
   
+  // --- THIS IS THE FIX to make the current tab update robustly ---
   const handleNewMotorcycleSubmit = async (newMotorcycleData) => {
     try {
-        const newMotorcycle = await createMotorcycle(newMotorcycleData);
-        await fetchMotorcycles(selectedCustomer._id);
-        setSelectedMotorcycle(newMotorcycle);
+        const createdMotorcycle = await createMotorcycle(newMotorcycleData);
+        // Re-fetch the list for the current user for an immediate and guaranteed update
+        const updatedMotorcyclesList = await fetchMotorcycles(selectedCustomer._id);
+        const newMotorcycleInList = updatedMotorcyclesList.find(m => m._id === createdMotorcycle._id);
+        setSelectedMotorcycle(newMotorcycleInList);
         setIsMotorcycleModalOpen(false);
     } catch (error) {
         console.error("Failed to create new motorcycle", error);
@@ -290,15 +305,9 @@ const SalesPage = () => {
 
     if (isConfirmed) {
       const saleData = {
-        items: cartItems
-          .filter(item => item.type === 'product')
-          .map(item => ({ product: item._id, quantity: item.cartQuantity, priceAtTime: item.price })),
-        services: cartItems
-          .filter(item => item.type === 'service')
-          .map(item => ({ service: item._id, priceAtTime: item.charge })),
-        recordedBy: user._id,
-        customerId: selectedCustomer ? selectedCustomer._id : undefined,
-        motorcycleId: selectedMotorcycle ? selectedMotorcycle._id : undefined,
+        items: cartItems.filter(item => item.type === 'product').map(item => ({ product: item._id, quantity: item.cartQuantity, priceAtTime: item.price })),
+        services: cartItems.filter(item => item.type === 'service').map(item => ({ service: item._id, priceAtTime: item.charge })),
+        recordedBy: user._id, customerId: selectedCustomer ? selectedCustomer._id : undefined, motorcycleId: selectedMotorcycle ? selectedMotorcycle._id : undefined,
       };
       
       try {
@@ -306,9 +315,7 @@ const SalesPage = () => {
         setLastSaleData(response.data);
         setShowReceiptModal(true);
         setCartItems([]);
-        
         localStorage.removeItem('salesCart');
-        
         setSelectedCustomer(null); 
         setSelectedMotorcycle(null);
         setCustomerMotorcycles([]);
@@ -331,21 +338,15 @@ const SalesPage = () => {
     });
   }, [products, searchTerm, selectedBrand, selectedCategory]);
 
-  const handleFilterChange = (setter) => (event, newValue) => {
-    setter(newValue);
-  };
+  const handleFilterChange = (setter) => (event, newValue) => { setter(newValue); };
 
   return (
     <Box sx={{ display: 'flex', height: '100%', gap: 2}}>
-    
-      {/* Left Column: Product Selection */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column'}}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%'}}>
           <TextField
-            fullWidth label="Search Products" variant="outlined" size="small" value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
-            sx={{ mb: 1 }}
+            fullWidth label="Search Products" variant="outlined" size="small" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }} sx={{ mb: 1 }}
           />
           <Box sx={{ mb: 1 }}>
             <ToggleButtonGroup value={selectedCategory} exclusive onChange={handleFilterChange(setSelectedCategory)} size="small" fullWidth sx={{ display: 'flex' }}>
@@ -363,49 +364,17 @@ const SalesPage = () => {
             <Grid container spacing={2}>
               {filteredProducts.map(product => (
                 <Grid item key={product._id} size={{ xs: 12, sm: 4, md: 3, lg: 2 }}>
-                  <Card sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: '100%',
-                    ...(product.quantity === 0 && {
-                      backgroundColor: grey[300],
-                      cursor: 'not-allowed'
-                    })
-                  }}>
+                  <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', ...(product.quantity === 0 && { backgroundColor: grey[300], cursor: 'not-allowed' }) }}>
                     <CardActionArea 
-                      onClick={() => addProductToCart(product)} 
-                      disabled={product.quantity === 0}
+                      onClick={() => addProductToCart(product)} disabled={product.quantity === 0}
                       sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1}} 
                     >
-                      <CardMedia
-                        component="img" height="120" image={product.image || 'https://placehold.co/300x200'}
-                        alt={product.name}
-                        sx={{
-                          objectFit: 'contain',
-                          p: 1,
-                          ...(product.quantity === 0 && {
-                            filter: 'grayscale(100%)'
-                          })
-                        }}
+                      <CardMedia component="img" height="120" image={product.image || 'https://placehold.co/300x200'} alt={product.name}
+                        sx={{ objectFit: 'contain', p: 1, ...(product.quantity === 0 && { filter: 'grayscale(100%)' }) }}
                       />
-                      {product.quantity === 0 && (
-                        <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '120px', backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                          <Typography variant="button" color="error" sx={{ fontWeight: 'bold'}}>Out of Stock</Typography>
-                        </Box>
-                      )}
-                      <CardContent sx={{ p: 1, flexGrow: 1, width: '100%' }}>
-                        <Typography gutterBottom variant="body2" component="div" sx={{ fontWeight: 'bold', minHeight: '40px' }}>
-                          {product.name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Stock: {product.quantity}
-                        </Typography>
-                      </CardContent>
-                      <Box sx={{ p: 1, pt: 0, width: '100%', mt: 'auto' }}>
-                         <Typography variant="h6" color="primary.main">
-                          ₱{product.price.toFixed(2)}
-                        </Typography>
-                      </Box>
+                      {product.quantity === 0 && (<Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '120px', backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center'}}><Typography variant="button" color="error" sx={{ fontWeight: 'bold'}}>Out of Stock</Typography></Box>)}
+                      <CardContent sx={{ p: 1, flexGrow: 1, width: '100%' }}><Typography gutterBottom variant="body2" component="div" sx={{ fontWeight: 'bold', minHeight: '40px' }}>{product.name}</Typography><Typography variant="body2" color="text.secondary">Stock: {product.quantity}</Typography></CardContent>
+                      <Box sx={{ p: 1, pt: 0, width: '100%', mt: 'auto' }}><Typography variant="h6" color="primary.main">₱{product.price.toFixed(2)}</Typography></Box>
                     </CardActionArea>
                   </Card>
                 </Grid>
@@ -414,111 +383,39 @@ const SalesPage = () => {
           </Box>
         </Paper>
       </Box>
-
-      {/* Right Column: Cart */}
       <Box sx={{ width: '380px', display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-          
           <Box sx={{ mb: 2 }}>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                <FaUserTag style={{ marginRight: '8px' }} /> Customer Details
-            </Typography>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><FaUserTag style={{ marginRight: '8px' }} /> Customer Details</Typography>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Autocomplete
-                sx={{ flexGrow: 1 }}
-                options={customers}
-                getOptionLabel={(option) => option.name}
-                value={selectedCustomer}
-                onChange={(event, newValue) => {
-                  setSelectedCustomer(newValue);
-                }}
+              <Autocomplete sx={{ flexGrow: 1 }} options={customers} getOptionLabel={(option) => option.name} value={selectedCustomer}
+                onChange={(event, newValue) => { setSelectedCustomer(newValue); }}
                 isOptionEqualToValue={(option, value) => option?._id === value?._id}
                 renderInput={(params) => <TextField {...params} label="Select a Customer (Optional)" size="small" />}
               />
-              <Button variant="outlined" size="small" onClick={() => setIsCustomerModalOpen(true)}>
-                New
-              </Button>
+              <Button variant="outlined" size="small" onClick={() => setIsCustomerModalOpen(true)}>New</Button>
             </Stack>
-            
             {selectedCustomer && (
               <Box sx={{ mt: 2 }}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <Autocomplete
-                    sx={{ flexGrow: 1 }}
-                    options={customerMotorcycles}
-                    loading={isFetchingMotorcycles}
-                    getOptionLabel={(option) => `${option.make} ${option.model} (${option.plateNumber || 'No Plate'})`}
-                    value={selectedMotorcycle}
-                    onChange={(event, newValue) => {
-                      setSelectedMotorcycle(newValue);
-                    }}
-                    isOptionEqualToValue={(option, value) => option?._id === value?._id}
-                    renderInput={(params) => (
-                      <TextField 
-                        {...params} 
-                        label="Select Motorcycle (Optional)" 
-                        size="small"
-                        InputProps={{
-                          ...params.InputProps,
-                          endAdornment: (
-                            <>
-                              {isFetchingMotorcycles ? <CircularProgress color="inherit" size={20} /> : null}
-                              {params.InputProps.endAdornment}
-                            </>
-                          ),
-                        }}
-                      />
-                    )}
+                  <Autocomplete sx={{ flexGrow: 1 }} options={customerMotorcycles} loading={isFetchingMotorcycles} getOptionLabel={(option) => `${option.make} ${option.model} (${option.plateNumber || 'No Plate'})`}
+                    value={selectedMotorcycle} onChange={(event, newValue) => { setSelectedMotorcycle(newValue); }} isOptionEqualToValue={(option, value) => option?._id === value?._id}
+                    renderInput={(params) => (<TextField {...params} label="Select Motorcycle (Optional)" size="small" InputProps={{ ...params.InputProps, endAdornment: (<>{isFetchingMotorcycles ? <CircularProgress color="inherit" size={20} /> : null}{params.InputProps.endAdornment}</>),}}/>)}
                   />
-                  <Button variant="outlined" size="small" onClick={() => setIsMotorcycleModalOpen(true)}>
-                    New
-                  </Button>
+                  <Button variant="outlined" size="small" onClick={() => setIsMotorcycleModalOpen(true)}>New</Button>
                 </Stack>
               </Box>
             )}
-
           </Box>
           <Divider sx={{ mb: 1 }} />
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale</Typography>
-              <Button variant="outlined" size="small" startIcon={<DesignServicesIcon />} onClick={() => setIsServiceModalOpen(true)}>
-                  Add Service
-              </Button>
-          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale</Typography><Button variant="outlined" size="small" startIcon={<DesignServicesIcon />} onClick={() => setIsServiceModalOpen(true)}>Add Service</Button></Box>
           <Divider sx={{ mb: 1 }} />
           <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-            {cartItems.length === 0 ? (
-              <Typography color="text.secondary" align="center" sx={{ mt: 4 }}>Cart is empty</Typography>
-            ) : (
+            {cartItems.length === 0 ? (<Typography color="text.secondary" align="center" sx={{ mt: 4 }}>Cart is empty</Typography>) : (
               <List>
                 {cartItems.map(item => (
                   <ListItem key={item._id} disablePadding>
-                    {item.type === 'product' ? (
-                      <>
-                        <ListItemText 
-                          primary={item.name} 
-                          secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`} 
-                        />
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <IconButton size="small" onClick={() => updateQuantity(item, -1)}><RemoveIcon fontSize="small"/></IconButton>
-                          <Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography>
-                          <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton>
-                        </Box>
-                      </>
-                    ) : (
-                      <>
-                        <ListItemText 
-                          primary={item.name}
-                          secondary={`₱${(item.charge).toFixed(2)}`}
-                        />
-                        <Tooltip title="Remove Service">
-                          <IconButton size="small" edge="end" aria-label="delete" onClick={() => removeServiceFromCart(item._id)}>
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </>
-                    )}
+                    {item.type === 'product' ? (<><ListItemText primary={item.name} secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`}/><Box sx={{ display: 'flex', alignItems: 'center' }}><IconButton size="small" onClick={() => updateQuantity(item, -1)}><RemoveIcon fontSize="small"/></IconButton><Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography><IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton></Box></>) : (<><ListItemText primary={item.name} secondary={`₱${(item.charge).toFixed(2)}`}/><Tooltip title="Remove Service"><IconButton size="small" edge="end" aria-label="delete" onClick={() => removeServiceFromCart(item._id)}><DeleteIcon /></IconButton></Tooltip></>)}
                   </ListItem>
                 ))}
               </List>
@@ -526,50 +423,15 @@ const SalesPage = () => {
           </Box>
           <Divider sx={{ my: 1 }} />
           <Box sx={{ mt: 'auto' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Total</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 'bold' }}>₱{calculateTotal.toFixed(2)}</Typography>
-            </Box>
-            <Button 
-              variant="contained" color="success" fullWidth size="large"
-              startIcon={<PointOfSaleIcon />}
-              onClick={handleCompleteSale}
-              disabled={cartItems.length === 0}
-            >
-              Complete Sale
-            </Button>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}><Typography variant="h5" sx={{ fontWeight: 'bold' }}>Total</Typography><Typography variant="h5" sx={{ fontWeight: 'bold' }}>₱{calculateTotal.toFixed(2)}</Typography></Box>
+            <Button variant="contained" color="success" fullWidth size="large" startIcon={<PointOfSaleIcon />} onClick={handleCompleteSale} disabled={cartItems.length === 0}>Complete Sale</Button>
           </Box>
         </Paper>
       </Box>
-
-      {selectedCustomer && (
-        <Dialog open={isMotorcycleModalOpen} onClose={() => setIsMotorcycleModalOpen(false)} maxWidth="sm" fullWidth>
-            <DialogTitle>Add New Motorcycle for {selectedCustomer.name}</DialogTitle>
-            <MotorcycleForm
-                customer={selectedCustomer}
-                onFormSubmit={handleNewMotorcycleSubmit}
-                onClose={() => setIsMotorcycleModalOpen(false)}
-            />
-        </Dialog>
-      )}
-
-      <Dialog open={isCustomerModalOpen} onClose={() => setIsCustomerModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add New Customer</DialogTitle>
-        <CustomerForm 
-          onClose={() => setIsCustomerModalOpen(false)}
-          onFormSubmit={handleNewCustomerSubmit}
-        />
-      </Dialog>
-      {showReceiptModal && lastSaleData && (
-        <ReceiptModal saleData={lastSaleData} onClose={() => setShowReceiptModal(false)} />
-      )}
-      <AddServiceModal
-        open={isServiceModalOpen}
-        onClose={() => setIsServiceModalOpen(false)}
-        services={services}
-        onAddService={addServiceToCart}
-        cartItems={cartItems}
-      />
+      {selectedCustomer && (<Dialog open={isMotorcycleModalOpen} onClose={() => setIsMotorcycleModalOpen(false)} maxWidth="sm" fullWidth><DialogTitle>Add New Motorcycle for {selectedCustomer.name}</DialogTitle><MotorcycleForm customer={selectedCustomer} onFormSubmit={handleNewMotorcycleSubmit} onClose={() => setIsMotorcycleModalOpen(false)}/></Dialog>)}
+      <Dialog open={isCustomerModalOpen} onClose={() => setIsCustomerModalOpen(false)} maxWidth="sm" fullWidth><DialogTitle>Add New Customer</DialogTitle><CustomerForm onClose={() => setIsCustomerModalOpen(false)} onFormSubmit={handleNewCustomerSubmit}/></Dialog>
+      {showReceiptModal && lastSaleData && (<ReceiptModal saleData={lastSaleData} onClose={() => setShowReceiptModal(false)} />)}
+      <AddServiceModal open={isServiceModalOpen} onClose={() => setIsServiceModalOpen(false)} services={services} onAddService={addServiceToCart} cartItems={cartItems}/>
     </Box>
   );
 };
