@@ -180,8 +180,9 @@ const SettingsPage = () => {
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>My Settings</Typography>
+      {/* --- Grid format updated to match your project's standard --- */}
       <Grid container spacing={4}>
-        <Grid item xs={12} md={6}>
+        <Grid item size={{ xs: 12, md: 6 }}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>My Profile</Typography>
             {pendingChanges && <Alert severity="info" sx={{ mb: 2 }}>You have pending changes awaiting owner approval.</Alert>}
@@ -194,7 +195,7 @@ const SettingsPage = () => {
             <Button variant="contained" onClick={openUpdateModal} sx={{ mt: 2 }}>Request Profile Update</Button>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={6}>
+        <Grid item size={{ xs: 12, md: 6 }}>
           <Paper component="form" onSubmit={handleSavePersonalSettings} sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>Notification Settings</Typography>
             <FormControlLabel
