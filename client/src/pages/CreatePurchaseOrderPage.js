@@ -1,20 +1,25 @@
 // client/src/pages/CreatePurchaseOrderPage.js
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPurchaseOrder, getSuppliers, getProducts } from '../api/purchaseOrderApi';
 import { toast } from 'react-toastify';
+import ConfirmationContext from '../context/ConfirmationContext';
+import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
 
 // MUI Imports
 import {
   Container, Typography, Box, Paper, Grid, TextField, Button, Autocomplete,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton,
-  CircularProgress, Alert
+  CircularProgress, Alert, Dialog, DialogContent, DialogActions
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
+import PrintIcon from '@mui/icons-material/Print';
 
 const CreatePurchaseOrderPage = () => {
   const navigate = useNavigate();
+  const { confirm } = useContext(ConfirmationContext);
+  const printoutRef = useRef();
 
   // Form State
   const [supplier, setSupplier] = useState(null);
@@ -28,6 +33,7 @@ const CreatePurchaseOrderPage = () => {
   // UI State
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [createdPO, setCreatedPO] = useState(null);
 
   // Item Addition State
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -57,18 +63,12 @@ const CreatePurchaseOrderPage = () => {
       toast.warn('Please select a product and enter a valid quantity and cost.');
       return;
     }
-    // Check if item already exists
     if (items.some(item => item.product._id === selectedProduct._id)) {
       toast.warn(`${selectedProduct.name} is already in the purchase order.`);
       return;
     }
-    const newItem = {
-      product: selectedProduct,
-      quantity,
-      cost,
-    };
+    const newItem = { product: selectedProduct, quantity, cost };
     setItems([...items, newItem]);
-    // Reset item input fields
     setSelectedProduct(null);
     setQuantity(1);
     setCost(0);
@@ -92,24 +92,51 @@ const CreatePurchaseOrderPage = () => {
         return;
     }
 
+    const isConfirmed = await confirm('Create this Purchase Order? Details cannot be edited after creation.');
+    if (!isConfirmed) {
+      return;
+    }
+
     const purchaseOrderData = {
         supplier: supplier._id,
         items: items.map(item => ({
-            productId: item.product._id,
+            product: item.product._id,
             quantity: item.quantity,
-            cost: item.cost,
+            unitCost: item.cost,
         })),
         notes,
     };
 
     try {
-        await createPurchaseOrder(purchaseOrderData);
+        const newPO = await createPurchaseOrder(purchaseOrderData);
         toast.success('Purchase Order created successfully!');
-        navigate('/purchase-orders');
+
+        // --- THIS IS THE FIX: Manually add the full supplier object to the PO data ---
+        const completePOData = {
+          ...newPO,
+          supplier: supplier, // Use the full supplier object from the component's state
+        };
+        setCreatedPO(completePOData); // Store the complete data to trigger the print modal
+        // --- END FIX ---
+
     } catch (err) {
         toast.error('Failed to create Purchase Order. Please try again.');
         console.error(err);
     }
+  };
+
+  const handlePrint = () => {
+    const printContents = printoutRef.current.innerHTML;
+    const originalContents = document.body.innerHTML;
+    document.body.innerHTML = `<div class="print-container">${printContents}</div>`;
+    window.print();
+    document.body.innerHTML = originalContents;
+    window.location.reload(); 
+  };
+
+  const handleClosePrintModal = () => {
+    setCreatedPO(null);
+    navigate('/purchase-orders'); 
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
@@ -117,13 +144,24 @@ const CreatePurchaseOrderPage = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Dialog open={!!createdPO} onClose={handleClosePrintModal} maxWidth="md" fullWidth>
+        <DialogContent>
+          <PurchaseOrderPrintout poData={createdPO} ref={printoutRef} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePrintModal}>Close</Button>
+          <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>
+            Print / Download PDF
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Typography variant="h4" component="h1" gutterBottom>
         Create New Purchase Order
       </Typography>
       <Paper sx={{ p: 3 }}>
         <Grid container spacing={3}>
-          {/* Supplier Selection */}
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <Autocomplete
               options={suppliersList}
               getOptionLabel={(option) => option.name}
@@ -133,36 +171,34 @@ const CreatePurchaseOrderPage = () => {
             />
           </Grid>
           
-          {/* Add Item Section */}
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <Typography variant="h6">Add Items</Typography>
           </Grid>
-          <Grid item xs={12} md={5}>
+          <Grid item size={{ xs: 12, md: 5 }}>
             <Autocomplete
               options={productsList.filter(p => !items.some(item => item.product._id === p._id))}
               getOptionLabel={(option) => `${option.name} (${option.itemCode})`}
               value={selectedProduct}
               onChange={(event, newValue) => {
                 setSelectedProduct(newValue);
-                setCost(newValue ? newValue.cost : 0); // Set cost based on product's default cost
+                setCost(newValue ? newValue.cost : 0);
               }}
               renderInput={(params) => <TextField {...params} label="Select Product" />}
             />
           </Grid>
-          <Grid item xs={6} md={2}>
+          <Grid item size={{ xs: 6, md: 2 }}>
             <TextField label="Quantity" type="number" value={quantity} onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10)))} fullWidth />
           </Grid>
-          <Grid item xs={6} md={2}>
+          <Grid item size={{ xs: 6, md: 2 }}>
             <TextField label="Unit Cost" type="number" value={cost} onChange={(e) => setCost(Math.max(0, parseFloat(e.target.value)))} fullWidth />
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid item size={{ xs: 12, md: 3 }}>
             <Button variant="outlined" startIcon={<AddCircleIcon />} onClick={handleAddItem} fullWidth sx={{height: '100%'}}>
               Add Item
             </Button>
           </Grid>
 
-          {/* Items Table */}
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <TableContainer component={Paper} variant="outlined">
               <Table>
                 <TableHead>
@@ -198,11 +234,10 @@ const CreatePurchaseOrderPage = () => {
             </TableContainer>
           </Grid>
           
-          {/* Notes and Actions */}
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <TextField label="Notes (Optional)" multiline rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} fullWidth />
           </Grid>
-          <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+          <Grid item size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
             <Button variant="text" color="secondary" onClick={() => navigate('/purchase-orders')}>Cancel</Button>
             <Button variant="contained" onClick={handleSubmit}>Save Purchase Order</Button>
           </Grid>

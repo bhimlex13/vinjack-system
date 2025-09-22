@@ -116,7 +116,6 @@ const InventoryPage = () => {
     {
       field: 'actions', headerName: 'Actions', width: 180, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => (
-        // --- THIS IS THE FIX: Show buttons for both Owner and Admin roles ---
         (user?.role === 'Owner' || user?.role === 'Admin') && (
           <Box>
             <Tooltip title="View History">
@@ -144,7 +143,8 @@ const InventoryPage = () => {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Dialog open={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} maxWidth="md">
+      {/* --- THIS IS THE FIX: Changed maxWidth to "lg" and added fullWidth --- */}
+      <Dialog open={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
         <DialogContent>
           <ProductForm

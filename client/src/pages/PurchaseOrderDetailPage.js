@@ -1,15 +1,18 @@
 // client/src/pages/PurchaseOrderDetailPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getPurchaseOrderById, receivePurchaseOrder } from '../api/purchaseOrderApi';
 import { toast } from 'react-toastify';
+import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
 
 // MUI Imports
 import {
   Container, Typography, Box, Paper, Grid, Button, CircularProgress, Alert,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
+  Dialog, DialogContent, DialogActions
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PrintIcon from '@mui/icons-material/Print';
 
 const PurchaseOrderDetailPage = () => {
   const { id } = useParams();
@@ -17,6 +20,9 @@ const PurchaseOrderDetailPage = () => {
   const [po, setPo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const printoutRef = useRef();
 
   useEffect(() => {
     const fetchPo = async () => {
@@ -38,11 +44,20 @@ const PurchaseOrderDetailPage = () => {
     try {
       const response = await receivePurchaseOrder(id);
       toast.success(response.message);
-      setPo(response.purchaseOrder); // Update state with the updated PO
+      setPo(response.purchaseOrder);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to receive stock.');
       console.error(err);
     }
+  };
+  
+  const handlePrint = () => {
+    const printContents = printoutRef.current.innerHTML;
+    const originalContents = document.body.innerHTML;
+    document.body.innerHTML = `<div class="print-container">${printContents}</div>`;
+    window.print();
+    document.body.innerHTML = originalContents;
+    window.location.reload();
   };
 
   const formatCurrency = (amount) => {
@@ -55,17 +70,39 @@ const PurchaseOrderDetailPage = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Dialog open={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} maxWidth="md" fullWidth>
+        <DialogContent>
+          <PurchaseOrderPrintout poData={po} ref={printoutRef} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsPrintModalOpen(false)}>Close</Button>
+          <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>
+            Print / Download PDF
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Paper sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <div>
             <Typography variant="h4" gutterBottom>{po.poNumber}</Typography>
             <Typography variant="subtitle1" color="textSecondary">
+              {/* --- THIS IS THE FIX: Corrected the function name --- */}
               Order Date: {new Date(po.orderDate).toLocaleDateString()}
             </Typography>
           </div>
-          <Button variant="outlined" onClick={() => navigate('/purchase-orders')}>
-            Back to List
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button variant="outlined" onClick={() => navigate('/purchase-orders')}>
+              Back to List
+            </Button>
+            <Button 
+              variant="contained" 
+              startIcon={<PrintIcon />} 
+              onClick={() => setIsPrintModalOpen(true)}
+            >
+              Print / Download PO
+            </Button>
+          </Box>
         </Box>
         <Divider sx={{ my: 2 }} />
         <Grid container spacing={3}>
@@ -115,7 +152,7 @@ const PurchaseOrderDetailPage = () => {
             color="success"
             startIcon={<CheckCircleIcon />}
             onClick={handleReceiveStock}
-            disabled={po.status === 'Completed'}
+            disabled={po.status === 'Completed' || po.status === 'Cancelled'}
           >
             {po.status === 'Completed' ? 'Stock Received' : 'Receive Stock & Add to Inventory'}
           </Button>
