@@ -93,7 +93,6 @@ const createReturn = async (req, res) => {
         await logMovement(movement, { session });
     }
 
-    // --- MODIFIED LINE ---
     logAction(req.user, 'PROCESS_RETURN', `Processed return for Sale #${originalSale._id} totaling ₱${calculatedRefundAmount.toFixed(2)}.`, { entityType: 'Return', entityId: savedReturn._id });
     
     await session.commitTransaction();
@@ -129,4 +128,32 @@ const getAllReturns = async (req, res) => {
     }
 };
 
-module.exports = { createReturn, getAllReturns };
+// --- 3. ADD THE NEW CONTROLLER FUNCTION ---
+const getReturnById = async (req, res) => {
+  try {
+    const returnRecord = await Return.findById(req.params.id)
+      .populate('recordedBy', 'fullName')
+      .populate('itemsReturned.product', 'name itemCode')
+      .populate('servicesReturned.service', 'name')
+      .populate({
+        path: 'originalSale',
+        select: '_id createdAt totalAmount customer',
+        populate: {
+          path: 'customer',
+          select: 'fullName'
+        }
+      });
+
+    if (!returnRecord) {
+      return res.status(404).json({ message: 'Return record not found.' });
+    }
+
+    res.json(returnRecord);
+
+  } catch (error) {
+    res.status(500).json({ message: 'Server error fetching return details.', error: error.message });
+  }
+};
+
+
+module.exports = { createReturn, getAllReturns, getReturnById }; // <-- 4. EXPORT THE NEW FUNCTION
