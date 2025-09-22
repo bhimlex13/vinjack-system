@@ -21,12 +21,11 @@ const TransactionsPage = () => {
   // State for filters
   const [customers, setCustomers] = useState([]);
   const [users, setUsers] = useState([]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(today); // --- Set initial start date to today ---
+  const [endDate, setEndDate] = useState(today);   // --- Set initial end date to today ---
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterUser, setFilterUser] = useState('');
-  const [wasGenerated, setWasGenerated] = useState(false);
-
+  
   // Fetch data for filter dropdowns
   useEffect(() => {
     const fetchFilterData = async () => {
@@ -45,27 +44,25 @@ const TransactionsPage = () => {
     fetchFilterData();
   }, []);
 
+  // --- Fetch today's sales on initial page load ---
+  useEffect(() => {
+    handleGenerate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array ensures this runs only once on mount
+
   const handleGenerate = async () => {
     setIsLoading(true);
     setError('');
-    setWasGenerated(true);
     try {
-      // Build query parameters, only including ones with values
       const params = new URLSearchParams();
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
+      // Use today's date if the fields are cleared, otherwise use the selected dates
+      const sDate = startDate || today;
+      const eDate = endDate || today;
+
+      params.append('startDate', sDate);
+      params.append('endDate', eDate);
       if (filterCustomer) params.append('customerId', filterCustomer);
       if (filterUser) params.append('userId', filterUser);
-
-      // Default to today if no dates are selected
-      if (!startDate && !endDate) {
-        params.append('startDate', today);
-        params.append('endDate', today);
-      } else if (!startDate || !endDate) {
-        setError("Please select both a start and end date, or leave both empty for today's transactions.");
-        setIsLoading(false);
-        return;
-      }
 
       const response = await api.get(`/reports/sales?${params.toString()}`);
       setSales(response.data);
@@ -161,12 +158,6 @@ const TransactionsPage = () => {
           initialState={{ sorting: { sortModel: [{ field: 'createdAt', sort: 'desc' }] } }}
         />
       </Paper>
-
-      {!wasGenerated && !isLoading && (
-        <Alert severity="info" sx={{ mt: 2 }}>
-          Select your filters and click "Find" to load transactions. Leaving dates empty will search for today's records.
-        </Alert>
-      )}
 
       {selectedSale && (
         <ReceiptModal
