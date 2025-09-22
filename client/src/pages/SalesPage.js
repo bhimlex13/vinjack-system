@@ -29,15 +29,42 @@ import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import { FaUserTag } from 'react-icons/fa';
 
 
+// --- FIX 1: Create a function to get the entire initial cart state from localStorage ---
+const getInitialCartState = () => {
+  try {
+    const savedCart = localStorage.getItem('salesCart');
+    if (savedCart) {
+      const parsedCart = JSON.parse(savedCart);
+      // Ensure the parsed data has the correct structure before returning
+      if (Array.isArray(parsedCart.items)) {
+        return {
+          items: parsedCart.items,
+          customer: parsedCart.customer || null,
+          motorcycle: parsedCart.motorcycle || null,
+        };
+      }
+    }
+  } catch (error) {
+    console.error("Failed to parse cart from localStorage", error);
+  }
+  // Return a default empty state if nothing is saved or an error occurs
+  return { items: [], customer: null, motorcycle: null };
+};
+
+
 const SalesPage = () => {
+  // --- FIX 2: Initialize all cart-related state from the function above ---
+  const [initialCart] = useState(getInitialCartState);
+  const [cartItems, setCartItems] = useState(initialCart.items);
+  const [selectedCustomer, setSelectedCustomer] = useState(initialCart.customer);
+  const [selectedMotorcycle, setSelectedMotorcycle] = useState(initialCart.motorcycle);
+
   // Customer State
   const [customers, setCustomers] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   
   // Motorcycle State
   const [customerMotorcycles, setCustomerMotorcycles] = useState([]);
-  const [selectedMotorcycle, setSelectedMotorcycle] = useState(null);
   const [isFetchingMotorcycles, setIsFetchingMotorcycles] = useState(false);
   const [isMotorcycleModalOpen, setIsMotorcycleModalOpen] = useState(false);
   
@@ -46,7 +73,6 @@ const SalesPage = () => {
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [services, setServices] = useState([]);
-  const [cartItems, setCartItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -56,6 +82,17 @@ const SalesPage = () => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [lastSaleData, setLastSaleData] = useState(null);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+
+  // --- FIX 3: Save the entire cart object (items, customer, motorcycle) on any change ---
+  useEffect(() => {
+    const cartData = {
+      items: cartItems,
+      customer: selectedCustomer,
+      motorcycle: selectedMotorcycle,
+    };
+    localStorage.setItem('salesCart', JSON.stringify(cartData));
+  }, [cartItems, selectedCustomer, selectedMotorcycle]);
+
 
   const fetchMotorcycles = async (customerId) => {
     setIsFetchingMotorcycles(true);
@@ -93,22 +130,49 @@ const SalesPage = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [productsRes, categoriesRes, brandsRes, servicesRes] = await Promise.all([
+        const [productsRes, categoriesRes, brandsRes, servicesRes, customersRes] = await Promise.all([
           api.get('/products'),
           api.get('/categories'),
           api.get('/brands'),
           getServices('active'),
+          getCustomers(), // Fetch customers here as well
         ]);
-        setProducts(productsRes.data);
+        
+        let productsData = productsRes.data;
+        if (cartItems.length > 0) {
+          productsData = productsData.map(product => {
+            const itemInCart = cartItems.find(item => item.type === 'product' && item._id === product._id);
+            if (itemInCart) {
+              return { ...product, quantity: product.quantity - itemInCart.cartQuantity };
+            }
+            return product;
+          });
+        }
+        setProducts(productsData);
+        
         setCategories(categoriesRes.data);
         setBrands(brandsRes.data);
         setServices(servicesRes);
-        fetchCustomers();
+        setCustomers(customersRes); // Set customers state
+
+        // --- FIX 4: Sync restored customer/motorcycle with fresh data from the server ---
+        if (selectedCustomer) {
+          const freshCustomer = customersRes.find(c => c._id === selectedCustomer._id);
+          if (freshCustomer) setSelectedCustomer(freshCustomer);
+        }
+        if (selectedCustomer && selectedMotorcycle) {
+          const freshMotorcycles = await getMotorcyclesByCustomer(selectedCustomer._id);
+          const freshMotorcycle = freshMotorcycles.find(m => m._id === selectedMotorcycle._id);
+          if (freshMotorcycle) setSelectedMotorcycle(freshMotorcycle);
+        }
+        // --- END FIX 4 ---
+
       } catch (error) {
         console.error("Failed to fetch initial data", error);
       }
     };
     fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleNewCustomerSubmit = async (newCustomerData) => {
@@ -132,7 +196,6 @@ const SalesPage = () => {
         console.error("Failed to create new motorcycle", error);
     }
   };
-
 
   const addProductToCart = (product) => {
     const productInState = products.find(p => p._id === product._id);
@@ -243,6 +306,9 @@ const SalesPage = () => {
         setLastSaleData(response.data);
         setShowReceiptModal(true);
         setCartItems([]);
+        
+        localStorage.removeItem('salesCart');
+        
         setSelectedCustomer(null); 
         setSelectedMotorcycle(null);
         setCustomerMotorcycles([]);
@@ -366,7 +432,7 @@ const SalesPage = () => {
                 onChange={(event, newValue) => {
                   setSelectedCustomer(newValue);
                 }}
-                isOptionEqualToValue={(option, value) => option._id === value._id}
+                isOptionEqualToValue={(option, value) => option?._id === value?._id}
                 renderInput={(params) => <TextField {...params} label="Select a Customer (Optional)" size="small" />}
               />
               <Button variant="outlined" size="small" onClick={() => setIsCustomerModalOpen(true)}>
@@ -386,7 +452,7 @@ const SalesPage = () => {
                     onChange={(event, newValue) => {
                       setSelectedMotorcycle(newValue);
                     }}
-                    isOptionEqualToValue={(option, value) => option._id === value._id}
+                    isOptionEqualToValue={(option, value) => option?._id === value?._id}
                     renderInput={(params) => (
                       <TextField 
                         {...params} 
