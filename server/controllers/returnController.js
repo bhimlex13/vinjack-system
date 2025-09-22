@@ -6,8 +6,6 @@ const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
 const mongoose = require('mongoose');
 
-// @desc    Create a new sales return
-// @route   POST /api/returns
 const createReturn = async (req, res) => {
   const { originalSaleId, itemsReturned, servicesReturned, reason } = req.body;
 
@@ -33,7 +31,6 @@ const createReturn = async (req, res) => {
     const processedServices = [];
     const movementsToLog = [];
 
-    // Process returned items
     if (itemsReturned && itemsReturned.length > 0) {
       for (const returnedItem of itemsReturned) {
         const soldItem = originalSale.items.find(item => item.product.toString() === returnedItem.product);
@@ -46,7 +43,7 @@ const createReturn = async (req, res) => {
 
         const product = await Product.findById(returnedItem.product).session(session);
         const stockBefore = product.quantity;
-        product.quantity += returnedItem.quantity; // Add stock back
+        product.quantity += returnedItem.quantity;
         await product.save({ session });
 
         calculatedRefundAmount += returnedItem.quantity * soldItem.priceAtTime;
@@ -58,16 +55,14 @@ const createReturn = async (req, res) => {
         
         movementsToLog.push({
           product: product._id,
-          // --- MODIFIED: Changed type to match your existing model ---
           type: 'RETURN', 
-          quantityChange: returnedItem.quantity, // Positive change
+          quantityChange: returnedItem.quantity,
           stockBefore,
           recordedBy: req.user.id
         });
       }
     }
 
-    // Process returned services
     if (servicesReturned && servicesReturned.length > 0) {
       for (const returnedService of servicesReturned) {
         const soldService = originalSale.services.find(s => s.service.toString() === returnedService.service);
@@ -98,7 +93,8 @@ const createReturn = async (req, res) => {
         await logMovement(movement, { session });
     }
 
-    logAction(req.user, 'PROCESS_RETURN', `Processed return for Sale #${originalSale._id} totaling ₱${calculatedRefundAmount.toFixed(2)}.`);
+    // --- MODIFIED LINE ---
+    logAction(req.user, 'PROCESS_RETURN', `Processed return for Sale #${originalSale._id} totaling ₱${calculatedRefundAmount.toFixed(2)}.`, { entityType: 'Return', entityId: savedReturn._id });
     
     await session.commitTransaction();
     
@@ -118,8 +114,6 @@ const createReturn = async (req, res) => {
   }
 };
 
-// @desc    Get all returns
-// @route   GET /api/returns
 const getAllReturns = async (req, res) => {
     try {
         const returns = await Return.find({})

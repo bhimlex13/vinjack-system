@@ -13,16 +13,13 @@ const auditLogSchema = new mongoose.Schema({
     enum: [
       'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT',
       'PROCESS_SALE',
-      'PROCESS_RETURN', // --- ADDED
-      
+      'PROCESS_RETURN',
       'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER',
-      
-      // --- ADDED CUSTOMER ACTIONS ---
       'CREATE_CUSTOMER', 'UPDATE_CUSTOMER', 'DELETE_CUSTOMER',
-
       'RECORD_DELIVERY',
       'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
       'CREATE_USER',
+      'DELETE_USER', // <-- THIS LINE FIXES THE ERROR
       'FORCE_PASSWORD_CHANGE',
       'REJECT_PROFILE_UPDATE',
       'CREATE_PO', 'RECEIVE_PO', 'CANCEL_PO',
@@ -32,6 +29,14 @@ const auditLogSchema = new mongoose.Schema({
   details: {
     type: String,
     required: true,
+  },
+  entityType: {
+    type: String,
+    required: false,
+  },
+  entityId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: false,
   }
 }, { timestamps: true });
 

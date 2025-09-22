@@ -20,19 +20,18 @@ const createPurchaseOrder = async (req, res) => {
       return res.status(400).json({ message: 'Supplier and items are required.' });
     }
     let totalAmount = 0;
-    // --- FIX IS IN THIS SECTION ---
     const processedItems = items.map(item => {
-      // FIX 1: Changed 'item.cost' to 'item.unitCost' to match frontend data
       const itemTotal = item.quantity * item.unitCost;
       totalAmount += itemTotal;
-      // FIX 2: Changed 'item.productId' to 'item.product' and 'item.cost' to 'item.unitCost'
       return { product: item.product, quantity: item.quantity, cost: item.unitCost, total: itemTotal };
     });
     const sequence = await getNextSequenceValue('purchaseOrder');
     const poNumber = `PO-${new Date().getFullYear()}-${String(sequence).padStart(4, '0')}`;
     const purchaseOrder = new PurchaseOrder({ poNumber, supplier, items: processedItems, totalAmount, notes });
     const createdPurchaseOrder = await purchaseOrder.save();
-    logAction(req.user, 'CREATE_PO', `Created Purchase Order #${poNumber}`);
+    
+    // --- MODIFIED LINE ---
+    logAction(req.user, 'CREATE_PO', `Created Purchase Order #${poNumber}`, { entityType: 'PurchaseOrder', entityId: createdPurchaseOrder._id });
     res.status(201).json(createdPurchaseOrder);
   } catch (error) {
     res.status(500).json({ message: 'Server error while creating purchase order.', error: error.message });
@@ -97,7 +96,9 @@ const receivePurchaseOrder = async (req, res) => {
     }
     po.status = 'Completed';
     const updatedPurchaseOrder = await po.save();
-    logAction(req.user, 'RECEIVE_PO', `Received items for PO #${po.poNumber} via Delivery #${createdDelivery._id}.`);
+    
+    // --- MODIFIED LINE ---
+    logAction(req.user, 'RECEIVE_PO', `Received items for PO #${po.poNumber} via Delivery #${createdDelivery._id}.`, { entityType: 'Delivery', entityId: createdDelivery._id });
     res.json({ message: 'Stock received and delivery record created successfully.', purchaseOrder: updatedPurchaseOrder });
   } catch (error) {
     res.status(500).json({ message: 'Server error while receiving stock.', error: error.message });
@@ -113,7 +114,9 @@ const cancelPurchaseOrder = async (req, res) => {
     }
     po.status = 'Cancelled';
     const updatedPurchaseOrder = await po.save();
-    logAction(req.user, 'CANCEL_PO', `Cancelled Purchase Order #${po.poNumber}`);
+
+    // --- MODIFIED LINE ---
+    logAction(req.user, 'CANCEL_PO', `Cancelled Purchase Order #${po.poNumber}`, { entityType: 'PurchaseOrder', entityId: updatedPurchaseOrder._id });
     res.json({ message: 'Purchase Order has been cancelled.', purchaseOrder: updatedPurchaseOrder });
   } catch (error) {
     res.status(500).json({ message: 'Server error while cancelling PO.', error: error.message });
