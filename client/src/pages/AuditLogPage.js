@@ -9,35 +9,35 @@ import UserDetailsModal from '../components/UserDetailsModal';
 
 // MUI Imports
 import {
-  Box,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  CircularProgress,
-  TablePagination,
-  IconButton,
-  Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  Alert
+  Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, Chip, CircularProgress, TablePagination, IconButton,
+  Tooltip, Dialog, DialogTitle, DialogContent, Alert, Grid, TextField,
+  FormControl, InputLabel, Select, MenuItem, InputAdornment
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import SearchIcon from '@mui/icons-material/Search';
 
 const AuditLogPage = () => {
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Pagination state
+  // Pagination and Filter State
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [totalLogs, setTotalLogs] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterUser, setFilterUser] = useState('');
+  const [filterAction, setFilterAction] = useState('');
+
+  // Data for filter dropdowns
+  const [users, setUsers] = useState([]);
+  const actionTypes = [
+    'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT', 'PROCESS_SALE', 'PROCESS_RETURN',
+    'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER', 'CREATE_CUSTOMER', 'UPDATE_CUSTOMER',
+    'DELETE_CUSTOMER', 'RECORD_DELIVERY', 'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
+    'CREATE_USER', 'DELETE_USER', 'FORCE_PASSWORD_CHANGE', 'REJECT_PROFILE_UPDATE',
+    'CREATE_PO', 'UPDATE_PO', 'RECEIVE_PO', 'CANCEL_PO', 'STOCK_ADJUSTMENT'
+  ];
 
   // State for viewing details modal
   const [selectedLog, setSelectedLog] = useState(null);
@@ -45,18 +45,36 @@ const AuditLogPage = () => {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
 
+  // Fetch users for the filter dropdown
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await api.get('/users');
+        setUsers(res.data);
+      } catch (error) {
+        console.error("Failed to fetch users", error);
+      }
+    };
+    fetchUsers();
+  }, []);
+
   // Fetch audit logs for the table
   useEffect(() => {
     const fetchLogs = async () => {
       setIsLoading(true);
       try {
-        const response = await api.get(`/audit-logs?page=${page + 1}&limit=${rowsPerPage}`);
-        
-        const logsData = Array.isArray(response.data.logs) ? response.data.logs : [];
-        const totalLogsData = response.data.totalLogs || 0;
+        const params = new URLSearchParams({
+          page: page + 1,
+          limit: rowsPerPage,
+        });
+        if (searchTerm) params.append('search', searchTerm);
+        if (filterUser) params.append('userId', filterUser);
+        if (filterAction) params.append('action', filterAction);
 
-        setLogs(logsData);
-        setTotalLogs(totalLogsData);
+        const response = await api.get(`/audit-logs?${params.toString()}`);
+        
+        setLogs(response.data.logs || []);
+        setTotalLogs(response.data.totalLogs || 0);
 
       } catch (error) {
         console.error("Failed to fetch audit logs", error);
@@ -66,7 +84,7 @@ const AuditLogPage = () => {
       }
     };
     fetchLogs();
-  }, [page, rowsPerPage]);
+  }, [page, rowsPerPage, searchTerm, filterUser, filterAction]);
 
   // Effect to fetch specific details when a log is selected
   useEffect(() => {
@@ -86,6 +104,7 @@ const AuditLogPage = () => {
         'Sale': `/sales/${selectedLog.entityId}`,
         'Return': `/returns/${selectedLog.entityId}`,
         'User': `/users/details/${selectedLog.entityId}`,
+        'PurchaseOrder': `/purchase-orders/${selectedLog.entityId}`,
       };
 
       const endpoint = entityEndpoints[selectedLog.entityType];
@@ -110,6 +129,15 @@ const AuditLogPage = () => {
     fetchDetails();
   }, [selectedLog]);
 
+  const handleFilterChange = (setter) => (event) => {
+    setter(event.target.value);
+    setPage(0); // Reset to first page when filter changes
+  };
+
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+    setPage(0);
+  };
 
   const handleViewDetails = (log) => {
     setSelectedLog(log);
@@ -131,7 +159,6 @@ const AuditLogPage = () => {
     setPage(0);
   };
   
-  // --- 1. MODIFIED HELPER FUNCTION FOR CUSTOM CHIP STYLES ---
   const getActionChipStyles = (action) => {
     const baseStyles = { fontWeight: 500 };
     if (action.includes('DELETE') || action.includes('CANCEL') || action.includes('REJECT')) {
@@ -152,7 +179,6 @@ const AuditLogPage = () => {
     return { ...baseStyles, backgroundColor: '#f5f5f5', color: '#424242' }; // Light Grey
   };
 
-  // Render the correct modal based on the selected log's entity type
   const renderDetailsModal = () => {
     if (!selectedLog) return null;
 
@@ -208,6 +234,38 @@ const AuditLogPage = () => {
         A record of all important actions performed by users.
       </Typography>
       
+      {/* --- Filter Bar --- */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        {/* --- Grid format updated to match your project's standard --- */}
+        <Grid container spacing={2} alignItems="center">
+          <Grid item size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth label="Search in Details" variant="outlined" size="small"
+              value={searchTerm} onChange={handleSearchChange}
+              InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
+            />
+          </Grid>
+          <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Filter by User</InputLabel>
+              <Select value={filterUser} label="Filter by User" onChange={handleFilterChange(setFilterUser)}>
+                <MenuItem value=""><em>All Users</em></MenuItem>
+                {users.map(u => <MenuItem key={u._id} value={u._id}>{u.fullName}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Filter by Action</InputLabel>
+              <Select value={filterAction} label="Filter by Action" onChange={handleFilterChange(setFilterAction)}>
+                <MenuItem value=""><em>All Actions</em></MenuItem>
+                {actionTypes.sort().map(action => <MenuItem key={action} value={action}>{action.replace(/_/g, ' ')}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
+      </Paper>
+      
       <TableContainer component={Paper}>
         <Table sx={{ minWidth: 650 }} aria-label="audit log table">
           <TableHead sx={{ backgroundColor: 'action.hover' }}>
@@ -220,7 +278,7 @@ const AuditLogPage = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {isLoading && logs.length === 0 ? (
+            {isLoading ? (
               <TableRow>
                   <TableCell colSpan={5} align="center"><CircularProgress /></TableCell>
               </TableRow>
@@ -235,7 +293,6 @@ const AuditLogPage = () => {
                   </TableCell>
                   <TableCell>{log.user?.fullName || 'N/A'}</TableCell>
                   <TableCell>
-                    {/* --- 2. UPDATED CHIP TO USE THE 'sx' PROP FOR CUSTOM STYLING --- */}
                     <Chip 
                       label={log.action.replace(/_/g, ' ')} 
                       size="small"
@@ -248,12 +305,15 @@ const AuditLogPage = () => {
                   <TableCell>{log.details}</TableCell>
                   <TableCell align="center">
                     <Tooltip title="View Details">
-                      <IconButton 
-                        onClick={() => handleViewDetails(log)} 
-                        size="small"
-                      >
-                        <VisibilityIcon />
-                      </IconButton>
+                      <span>
+                        <IconButton 
+                          onClick={() => handleViewDetails(log)} 
+                          size="small"
+                          disabled={!log.entityId} // Disable if there's no entity to view
+                        >
+                          <VisibilityIcon />
+                        </IconButton>
+                      </span>
                     </Tooltip>
                   </TableCell>
                 </TableRow>
@@ -273,7 +333,6 @@ const AuditLogPage = () => {
         />
       </TableContainer>
 
-      {/* Render the modal */}
       {renderDetailsModal()}
     </Box>
   );
