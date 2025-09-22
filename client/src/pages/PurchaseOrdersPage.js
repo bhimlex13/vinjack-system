@@ -8,7 +8,7 @@ import ConfirmationContext from '../context/ConfirmationContext';
 import {
   Container, Typography, Button, Box, Paper, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, CircularProgress, Alert,
-  Chip, Tooltip, IconButton
+  Chip, Tooltip, IconButton, Grid // Import Grid
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -89,88 +89,95 @@ const PurchaseOrdersPage = () => {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" component="h1">
-          Purchase Orders
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/purchase-orders/new')}
-        >
-          Create Purchase Order
-        </Button>
-      </Box>
+      {/* --- THIS IS THE FIX: Implemented Grid layout to match the ProductForm format --- */}
+      <Grid container spacing={3}>
+        <Grid item size={{ xs: 12 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h4" component="h1">
+              Purchase Orders
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/purchase-orders/new')}
+            >
+              Create Purchase Order
+            </Button>
+          </Box>
+        </Grid>
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Alert severity="error">{error}</Alert>
-      ) : (
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer>
-            <Table stickyHeader aria-label="purchase orders table">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>PO Number</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Supplier</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Order Date</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total Amount</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {purchaseOrders.map((po) => {
-                  const isActionable = po.status === 'Pending' || po.status === 'Approved';
-                  return (
-                    <TableRow hover key={po._id}>
-                      <TableCell>{po.poNumber}</TableCell>
-                      <TableCell>{po.supplier?.name || 'N/A'}</TableCell>
-                      <TableCell>
-                        <StatusChip status={po.status} />
-                      </TableCell>
-                      <TableCell>{new Date(po.orderDate).toLocaleDateString()}</TableCell>
-                      <TableCell align="right">{formatCurrency(po.totalAmount)}</TableCell>
-                      <TableCell align="center">
-                        <Tooltip title="View Details">
-                          <IconButton onClick={() => navigate(`/purchase-orders/${po._id}`)} color="primary">
-                            <VisibilityIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Receive Stock">
-                          <span> {/* Span is needed to show tooltip on disabled button */}
-                            <IconButton 
-                              onClick={() => handleReceive(po._id, po.poNumber)} 
-                              color="success" 
-                              disabled={!isActionable}
-                            >
-                              <CheckCircleIcon />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title="Cancel Order">
-                          <span>
-                            <IconButton 
-                              onClick={() => handleCancel(po._id, po.poNumber)} 
-                              color="error" 
-                              disabled={!isActionable}
-                            >
-                              <CancelIcon />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      </TableCell>
+        <Grid item size={{ xs: 12 }}>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
+              <CircularProgress />
+            </Box>
+          ) : error ? (
+            <Alert severity="error">{error}</Alert>
+          ) : (
+            <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+              <TableContainer>
+                <Table stickyHeader aria-label="purchase orders table">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'bold' }}>PO Number</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Supplier</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Order Date</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total Amount</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      )}
+                  </TableHead>
+                  <TableBody>
+                    {purchaseOrders.map((po) => {
+                      const isActionable = po.status === 'Pending' || po.status === 'Approved';
+                      return (
+                        <TableRow hover key={po._id}>
+                          <TableCell>{po.poNumber}</TableCell>
+                          <TableCell>{po.supplier?.name || 'N/A'}</TableCell>
+                          <TableCell>
+                            <StatusChip status={po.status} />
+                          </TableCell>
+                          <TableCell>{new Date(po.orderDate).toLocaleDateString()}</TableCell>
+                          <TableCell align="right">{formatCurrency(po.totalAmount)}</TableCell>
+                          <TableCell align="center">
+                            <Tooltip title="View Details">
+                              <IconButton onClick={() => navigate(`/purchase-orders/${po._id}`)} color="primary">
+                                <VisibilityIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Receive Stock">
+                              <span> {/* Span is needed to show tooltip on disabled button */}
+                                <IconButton 
+                                  onClick={() => handleReceive(po._id, po.poNumber)} 
+                                  color="success" 
+                                  disabled={!isActionable}
+                                >
+                                  <CheckCircleIcon />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title="Cancel Order">
+                              <span>
+                                <IconButton 
+                                  onClick={() => handleCancel(po._id, po.poNumber)} 
+                                  color="error" 
+                                  disabled={!isActionable}
+                                >
+                                  <CancelIcon />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          )}
+        </Grid>
+      </Grid>
     </Container>
   );
 };

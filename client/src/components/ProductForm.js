@@ -123,28 +123,30 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
   return (
     <Box sx={{ minWidth: 500, p: 3, pt: 1 }}>
         <Box component="form" onSubmit={handleSubmit}>
+          {/* --- THIS IS THE FIX: Changed grid format to match DashboardPage.js --- */}
           <Grid container spacing={2}>
-            <Grid item xs={6}><TextField fullWidth required name="itemCode" label="Item Code" value={formData.itemCode} onChange={handleChange} /></Grid>
-            <Grid item xs={6}><TextField fullWidth required name="name" label="Product Name" value={formData.name} onChange={handleChange} /></Grid>
-            <Grid item xs={6}>
+            <Grid item size={{ xs: 12 }}><TextField fullWidth required name="itemCode" label="Item Code" value={formData.itemCode} onChange={handleChange} /></Grid>
+            <Grid item size={{ xs: 12 }}><TextField fullWidth required name="name" label="Product Name" value={formData.name} onChange={handleChange} /></Grid>
+            
+            <Grid item size={{ xs: 6 }}>
               <FormControl fullWidth required><InputLabel>Category</InputLabel>
                 <Select name="category" label="Category" value={formData.category} onChange={handleChange}>
                   {categories.map(c => <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={6}>
+            <Grid item size={{ xs: 6 }}>
               <FormControl fullWidth required><InputLabel>Brand</InputLabel>
                 <Select name="brand" label="Brand" value={formData.brand} onChange={handleChange}>
                   {brands.map(b => <MenuItem key={b._id} value={b._id}>{b.name}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={6}><TextField fullWidth required type="number" name="cost" label="Cost" value={formData.cost} onChange={handleChange} inputProps={{ step: "0.01" }} /></Grid>
-            <Grid item xs={6}><TextField fullWidth required type="number" name="price" label="Price" value={formData.price} onChange={handleChange} inputProps={{ step: "0.01" }} /></Grid>
-            <Grid item xs={6}><TextField fullWidth required type="number" name="quantity" label="Quantity" value={formData.quantity} onChange={handleChange} /></Grid>
-            <Grid item xs={6}><TextField fullWidth required type="number" name="reorderLevel" label="Reorder Level" value={formData.reorderLevel} onChange={handleChange} /></Grid>
-            <Grid item xs={12}>
+            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="cost" label="Cost" value={formData.cost} onChange={handleChange} inputProps={{ step: "0.01" }} /></Grid>
+            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="price" label="Price" value={formData.price} onChange={handleChange} inputProps={{ step: "0.01" }} /></Grid>
+            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="quantity" label="Quantity" value={formData.quantity} onChange={handleChange} /></Grid>
+            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="reorderLevel" label="Reorder Level" value={formData.reorderLevel} onChange={handleChange} /></Grid>
+            <Grid item size={{ xs: 12 }}>
               <FormControl fullWidth>
                 <ToggleButtonGroup value={imageSource} exclusive onChange={(e, val) => val && setImageSource(val)} size="small">
                   <ToggleButton value="url">URL</ToggleButton>

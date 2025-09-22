@@ -20,10 +20,13 @@ const createPurchaseOrder = async (req, res) => {
       return res.status(400).json({ message: 'Supplier and items are required.' });
     }
     let totalAmount = 0;
+    // --- FIX IS IN THIS SECTION ---
     const processedItems = items.map(item => {
-      const itemTotal = item.quantity * item.cost;
+      // FIX 1: Changed 'item.cost' to 'item.unitCost' to match frontend data
+      const itemTotal = item.quantity * item.unitCost;
       totalAmount += itemTotal;
-      return { product: item.productId, quantity: item.quantity, cost: item.cost, total: itemTotal };
+      // FIX 2: Changed 'item.productId' to 'item.product' and 'item.cost' to 'item.unitCost'
+      return { product: item.product, quantity: item.quantity, cost: item.unitCost, total: itemTotal };
     });
     const sequence = await getNextSequenceValue('purchaseOrder');
     const poNumber = `PO-${new Date().getFullYear()}-${String(sequence).padStart(4, '0')}`;
