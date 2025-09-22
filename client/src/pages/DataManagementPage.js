@@ -1,7 +1,7 @@
 // client/src/pages/DataManagementPage.js
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { getServices, createService, updateService, deleteService } from '../api/serviceApi'; // Import new service API
+import { getServices, createService, updateService, deleteService } from '../api/serviceApi';
 
 // MUI Imports
 import {
@@ -21,11 +21,11 @@ const DataManagementPage = () => {
   const [activeTab, setActiveTab] = useState('categories');
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [services, setServices] = useState([]); // State for services
+  const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState(null); // Will hold the item being edited
-  const [formState, setFormState] = useState(emptyFormState); // State for form fields
+  const [editingItem, setEditingItem] = useState(null);
+  const [formState, setFormState] = useState(emptyFormState);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -33,7 +33,7 @@ const DataManagementPage = () => {
       const [catRes, brandRes, serviceRes] = await Promise.all([
         api.get('/categories'),
         api.get('/brands'),
-        getServices(), // Fetch all services
+        getServices(),
       ]);
       setCategories(catRes.data);
       setBrands(brandRes.data);
@@ -76,7 +76,8 @@ const DataManagementPage = () => {
   };
 
   const handleFormChange = (e) => {
-    const { name, value, checked, type } = e.target;
+    // --- 'type' variable removed from this line ---
+    const { name, value, checked } = e.target;
     if (activeTab === 'services' && name === 'status') {
       setFormState(prev => ({ ...prev, status: checked ? 'active' : 'inactive' }));
     } else {

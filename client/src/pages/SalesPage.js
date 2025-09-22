@@ -81,7 +81,6 @@ const SalesPage = () => {
 
     socket.on('customer_added', (newCustomer) => {
       setCustomers(prevCustomers => {
-        // Prevent adding duplicates
         if (prevCustomers.some(c => c._id === newCustomer._id)) {
           return prevCustomers;
         }
@@ -89,9 +88,7 @@ const SalesPage = () => {
       });
     });
 
-    // --- THIS IS THE FIX for real-time Motorcycle updates ---
     socket.on('motorcycle_added', (newMotorcycle) => {
-      // If the new motorcycle belongs to the currently selected customer, re-fetch the list
       if (selectedCustomer && selectedCustomer._id === newMotorcycle.owner) {
         fetchMotorcycles(selectedCustomer._id);
       }
@@ -134,15 +131,7 @@ const SalesPage = () => {
     }
   }, [selectedCustomer]);
 
-  const fetchCustomers = async () => {
-    try {
-      const customersRes = await getCustomers();
-      setCustomers(customersRes);
-      return customersRes;
-    } catch (error) {
-      console.error("Failed to fetch customers", error);
-    }
-  };
+  // --- Unused 'fetchCustomers' function has been removed from this section ---
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -189,7 +178,6 @@ const SalesPage = () => {
   const handleNewCustomerSubmit = async (newCustomerData) => {
     try {
       const createdCustomer = await createCustomer(newCustomerData);
-      // The socket event will update other tabs, but we update the current tab immediately.
       setCustomers(prev => [...prev, createdCustomer]);
       setSelectedCustomer(createdCustomer);
       setIsCustomerModalOpen(false);
@@ -198,11 +186,9 @@ const SalesPage = () => {
     }
   };
   
-  // --- THIS IS THE FIX to make the current tab update robustly ---
   const handleNewMotorcycleSubmit = async (newMotorcycleData) => {
     try {
         const createdMotorcycle = await createMotorcycle(newMotorcycleData);
-        // Re-fetch the list for the current user for an immediate and guaranteed update
         const updatedMotorcyclesList = await fetchMotorcycles(selectedCustomer._id);
         const newMotorcycleInList = updatedMotorcyclesList.find(m => m._id === createdMotorcycle._id);
         setSelectedMotorcycle(newMotorcycleInList);
@@ -363,7 +349,7 @@ const SalesPage = () => {
           <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
             <Grid container spacing={2}>
               {filteredProducts.map(product => (
-                <Grid item key={product._id} size={{ xs: 12, sm: 4, md: 3, lg: 2 }}>
+                <Grid item key={product._id} xs={12} sm={4} md={3} lg={2}>
                   <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', ...(product.quantity === 0 && { backgroundColor: grey[300], cursor: 'not-allowed' }) }}>
                     <CardActionArea 
                       onClick={() => addProductToCart(product)} disabled={product.quantity === 0}
