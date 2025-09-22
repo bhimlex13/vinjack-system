@@ -19,13 +19,19 @@ export const createPurchaseOrder = async (purchaseOrderData) => {
   return response.data;
 };
 
+// --- ADDED: Update a purchase order ---
+export const updatePurchaseOrder = async (id, purchaseOrderData) => {
+  const response = await api.put(`/purchase-orders/${id}`, purchaseOrderData);
+  return response.data;
+};
+
 // Mark a purchase order as received
 export const receivePurchaseOrder = async (id) => {
   const response = await api.post(`/purchase-orders/${id}/receive`);
   return response.data;
 };
 
-// --- NEW: Cancel a purchase order ---
+// Cancel a purchase order
 export const cancelPurchaseOrder = async (id) => {
   const response = await api.post(`/purchase-orders/${id}/cancel`);
   return response.data;

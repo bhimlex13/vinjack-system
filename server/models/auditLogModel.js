@@ -19,10 +19,10 @@ const auditLogSchema = new mongoose.Schema({
       'RECORD_DELIVERY',
       'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
       'CREATE_USER',
-      'DELETE_USER', // <-- THIS LINE FIXES THE ERROR
+      'DELETE_USER',
       'FORCE_PASSWORD_CHANGE',
       'REJECT_PROFILE_UPDATE',
-      'CREATE_PO', 'RECEIVE_PO', 'CANCEL_PO',
+      'CREATE_PO', 'UPDATE_PO', 'RECEIVE_PO', 'CANCEL_PO', // <-- 'UPDATE_PO' ADDED HERE
       'STOCK_ADJUSTMENT'
     ]
   },
