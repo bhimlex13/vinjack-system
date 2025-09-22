@@ -3,29 +3,39 @@ const AuditLog = require('../models/auditLogModel');
 
 const getLogs = async (req, res) => {
     try {
-        // --- ADDED: Pagination Logic ---
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20; // Default to 20 items per page
-        const skip = (page - 1) * limit;
+        // --- MODIFIED: Read filters and pagination from query ---
+        const { page = 1, limit = 20, search, userId, action } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        // Execute two queries in parallel: one for the logs on the page, one for the total count
+        // --- ADDED: Build a dynamic filter object ---
+        const filter = {};
+        if (userId) {
+            filter.user = userId;
+        }
+        if (action) {
+            filter.action = action;
+        }
+        if (search) {
+            // Case-insensitive search on the 'details' field
+            filter.details = { $regex: search, $options: 'i' };
+        }
+
+        // Execute queries with the filter object
         const [logs, totalLogs] = await Promise.all([
-            AuditLog.find({})
+            AuditLog.find(filter) // Apply filter
                 .sort({ createdAt: -1 })
                 .skip(skip)
-                .limit(limit)
+                .limit(parseInt(limit))
                 .populate('user', 'fullName'),
-            AuditLog.countDocuments()
+            AuditLog.countDocuments(filter) // Apply filter to get the correct total
         ]);
 
-        // Send back both the logs and the total count
         res.json({
             logs,
             totalLogs,
-            currentPage: page,
-            totalPages: Math.ceil(totalLogs / limit)
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(totalLogs / parseInt(limit))
         });
-        // --- END ADDED ---
 
     } catch (error) {
         res.status(500).json({ message: 'Server Error' });
