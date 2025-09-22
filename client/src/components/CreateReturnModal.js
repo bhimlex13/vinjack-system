@@ -174,8 +174,9 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
 
     if (step === 'search') {
       return (
+        // --- Grid format updated to match ProductForm.js ---
         <Grid container spacing={2} sx={{ pt: 1 }}>
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <TextField
               fullWidth
               label="Search by Exact Sales ID"
@@ -183,8 +184,8 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
               onChange={(e) => setSearchSaleId(e.target.value)}
             />
           </Grid>
-          <Grid item xs={12}><Divider>OR</Divider></Grid>
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}><Divider>OR</Divider></Grid>
+          <Grid item size={{ xs: 12 }}>
             <Autocomplete
               options={customers}
               getOptionLabel={(option) => option.name}
@@ -193,7 +194,7 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
               renderInput={(params) => <TextField {...params} label="Filter by Customer" />}
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <Autocomplete
               options={users}
               getOptionLabel={(option) => option.fullName}
@@ -202,10 +203,10 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
               renderInput={(params) => <TextField {...params} label="Filter by Cashier" />}
             />
           </Grid>
-          <Grid item xs={6}>
+          <Grid item size={{ xs: 6 }}>
             <TextField type="date" label="Start Date" value={searchParams.startDate} onChange={(e) => setSearchParams(prev => ({...prev, startDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
           </Grid>
-          <Grid item xs={6}>
+          <Grid item size={{ xs: 6 }}>
             <TextField type="date" label="End Date" value={searchParams.endDate} onChange={(e) => setSearchParams(prev => ({...prev, endDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
           </Grid>
         </Grid>
