@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
+import ConfirmationContext from '../context/ConfirmationContext'; // 1. Import ConfirmationContext
 
 // MUI Imports
 import {
@@ -20,12 +21,14 @@ import {
   IconButton,
   Divider,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 const RecordDeliveryForm = ({ onClose }) => {
   const { user } = useContext(AuthContext);
+  const { confirm } = useContext(ConfirmationContext); // 2. Get confirm function from context
 
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -82,6 +85,7 @@ const RecordDeliveryForm = ({ onClose }) => {
     setProductsReceived(productsReceived.filter((p) => p.product !== productId));
   };
 
+  // 3. Updated handleSubmit with confirmation logic
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedSupplier || productsReceived.length === 0) {
@@ -89,19 +93,22 @@ const RecordDeliveryForm = ({ onClose }) => {
       return;
     }
 
-    const deliveryData = {
-      supplier: selectedSupplier,
-      productsReceived: productsReceived.map(({ name, ...rest }) => rest),
-      recordedBy: user._id,
-    };
+    const isConfirmed = await confirm('Are you sure you want to save this delivery record?');
+    if (isConfirmed) {
+      const deliveryData = {
+        supplier: selectedSupplier,
+        productsReceived: productsReceived.map(({ name, ...rest }) => rest),
+        recordedBy: user._id,
+      };
 
-    try {
-      await api.post('/deliveries', deliveryData);
-      onClose(); // Close modal on success
-    } catch (err) {
-      setError(
-        `Failed to record delivery: ${err.response?.data?.message || err.message}`
-      );
+      try {
+        await api.post('/deliveries', deliveryData);
+        onClose(); // Close modal on success
+      } catch (err) {
+        setError(
+          `Failed to record delivery: ${err.response?.data?.message || err.message}`
+        );
+      }
     }
   };
 
@@ -126,9 +133,9 @@ const RecordDeliveryForm = ({ onClose }) => {
       <Divider sx={{ my: 2 }}>
         <Typography variant="overline">Add Products</Typography>
       </Divider>
-
+      
       <Grid container spacing={2} alignItems="center">
-        <Grid item xs={12} sm={5}>
+        <Grid item size={{ xs: 12, sm: 6 }}>
           <FormControl fullWidth>
             <InputLabel>Product</InputLabel>
             <Select
@@ -145,16 +152,17 @@ const RecordDeliveryForm = ({ onClose }) => {
             </Select>
           </FormControl>
         </Grid>
-        <Grid item xs={6} sm={2}>
+        <Grid item size={{ xs: 6, sm: 2 }}>
           <TextField
             name="quantity"
             label="Quantity"
             type="number"
             value={currentItem.quantity}
             onChange={handleItemChange}
+            fullWidth
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid item size={{ xs: 6, sm: 3 }}>
           <TextField
             name="costAtTime"
             label="Cost per Item"
@@ -162,17 +170,19 @@ const RecordDeliveryForm = ({ onClose }) => {
             value={currentItem.costAtTime}
             onChange={handleItemChange}
             inputProps={{ step: "0.01" }}
+            fullWidth
           />
         </Grid>
-        <Grid item xs={12} sm={2}>
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={handleAddItem}
-            startIcon={<AddCircleIcon />}
-          >
-            Add
-          </Button>
+        <Grid item size={{ xs: 12, sm: 1 }}>
+          <Tooltip title="Add Product to List">
+            <IconButton
+              color="primary"
+              onClick={handleAddItem}
+              sx={{ width: '100%' }}
+            >
+              <AddCircleIcon />
+            </IconButton>
+          </Tooltip>
         </Grid>
       </Grid>
       

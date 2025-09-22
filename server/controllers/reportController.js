@@ -3,7 +3,6 @@ const Sale = require('../models/saleModel');
 const Product = require('../models/productModel');
 const PurchaseOrder = require('../models/purchaseOrderModel');
 
-// --- NEW HELPER FUNCTION ---
 // Helper to create a date filter object based on the time range query
 const createDateFilter = (range) => {
   const dateFilter = {};
@@ -11,29 +10,24 @@ const createDateFilter = (range) => {
 
   switch (range) {
     case 'today':
-      // Start of today
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       dateFilter.createdAt = { $gte: today };
       break;
     case 'week':
-      // Start of the current week (assuming Sunday is the first day)
       const startOfWeek = new Date(now);
       startOfWeek.setDate(now.getDate() - now.getDay());
       startOfWeek.setHours(0, 0, 0, 0);
       dateFilter.createdAt = { $gte: startOfWeek };
       break;
     case 'month':
-      // Start of the current month
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       dateFilter.createdAt = { $gte: startOfMonth };
       break;
     default:
-      // 'all' or no range provided, dateFilter remains empty
       break;
   }
   return dateFilter;
 };
-// --- END HELPER FUNCTION ---
 
 
 // @desc    Get dashboard summary statistics
@@ -41,10 +35,8 @@ const createDateFilter = (range) => {
 const getDashboardSummary = async (req, res) => {
   try {
     const { range } = req.query;
-    // --- CHANGE: Use helper function for consistency ---
     const dateFilter = createDateFilter(range);
 
-    // 1. Calculate Total Revenue and Sales in parallel with Total COGS
     const [salesData, cogsData] = await Promise.all([
       Sale.aggregate([
         { $match: dateFilter },
@@ -81,7 +73,6 @@ const getDashboardSummary = async (req, res) => {
     const totalCOGS = cogsData[0]?.totalCOGS || 0;
     const totalProfit = totalRevenue - totalCOGS;
 
-    // 2. Product stats are not time-sensitive
     const productStats = await Product.aggregate([
       {
         $group: {
@@ -92,7 +83,6 @@ const getDashboardSummary = async (req, res) => {
       }
     ]);
 
-    // 3. Top selling products, applying the date filter
     const topSellingProducts = await Sale.aggregate([
       { $match: dateFilter },
       { $unwind: '$items' },
@@ -149,7 +139,9 @@ const getSalesReport = async (req, res) => {
     })
     .sort({ createdAt: -1 })
     .populate('recordedBy', 'fullName')
-    .populate('items.product', 'name');
+    .populate('items.product', 'name')
+    .populate('customer', 'name'); // <-- THIS IS THE FIX
+    
     res.json(sales);
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
@@ -173,32 +165,28 @@ const getLowStockProducts = async (req, res) => {
   }
 };
 
-// --- MODIFIED FUNCTION START ---
 // @desc    Get sales trend data
 // @route   GET /api/reports/sales-trend
 const getSalesTrend = async (req, res) => {
   try {
     const { range } = req.query;
     let dateFilter = {};
-    let groupByFormat = "%Y-%m-%d"; // Group by day by default
+    let groupByFormat = "%Y-%m-%d";
     const now = new Date();
 
     if (range === 'all' || !range) {
-      // For "all time", group by month to make the chart readable
       groupByFormat = "%Y-%m";
     } else {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        // Default to last 30 days if no specific range is matched below
         dateFilter = { createdAt: { $gte: thirtyDaysAgo } };
     }
   
-    // Specific time ranges override the default
     switch (range) {
       case 'today':
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         dateFilter = { createdAt: { $gte: todayStart } };
-        groupByFormat = "%Y-%m-%d %H:00"; // Group by hour for today's view
+        groupByFormat = "%Y-%m-%d %H:00";
         break;
       case 'week':
         const weekStart = new Date(now);
@@ -229,18 +217,15 @@ const getSalesTrend = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
-// --- MODIFIED FUNCTION END ---
 
-
-// --- MODIFIED FUNCTION START ---
 // @desc    Get the most recent transactions based on a time range
 // @route   GET /api/reports/recent-transactions
 const getRecentTransactions = async (req, res) => {
   try {
     const { range } = req.query;
-    const dateFilter = createDateFilter(range); // Use the helper
+    const dateFilter = createDateFilter(range);
 
-    const recentSales = await Sale.find(dateFilter) // Apply filter
+    const recentSales = await Sale.find(dateFilter)
       .sort({ createdAt: -1 })
       .limit(5)
       .populate('recordedBy', 'fullName');
@@ -250,7 +235,6 @@ const getRecentTransactions = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
-// --- MODIFIED FUNCTION END ---
 
 // @desc    Get pending purchase orders
 // @route   GET /api/reports/pending-pos
