@@ -100,7 +100,8 @@ const createSale = async (req, res) => {
         await logMovement(movement);
     }
 
-    logAction(req.user, 'PROCESS_SALE', `Processed sale #${createdSale._id} with a total of ₱${calculatedTotal.toFixed(2)}.`);
+    // --- MODIFIED LINE ---
+    logAction(req.user, 'PROCESS_SALE', `Processed sale #${createdSale._id} with a total of ₱${calculatedTotal.toFixed(2)}.`, { entityType: 'Sale', entityId: createdSale._id });
 
     const populatedSale = await Sale.findById(createdSale._id)
       .populate('recordedBy', 'fullName')
@@ -147,7 +148,6 @@ const getSaleById = async (req, res) => {
     }
 };
 
-// --- NEW: Function to search for sales ---
 const searchSales = async (req, res) => {
   try {
     const { customerId, userId, startDate, endDate } = req.query;
@@ -168,7 +168,7 @@ const searchSales = async (req, res) => {
 
     const sales = await Sale.find(filter)
       .sort({ createdAt: -1 })
-      .limit(50) // Limit results to prevent performance issues
+      .limit(50)
       .populate('customer', 'name');
 
     res.json(sales);
@@ -178,5 +178,4 @@ const searchSales = async (req, res) => {
   }
 };
 
-// --- EXPORT THE NEW FUNCTION ---
 module.exports = { createSale, getAllSales, getSaleById, searchSales };

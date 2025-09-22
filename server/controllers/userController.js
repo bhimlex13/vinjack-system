@@ -7,6 +7,7 @@ const { sendVerificationEmail } = require('../utils/emailService');
 const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
 
+// ... (all existing functions like createUserByAdmin, loginUser, etc. remain unchanged)
 const createUserByAdmin = async (req, res) => {
   try {
     const { fullName, email, role } = req.body;
@@ -19,32 +20,30 @@ const createUserByAdmin = async (req, res) => {
       return res.status(400).json({ message: 'Email is already in use.' });
     }
 
-    // Generate username from email, ensuring uniqueness
     let username = email.split('@')[0];
     const userExists = await User.findOne({ username });
     if (userExists) {
-      username = `${username}${crypto.randomBytes(2).toString('hex')}`; // Append random chars if username exists
+      username = `${username}${crypto.randomBytes(2).toString('hex')}`;
     }
 
-    // Generate a secure temporary password
     const temporaryPassword = crypto.randomBytes(8).toString('hex').slice(0, 10);
 
     const user = await User.create({
       fullName,
       username,
       email,
-      password: temporaryPassword, // The 'pre-save' hook will hash this
+      password: temporaryPassword,
       role,
-      status: 'active', // User is active immediately
-      mustChangePassword: true, // Force password change on first login
+      status: 'active',
+      mustChangePassword: true,
     });
 
     if (user) {
-      logAction(req.user, 'CREATE_USER', `Created a new user account for ${user.fullName}.`);
+      logAction(req.user, 'CREATE_USER', `Created a new user account for ${user.fullName}.`, { entityType: 'User', entityId: user._id });
       res.status(201).json({
         message: 'User created successfully. Please provide them with their credentials.',
         generatedUsername: username,
-        temporaryPassword: temporaryPassword, // Return plain-text password to admin
+        temporaryPassword: temporaryPassword,
       });
     } else {
       res.status(400).json({ message: 'Invalid user data.' });
@@ -107,7 +106,7 @@ const forceChangePassword = async (req, res) => {
         user.mustChangePassword = false;
         await user.save();
 
-        logAction(req.user, 'FORCE_PASSWORD_CHANGE', `User successfully changed their temporary password.`);
+        logAction(req.user, 'FORCE_PASSWORD_CHANGE', `User successfully changed their temporary password.`, { entityType: 'User', entityId: user._id });
         res.json({ message: 'Password has been updated successfully. You can now access the system.' });
         
     } catch (error) {
@@ -300,7 +299,7 @@ const rejectUserUpdate = async (req, res) => {
             });
         }
 
-        logAction(req.user, 'REJECT_PROFILE_UPDATE', `Rejected profile changes for user ${user.username}.`);
+        logAction(req.user, 'REJECT_PROFILE_UPDATE', `Rejected profile changes for user ${user.username}.`, { entityType: 'User', entityId: user._id });
         res.json({ message: 'Pending changes have been rejected.' });
 
     } catch (error) {
@@ -345,20 +344,44 @@ const deleteUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (user) {
+      const deletedUserName = user.fullName;
+      const deletedUserId = user._id;
+
       await user.deleteOne();
+
+      logAction(req.user, 'DELETE_USER', `Deleted user: '${deletedUserName}'`, { entityType: 'User', entityId: deletedUserId });
+
       res.json({ message: 'User removed' });
     } else {
       res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
+    console.error("Error in deleteUser:", error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '7d', // <-- CHANGED FROM '1d' TO '7d'
+    expiresIn: '7d',
   });
+};
+
+// --- 3. ADD THE NEW CONTROLLER FUNCTION ---
+const getUserDetails = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(user);
+
+  } catch (error) {
+    console.error("Error fetching user details:", error);
+    res.status(500).json({ message: 'Server error while fetching user details.' });
+  }
 };
 
 
@@ -373,5 +396,6 @@ module.exports = {
   requestProfileUpdate, 
   verifyOwnerUpdate,
   approveUserUpdate,    
-  rejectUserUpdate      
+  rejectUserUpdate,
+  getUserDetails // <-- 4. EXPORT THE NEW FUNCTION
 };

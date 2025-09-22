@@ -2,6 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 
+// Component Imports
+import ReceiptModal from '../components/ReceiptModal';
+import ReturnDetailsModal from '../components/ReturnDetailsModal';
+import UserDetailsModal from '../components/UserDetailsModal';
+
 // MUI Imports
 import {
   Box,
@@ -15,43 +20,107 @@ import {
   TableRow,
   Chip,
   CircularProgress,
-  TablePagination
+  TablePagination,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Alert
 } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const AuditLogPage = () => {
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [totalLogs, setTotalLogs] = useState(0);
 
+  // State for viewing details modal
+  const [selectedLog, setSelectedLog] = useState(null);
+  const [detailData, setDetailData] = useState(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+
+  // Fetch audit logs for the table
   useEffect(() => {
     const fetchLogs = async () => {
       setIsLoading(true);
       try {
         const response = await api.get(`/audit-logs?page=${page + 1}&limit=${rowsPerPage}`);
         
-        // --- THIS IS THE FIX: Add a safeguard to handle different response formats ---
-        // This ensures 'logs' is always an array, preventing the .map() error.
-        const logsData = Array.isArray(response.data.logs) 
-          ? response.data.logs 
-          : (Array.isArray(response.data) ? response.data : []);
-        
-        const totalLogsData = response.data.totalLogs || logsData.length;
+        const logsData = Array.isArray(response.data.logs) ? response.data.logs : [];
+        const totalLogsData = response.data.totalLogs || 0;
 
         setLogs(logsData);
         setTotalLogs(totalLogsData);
 
       } catch (error) {
         console.error("Failed to fetch audit logs", error);
-        setLogs([]); // Ensure logs is an empty array on error
+        setLogs([]);
       } finally {
         setIsLoading(false);
       }
     };
     fetchLogs();
   }, [page, rowsPerPage]);
+
+  // Effect to fetch specific details when a log is selected
+  useEffect(() => {
+    if (!selectedLog) return;
+
+    if (!selectedLog.entityType || !selectedLog.entityId) {
+      setDetailData({ genericDetails: selectedLog.details });
+      return;
+    }
+    
+    const fetchDetails = async () => {
+      setIsDetailLoading(true);
+      setDetailError('');
+      setDetailData(null);
+
+      const entityEndpoints = {
+        'Sale': `/sales/${selectedLog.entityId}`,
+        'Return': `/returns/${selectedLog.entityId}`,
+        'User': `/users/details/${selectedLog.entityId}`,
+      };
+
+      const endpoint = entityEndpoints[selectedLog.entityType];
+
+      if (!endpoint) {
+        setDetailError(`No detailed view is configured for type: ${selectedLog.entityType}`);
+        setIsDetailLoading(false);
+        return;
+      }
+
+      try {
+        const response = await api.get(endpoint);
+        setDetailData(response.data);
+      } catch (err) {
+        console.error(`Failed to fetch details for ${selectedLog.entityType}`, err);
+        setDetailError(`Could not load details. The record may have been deleted.`);
+      } finally {
+        setIsDetailLoading(false);
+      }
+    };
+
+    fetchDetails();
+  }, [selectedLog]);
+
+
+  const handleViewDetails = (log) => {
+    setSelectedLog(log);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedLog(null);
+    setDetailData(null);
+    setIsDetailLoading(false);
+    setDetailError('');
+  };
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -61,14 +130,74 @@ const AuditLogPage = () => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
+  
+  // --- 1. MODIFIED HELPER FUNCTION FOR CUSTOM CHIP STYLES ---
+  const getActionChipStyles = (action) => {
+    const baseStyles = { fontWeight: 500 };
+    if (action.includes('DELETE') || action.includes('CANCEL') || action.includes('REJECT')) {
+      return { ...baseStyles, backgroundColor: '#ffebee', color: '#c62828' }; // Light Red
+    }
+    if (action.includes('CREATE')) {
+      return { ...baseStyles, backgroundColor: '#e3f2fd', color: '#1565c0' }; // Light Blue
+    }
+    if (action.includes('SALE') || action.includes('RECEIVE')) {
+      return { ...baseStyles, backgroundColor: '#e0f2f1', color: '#00695c' }; // Mint Green
+    }
+    if (action.includes('RETURN') || action.includes('ADJUSTMENT')) {
+      return { ...baseStyles, backgroundColor: '#fff8e1', color: '#ff8f00' }; // Light Amber
+    }
+    if (action.includes('UPDATE') || action.includes('CHANGE')) {
+      return { ...baseStyles, backgroundColor: '#e0f7fa', color: '#00838f' }; // Light Cyan
+    }
+    return { ...baseStyles, backgroundColor: '#f5f5f5', color: '#424242' }; // Light Grey
+  };
 
-  if (isLoading && logs.length === 0) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  // Render the correct modal based on the selected log's entity type
+  const renderDetailsModal = () => {
+    if (!selectedLog) return null;
+
+    if (isDetailLoading) {
+      return (
+        <Dialog open={true} onClose={handleCloseModal}>
+          <DialogContent sx={{ p: 4, display: 'flex', justifyContent: 'center' }}>
+            <CircularProgress />
+          </DialogContent>
+        </Dialog>
+      );
+    }
+    
+    if (detailError) {
+      return (
+        <Dialog open={true} onClose={handleCloseModal}>
+          <DialogTitle>Error</DialogTitle>
+          <DialogContent><Alert severity="error">{detailError}</Alert></DialogContent>
+        </Dialog>
+      );
+    }
+
+    if (!detailData) return null;
+    
+    switch (selectedLog.entityType) {
+      case 'Sale':
+        return <ReceiptModal saleData={detailData} onClose={handleCloseModal} />;
+      case 'Return':
+        return <ReturnDetailsModal returnData={detailData} open={true} onClose={handleCloseModal} />;
+      case 'User':
+        return <UserDetailsModal userData={detailData} open={true} onClose={handleCloseModal} />;
+      default:
+        return (
+          <Dialog open={true} onClose={handleCloseModal} maxWidth="sm" fullWidth>
+            <DialogTitle>Log Details</DialogTitle>
+            <DialogContent>
+              <Typography variant="body1" style={{ whiteSpace: 'pre-wrap' }}>
+                {detailData.genericDetails || 'No specific details to display.'}
+              </Typography>
+            </DialogContent>
+          </Dialog>
+        );
+    }
+  };
+
 
   return (
     <Box sx={{ p: 3 }}>
@@ -87,12 +216,13 @@ const AuditLogPage = () => {
               <TableCell sx={{ fontWeight: 'bold' }}>User</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Action</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Details</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {isLoading ? (
+            {isLoading && logs.length === 0 ? (
               <TableRow>
-                  <TableCell colSpan={4} align="center"><CircularProgress /></TableCell>
+                  <TableCell colSpan={5} align="center"><CircularProgress /></TableCell>
               </TableRow>
             ) : (
               logs.map(log => (
@@ -105,9 +235,27 @@ const AuditLogPage = () => {
                   </TableCell>
                   <TableCell>{log.user?.fullName || 'N/A'}</TableCell>
                   <TableCell>
-                    <Chip label={log.action.replace(/_/g, ' ')} size="small" />
+                    {/* --- 2. UPDATED CHIP TO USE THE 'sx' PROP FOR CUSTOM STYLING --- */}
+                    <Chip 
+                      label={log.action.replace(/_/g, ' ')} 
+                      size="small"
+                      sx={{
+                        ...getActionChipStyles(log.action),
+                        textTransform: 'capitalize',
+                      }}
+                    />
                   </TableCell>
                   <TableCell>{log.details}</TableCell>
+                  <TableCell align="center">
+                    <Tooltip title="View Details">
+                      <IconButton 
+                        onClick={() => handleViewDetails(log)} 
+                        size="small"
+                      >
+                        <VisibilityIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -124,6 +272,9 @@ const AuditLogPage = () => {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </TableContainer>
+
+      {/* Render the modal */}
+      {renderDetailsModal()}
     </Box>
   );
 };

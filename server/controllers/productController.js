@@ -2,16 +2,14 @@
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
-// ADDED: Import the new notification manager
 const { createNotification } = require('../utils/notificationManager');
 
 const getProducts = async (req, res) => {
   try {
-    // UPDATED QUERY: Explicitly select all fields AND populate them
     const products = await Product.find({})
       .select('itemCode name category brand cost price quantity reorderLevel image')
-      .populate('category', 'name') // Populate category and only get its 'name'
-      .populate('brand', 'name');    // Populate brand and only get its 'name'
+      .populate('category', 'name')
+      .populate('brand', 'name');    
       
     res.status(200).json(products);
   } catch (error) {
@@ -36,7 +34,6 @@ const createProduct = async (req, res) => {
       });
     }
 
-    // ADDED: Check if the new product is already low on stock
     if (savedProduct.quantity <= savedProduct.reorderLevel) {
         await createNotification({
             recipientRole: 'Owner',
@@ -46,7 +43,8 @@ const createProduct = async (req, res) => {
         });
     }
 
-    logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`);
+    // --- MODIFIED LINE ---
+    logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`, { entityType: 'Product', entityId: savedProduct._id });
     res.status(201).json(savedProduct);
   } catch (error) {
     res.status(400).json({ message: 'Error creating product', error: error.message });
@@ -83,7 +81,6 @@ const updateProduct = async (req, res) => {
           recordedBy: req.user.id
         });
 
-        // ADDED: Check if the manual adjustment made the stock low
         if (updatedProduct.quantity <= updatedProduct.reorderLevel && stockBefore > updatedProduct.reorderLevel) {
             await createNotification({
                 recipientRole: 'Owner',
@@ -94,7 +91,8 @@ const updateProduct = async (req, res) => {
         }
       }
 
-      logAction(req.user, 'UPDATE_PRODUCT', `Updated product: '${updatedProduct.name}' (Code: ${updatedProduct.itemCode})`);
+      // --- MODIFIED LINE ---
+      logAction(req.user, 'UPDATE_PRODUCT', `Updated product: '${updatedProduct.name}' (Code: ${updatedProduct.itemCode})`, { entityType: 'Product', entityId: updatedProduct._id });
       res.json(updatedProduct);
     } else {
       res.status(404).json({ message: 'Product not found' });
@@ -108,8 +106,13 @@ const deleteProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
         if (product) {
+            const productId = product._id; // Save ID before deleting
+            const productDetails = `Deleted product: '${product.name}' (Code: ${product.itemCode})`;
+            
             await product.deleteOne();
-            logAction(req.user, 'DELETE_PRODUCT', `Deleted product: '${product.name}' (Code: ${product.itemCode})`);
+
+            // --- MODIFIED LINE ---
+            logAction(req.user, 'DELETE_PRODUCT', productDetails, { entityType: 'Product', entityId: productId });
             res.json({ message: 'Product removed' });
         } else {
             res.status(404).json({ message: 'Product not found' });
