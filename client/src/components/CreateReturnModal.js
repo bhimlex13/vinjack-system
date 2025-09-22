@@ -1,11 +1,11 @@
 // client/src/components/CreateReturnModal.js
-import React, { useState, useEffect, useContext } from 'react'; // Added useContext
+import React, { useState, useEffect, useContext } from 'react';
 import { searchSales, getSaleById } from '../api/saleApi';
 import { createReturn } from '../api/returnApi';
 import { getCustomers } from '../api/customerApi';
 import { getUsers } from '../api/userApi';
 import { toast } from 'react-toastify';
-import ConfirmationContext from '../context/ConfirmationContext'; // Added ConfirmationContext import
+import ConfirmationContext from '../context/ConfirmationContext';
 
 // MUI Imports
 import {
@@ -20,7 +20,7 @@ import SearchIcon from '@mui/icons-material/Search';
 
 
 const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
-  const { confirm } = useContext(ConfirmationContext); // Added confirm hook
+  const { confirm } = useContext(ConfirmationContext);
   const [step, setStep] = useState('search');
   
   // Search state
@@ -34,9 +34,6 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
   const [saleDetails, setSaleDetails] = useState(null);
   const [itemsToReturn, setItemsToReturn] = useState({});
   const [reason, setReason] = useState('');
-  
-  // General state
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -61,7 +58,6 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
     setSaleDetails(null);
     setItemsToReturn({});
     setReason('');
-    setError('');
   };
 
   const handleClose = () => {
@@ -71,7 +67,6 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
 
   const handleSearch = async () => {
     setStep('loading');
-    setError('');
     try {
       let data;
       if (searchSaleId.trim()) {
@@ -149,7 +144,6 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
         return;
     }
     
-    // --- ADDED: Calculate refund and show confirmation ---
     const totalRefund = returnPayload.itemsReturned.reduce((acc, returnedItem) => {
       const originalItem = saleDetails.items.find(i => i.product._id === returnedItem.product);
       return acc + (originalItem.priceAtTime * returnedItem.quantity);
@@ -181,7 +175,7 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
     if (step === 'search') {
       return (
         <Grid container spacing={2} sx={{ pt: 1 }}>
-          <Grid item size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <TextField
               fullWidth
               label="Search by Exact Sales ID"
@@ -189,8 +183,8 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
               onChange={(e) => setSearchSaleId(e.target.value)}
             />
           </Grid>
-          <Grid item size={{ xs: 12 }}><Divider>OR</Divider></Grid>
-          <Grid item size={{ xs: 12 }}>
+          <Grid item xs={12}><Divider>OR</Divider></Grid>
+          <Grid item xs={12}>
             <Autocomplete
               options={customers}
               getOptionLabel={(option) => option.name}
@@ -199,7 +193,7 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
               renderInput={(params) => <TextField {...params} label="Filter by Customer" />}
             />
           </Grid>
-          <Grid item size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <Autocomplete
               options={users}
               getOptionLabel={(option) => option.fullName}
@@ -208,10 +202,10 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
               renderInput={(params) => <TextField {...params} label="Filter by Cashier" />}
             />
           </Grid>
-          <Grid item size={{ xs: 6 }}>
+          <Grid item xs={6}>
             <TextField type="date" label="Start Date" value={searchParams.startDate} onChange={(e) => setSearchParams(prev => ({...prev, startDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
           </Grid>
-          <Grid item size={{ xs: 6 }}>
+          <Grid item xs={6}>
             <TextField type="date" label="End Date" value={searchParams.endDate} onChange={(e) => setSearchParams(prev => ({...prev, endDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
           </Grid>
         </Grid>
