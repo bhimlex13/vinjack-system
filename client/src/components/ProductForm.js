@@ -3,12 +3,16 @@ import React, { useState, useEffect, useContext } from 'react';
 import api from '../api/axios';
 import ConfirmationContext from '../context/ConfirmationContext';
 import AuthContext from '../context/AuthContext';
+import { toast } from 'react-toastify';
 
 // MUI Imports
 import {
   Box, Button, TextField, FormControl, InputLabel, Select, MenuItem,
-  Grid, ToggleButtonGroup, ToggleButton, Alert, Stack
+  Grid, ToggleButtonGroup, ToggleButton, Alert, Stack, InputAdornment, IconButton,
+  Typography, Tooltip
 } from '@mui/material';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) => {
   const { confirm } = useContext(ConfirmationContext);
@@ -21,6 +25,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
   const [brands, setBrands] = useState([]);
   const [error, setError] = useState('');
   const [imageSource, setImageSource] = useState('url');
+  const [uploadedFileName, setUploadedFileName] = useState('');
 
   useEffect(() => {
     const initialData = productToEdit ? {
@@ -38,6 +43,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
       cost: '', price: '', quantity: '', reorderLevel: 5, image: ''
     };
     setFormData(initialData);
+    setUploadedFileName('');
   }, [productToEdit]);
 
   useEffect(() => {
@@ -55,6 +61,25 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+  
+  const handleGenerateItemCode = () => {
+    const { name, category, brand } = formData;
+    if (!name || !category || !brand) {
+      toast.warn('Please fill in Product Name, Category, and Brand first.');
+      return;
+    }
+
+    const categoryName = categories.find(c => c._id === category)?.name || 'CAT';
+    const brandName = brands.find(b => b._id === brand)?.name || 'BRA';
+
+    const namePart = name.substring(0, 3).toUpperCase();
+    const catPart = categoryName.substring(0, 3).toUpperCase();
+    const brandPart = brandName.substring(0, 3).toUpperCase();
+    const uniquePart = Date.now().toString().slice(-4);
+
+    const newItemCode = `${namePart}-${catPart}-${brandPart}-${uniquePart}`;
+    setFormData({ ...formData, itemCode: newItemCode });
   };
 
   const resizeImage = (file, maxWidth, maxHeight) => {
@@ -86,11 +111,14 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
+      setUploadedFileName(file.name);
       try {
         const resizedImage = await resizeImage(file, 800, 800);
         setFormData({ ...formData, image: resizedImage });
+        toast.success("Image ready for upload.");
       } catch (error) {
         setError("Failed to process image. Please try another file.");
+        setUploadedFileName('');
       }
     }
   };
@@ -123,9 +151,24 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
   return (
     <Box sx={{ minWidth: 500, p: 3, pt: 1 }}>
         <Box component="form" onSubmit={handleSubmit}>
-          {/* --- THIS IS THE FIX: Changed grid format to match DashboardPage.js --- */}
           <Grid container spacing={2}>
-            <Grid item size={{ xs: 12 }}><TextField fullWidth required name="itemCode" label="Item Code" value={formData.itemCode} onChange={handleChange} /></Grid>
+            {/* --- Grid format updated to match DashboardPage.js --- */}
+            <Grid item size={{ xs: 12 }}>
+              <TextField 
+                fullWidth required name="itemCode" label="Item Code" value={formData.itemCode} onChange={handleChange}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip title="Generate Unique Item Code">
+                        <IconButton onClick={handleGenerateItemCode} edge="end">
+                          <AutoFixHighIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Grid>
             <Grid item size={{ xs: 12 }}><TextField fullWidth required name="name" label="Product Name" value={formData.name} onChange={handleChange} /></Grid>
             
             <Grid item size={{ xs: 6 }}>
@@ -146,6 +189,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
             <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="price" label="Price" value={formData.price} onChange={handleChange} inputProps={{ step: "0.01" }} /></Grid>
             <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="quantity" label="Quantity" value={formData.quantity} onChange={handleChange} /></Grid>
             <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="reorderLevel" label="Reorder Level" value={formData.reorderLevel} onChange={handleChange} /></Grid>
+            
             <Grid item size={{ xs: 12 }}>
               <FormControl fullWidth>
                 <ToggleButtonGroup value={imageSource} exclusive onChange={(e, val) => val && setImageSource(val)} size="small">
@@ -155,9 +199,17 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
                 {imageSource === 'url' ? (
                   <TextField name="image" label="Image URL" value={formData.image} onChange={handleChange} sx={{ mt: 1 }} />
                 ) : (
-                  <Button variant="outlined" component="label" sx={{ mt: 1 }}> Upload File
-                    <input type="file" hidden onChange={handleImageUpload} accept="image/*" />
-                  </Button>
+                  <Box sx={{ mt: 1 }}>
+                    <Button variant="outlined" component="label" fullWidth> Upload File
+                      <input type="file" hidden onChange={handleImageUpload} accept="image/*" />
+                    </Button>
+                    {uploadedFileName && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, color: 'success.main' }}>
+                        <CheckCircleIcon fontSize="small" sx={{ mr: 1 }} />
+                        <Typography variant="body2">{uploadedFileName}</Typography>
+                      </Box>
+                    )}
+                  </Box>
                 )}
               </FormControl>
             </Grid>
