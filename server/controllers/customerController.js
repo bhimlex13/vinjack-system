@@ -9,10 +9,19 @@ const createCustomer = async (req, res) => {
     if (!name) {
       return res.status(400).json({ message: 'Customer name is required.' });
     }
-    const newCustomer = new Customer({ name, email, phone, address });
+
+    // --- THIS IS THE FIX: Handle empty email strings ---
+    const customerData = {
+      name,
+      phone,
+      address,
+      // Only set the email if it's a non-empty string
+      ...(email && { email }),
+    };
+
+    const newCustomer = new Customer(customerData);
     const savedCustomer = await newCustomer.save();
 
-    // --- MODIFIED LINE ---
     logAction(req.user, 'CREATE_CUSTOMER', `Created new customer: '${savedCustomer.name}'`, { entityType: 'Customer', entityId: savedCustomer._id });
 
     const io = req.app.get('socketio');
@@ -47,11 +56,20 @@ const getCustomerById = async (req, res) => {
 
 const updateCustomer = async (req, res) => {
   try {
-    const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const updateData = { ...req.body };
+    
+    // --- THIS IS THE FIX: Handle empty email strings on update ---
+    // If the email is sent as an empty string, set it to null to avoid unique index errors
+    if (updateData.email === '') {
+      updateData.email = null;
+    }
+
+    const customer = await Customer.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+    
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
     }
-    // --- MODIFIED LINE ---
+    
     logAction(req.user, 'UPDATE_CUSTOMER', `Updated customer: '${customer.name}'`, { entityType: 'Customer', entityId: customer._id });
     res.json(customer);
   } catch (error) {
@@ -70,7 +88,6 @@ const deleteCustomer = async (req, res) => {
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
     }
-    // --- MODIFIED LINE ---
     logAction(req.user, 'DELETE_CUSTOMER', `Deleted customer: '${customer.name}'`, { entityType: 'Customer', entityId: customer._id });
     res.json({ message: 'Customer removed successfully.' });
   } catch (error) {
