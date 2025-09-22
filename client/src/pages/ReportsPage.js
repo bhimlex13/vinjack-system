@@ -67,7 +67,8 @@ const ReportsPage = () => {
   };
 
   const SummaryCard = ({ title, value, profit = false }) => (
-    <Grid item xs={12} sm={4}>
+    // --- Grid format updated to match your project's standard ---
+    <Grid item size={{ xs: 12, sm: 4 }}>
       <Paper sx={{ p: 2 }}>
         <Typography variant="subtitle1" color="text.secondary">{title}</Typography>
         <Typography variant="h5" sx={{ fontWeight: 'bold', color: profit ? 'success.main' : 'text.primary' }}>
@@ -78,7 +79,6 @@ const ReportsPage = () => {
   );
 
   return (
-    // --- THIS IS THE KEY CHANGE ---
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
         Sales & Profitability Report
@@ -122,6 +122,7 @@ const ReportsPage = () => {
                 <TableHead sx={{ backgroundColor: 'action.hover' }}>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Customer</TableCell> {/* --- "Customer" column added --- */}
                     <TableCell sx={{ fontWeight: 'bold' }}>Items Sold</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Recorded By</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Total Revenue</TableCell>
@@ -136,6 +137,7 @@ const ReportsPage = () => {
                     return (
                       <TableRow key={sale._id}>
                         <TableCell>{new Date(sale.createdAt).toLocaleString()}</TableCell>
+                        <TableCell>{sale.customer?.name || 'Walk-in'}</TableCell> {/* --- Customer name cell added --- */}
                         <TableCell>
                           <List dense disablePadding>
                             {sale.items.map(item => (
