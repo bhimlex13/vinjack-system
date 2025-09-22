@@ -1,7 +1,7 @@
 // client/src/api/userApi.js
 import api from './axios';
 
-// --- NEW: Get all users (for cashier dropdown) ---
+// Get all users (for cashier dropdown)
 export const getUsers = async () => {
     try {
         const response = await api.get('/users');
@@ -20,6 +20,12 @@ export const createUser = async (userData) => {
 // For a new user to change their temporary password
 export const forceChangePassword = async (passwordData) => {
   return api.put('/users/force-change-password', passwordData);
+};
+
+// --- ADDED: For an admin to reset another user's password ---
+export const adminResetPassword = async (targetUserId, adminPassword) => {
+  const response = await api.post(`/users/${targetUserId}/admin-reset-password`, { adminPassword });
+  return response.data;
 };
 
 export const requestProfileUpdate = async (changes) => {

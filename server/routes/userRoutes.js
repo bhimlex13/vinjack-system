@@ -13,7 +13,8 @@ const {
     rejectUserUpdate,
     getMe,
     verifyOwnerUpdate,
-    getUserDetails // <-- 1. IMPORT THE NEW CONTROLLER
+    getUserDetails,
+    adminResetPassword // <-- 1. IMPORT THE NEW CONTROLLER
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -36,10 +37,12 @@ router.route('/:id')
     .put(protect, authorize('Owner'), updateUser) 
     .delete(protect, authorize('Owner'), deleteUser);
 
-// --- 2. ADD THE NEW ROUTE FOR FETCHING USER DETAILS ---
 router.get('/details/:id', protect, authorize('Owner'), getUserDetails);
 
 router.post('/:id/approve', protect, authorize('Owner'), approveUserUpdate);
 router.post('/:id/reject', protect, authorize('Owner'), rejectUserUpdate);
+
+// --- 2. ADD THE NEW ROUTE FOR ADMIN PASSWORD RESET ---
+router.post('/:id/admin-reset-password', protect, authorize('Owner'), adminResetPassword);
 
 module.exports = router;

@@ -22,8 +22,9 @@ const auditLogSchema = new mongoose.Schema({
       'DELETE_USER',
       'FORCE_PASSWORD_CHANGE',
       'REJECT_PROFILE_UPDATE',
-      'CREATE_PO', 'UPDATE_PO', 'RECEIVE_PO', 'CANCEL_PO', // <-- 'UPDATE_PO' ADDED HERE
-      'STOCK_ADJUSTMENT'
+      'CREATE_PO', 'UPDATE_PO', 'RECEIVE_PO', 'CANCEL_PO',
+      'STOCK_ADJUSTMENT',
+      'ADMIN_RESET_PASSWORD'
     ]
   },
   details: {

@@ -5,9 +5,10 @@ import { approveUserUpdate, rejectUserUpdate } from '../api/userApi';
 import EditUserModal from '../components/EditUserModal';
 import CreateUserModal from '../components/CreateUserModal'; 
 import CredentialsDisplayModal from '../components/CredentialsDisplayModal';
+import { toast } from 'react-toastify';
 
 // MUI Imports
-import { Box, Button, Typography, Paper, Stack, Chip, Alert } from '@mui/material';
+import { Box, Button, Typography, Paper, Stack, Chip, Alert, Grid } from '@mui/material'; // Grid imported
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 
@@ -16,27 +17,26 @@ const UserManagementPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newCredentials, setNewCredentials] = useState(null);
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   const fetchUsers = async () => {
-    setIsLoading(true);
+    // No need to set loading here as DataGrid has its own loading spinner
     try {
       const response = await api.get('/users');
       setUsers(response.data);
     } catch (error) {
       console.error("Failed to fetch users", error);
-      setError('Failed to fetch users.');
+      toast.error('Failed to fetch users.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetchUsers();
+  }, []);
 
   const profileUpdateRequests = useMemo(() => users.filter(u => u.hasPendingChanges), [users]);
   const managedUsers = useMemo(() => users.filter(u => u.role !== 'Owner'), [users]);
@@ -50,15 +50,10 @@ const UserManagementPage = () => {
   const handleApiResponse = async (apiCall) => {
     try {
       const response = await apiCall();
-      setMessage(response.message || 'Action completed successfully!');
+      toast.success(response.message || 'Action completed successfully!');
       fetchUsers();
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred.');
-    } finally {
-      setTimeout(() => {
-        setMessage('');
-        setError('');
-      }, 5000);
+      toast.error(err.response?.data?.message || 'An error occurred.');
     }
   };
 
@@ -143,65 +138,75 @@ const UserManagementPage = () => {
   ];
 
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
       {/* --- MODALS --- */}
       {isEditModalOpen && (
         <EditUserModal 
           open={isEditModalOpen} 
           user={editingUser} 
           onClose={() => setIsEditModalOpen(false)} 
-          onUserUpdate={fetchUsers} 
+          onUserUpdate={fetchUsers}
+          onPasswordResetSuccess={(credentials) => {
+            setNewCredentials({
+              username: credentials.username,
+              password: credentials.temporaryPassword,
+            });
+            setIsEditModalOpen(false);
+          }}
         />
       )}
       {isCreateModalOpen && (
         <CreateUserModal 
-          open={isCreateModalOpen} 
           onClose={() => setIsCreateModalOpen(false)} 
           onUserCreated={handleUserCreated} 
         />
       )}
       {newCredentials && <CredentialsDisplayModal credentials={newCredentials} onClose={() => setNewCredentials(null)} />}
 
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 2 }}>
-        User Management
-      </Typography>
+      {/* --- Page layout updated to use Grid --- */}
+      <Grid container spacing={4}>
+        <Grid item size={{ xs: 12 }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+            User Management
+          </Typography>
+        </Grid>
+        
+        <Grid item size={{ xs: 12 }}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h5" gutterBottom>Profile Update Requests</Typography>
+            <Box sx={{ height: 'auto', width: '100%' }}>
+              <DataGrid
+                rows={profileUpdateRequests}
+                columns={requestColumns}
+                loading={isLoading}
+                getRowId={(row) => row._id}
+                autoHeight
+                rowHeight={80}
+              />
+            </Box>
+          </Paper>
+        </Grid>
 
-      <Stack spacing={1} sx={{ mb: 2 }}>
-        {message && <Alert severity="success">{message}</Alert>}
-        {error && <Alert severity="error">{error}</Alert>}
-      </Stack>
-
-      <Paper sx={{ mb: 4, p: 2 }}>
-        <Typography variant="h5" gutterBottom>Profile Update Requests</Typography>
-        <Box sx={{ height: 'auto', width: '100%' }}>
-          <DataGrid
-            rows={profileUpdateRequests}
-            columns={requestColumns}
-            loading={isLoading}
-            getRowId={(row) => row._id}
-            autoHeight
-            rowHeight={80}
-          />
-        </Box>
-      </Paper>
-
-      <Paper sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h5">Manage Employees</Typography>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateModalOpen(true)}>
-              Add New Employee
-            </Button>
-        </Box>
-        <Box sx={{ height: 'auto', width: '100%' }}>
-            <DataGrid
-              rows={managedUsers}
-              columns={employeeColumns}
-              loading={isLoading}
-              getRowId={(row) => row._id}
-              autoHeight
-            />
-        </Box>
-      </Paper>
+        <Grid item size={{ xs: 12 }}>
+          <Paper sx={{ p: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h5">Manage Employees</Typography>
+                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateModalOpen(true)}>
+                  Add New Employee
+                </Button>
+            </Box>
+            <Box sx={{ height: 'auto', width: '100%' }}>
+                <DataGrid
+                  rows={managedUsers}
+                  columns={employeeColumns}
+                  loading={isLoading}
+                  getRowId={(row) => row._id}
+                  autoHeight
+                />
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
     </Box>
   );
 };
