@@ -123,24 +123,33 @@ const getDashboardSummary = async (req, res) => {
 // @route   GET /api/reports/sales
 const getSalesReport = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    if (!startDate || !endDate) {
-      return res.status(400).json({ message: 'Please provide a start and end date.' });
+    // --- THIS IS THE FIX: Read new filters from query ---
+    const { startDate, endDate, customerId, userId } = req.query;
+    
+    const filter = {};
+
+    // Build date filter
+    if (startDate && endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setDate(endOfDay.getDate() + 1);
+        filter.createdAt = { $gte: new Date(startDate), $lt: endOfDay };
+    } else {
+        return res.status(400).json({ message: 'Please provide a start and end date.' });
     }
 
-    const endOfDay = new Date(endDate);
-    endOfDay.setDate(endOfDay.getDate() + 1);
+    // Add customer and user filters if they exist
+    if (customerId) {
+        filter.customer = customerId;
+    }
+    if (userId) {
+        filter.recordedBy = userId;
+    }
 
-    const sales = await Sale.find({
-      createdAt: {
-        $gte: new Date(startDate),
-        $lt: endOfDay,
-      },
-    })
-    .sort({ createdAt: -1 })
-    .populate('recordedBy', 'fullName')
-    .populate('items.product', 'name')
-    .populate('customer', 'name'); // <-- THIS IS THE FIX
+    const sales = await Sale.find(filter) // Use the dynamic filter object
+      .sort({ createdAt: -1 })
+      .populate('recordedBy', 'fullName')
+      .populate('items.product', 'name')
+      .populate('customer', 'name');
     
     res.json(sales);
   } catch (error) {

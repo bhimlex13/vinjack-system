@@ -4,118 +4,169 @@ import api from '../api/axios';
 import ReceiptModal from '../components/ReceiptModal';
 
 // MUI Imports
-import { Box, Button, Typography, Paper } from '@mui/material';
+import {
+  Box, Button, Typography, Paper, Container, Grid, TextField, FormControl,
+  InputLabel, Select, MenuItem, Alert, CircularProgress
+} from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 
 const TransactionsPage = () => {
+  const today = new Date().toISOString().split('T')[0];
+
   const [sales, setSales] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedSale, setSelectedSale] = useState(null);
 
+  // State for filters
+  const [customers, setCustomers] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterUser, setFilterUser] = useState('');
+  const [wasGenerated, setWasGenerated] = useState(false);
+
+  // Fetch data for filter dropdowns
   useEffect(() => {
-    const fetchSales = async () => {
+    const fetchFilterData = async () => {
       try {
-        const response = await api.get('/sales');
-        setSales(response.data);
+        const [customersRes, usersRes] = await Promise.all([
+          api.get('/customers'),
+          api.get('/users')
+        ]);
+        setCustomers(customersRes.data);
+        setUsers(usersRes.data);
       } catch (err) {
-        setError('Failed to fetch transaction data.');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
+        console.error("Failed to fetch filter data", err);
+        setError("Could not load filter options.");
       }
     };
-    fetchSales();
+    fetchFilterData();
   }, []);
+
+  const handleGenerate = async () => {
+    setIsLoading(true);
+    setError('');
+    setWasGenerated(true);
+    try {
+      // Build query parameters, only including ones with values
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (filterCustomer) params.append('customerId', filterCustomer);
+      if (filterUser) params.append('userId', filterUser);
+
+      // Default to today if no dates are selected
+      if (!startDate && !endDate) {
+        params.append('startDate', today);
+        params.append('endDate', today);
+      } else if (!startDate || !endDate) {
+        setError("Please select both a start and end date, or leave both empty for today's transactions.");
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await api.get(`/reports/sales?${params.toString()}`);
+      setSales(response.data);
+    } catch (err) {
+      setError('Failed to fetch transaction data.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const columns = [
     {
-      field: 'createdAt',
-      headerName: 'Date',
-      flex: 1,
-      minWidth: 200,
-      renderCell: (params) => {
-        const date = new Date(params.value);
-        return date.toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-      },
+      field: 'createdAt', headerName: 'Date', flex: 1, minWidth: 200,
+      renderCell: (params) => new Date(params.value).toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      }),
     },
     { field: '_id', headerName: 'Sale ID', flex: 1, minWidth: 220 },
     {
-      field: 'recordedBy',
-      headerName: 'Cashier',
-      flex: 1,
-      minWidth: 180,
-      renderCell: (params) => params.row?.recordedBy?.fullName || 'N/A'
+      field: 'customer', headerName: 'Customer', flex: 1, minWidth: 180,
+      renderCell: (params) => params.row.customer?.name || 'Walk-in'
     },
     {
-      field: 'totalAmount',
-      headerName: 'Total Amount',
-      flex: 1,
-      minWidth: 150,
-      type: 'number',
-      align: 'right',
-      headerAlign: 'right',
-      // --- THE FINAL FIX IS HERE: Replaced valueFormatter with the more reliable renderCell ---
-      renderCell: (params) => {
-        const amount = parseFloat(params.row.totalAmount);
-        if (isNaN(amount)) {
-          return '₱0.00';
-        }
-        return new Intl.NumberFormat('en-PH', {
-          style: 'currency',
-          currency: 'PHP',
-        }).format(amount);
-      },
+      field: 'recordedBy', headerName: 'Cashier', flex: 1, minWidth: 180,
+      renderCell: (params) => params.row.recordedBy?.fullName || 'N/A'
     },
     {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 150,
-      sortable: false,
-      align: 'center',
-      headerAlign: 'center',
+      field: 'totalAmount', headerName: 'Total Amount', flex: 1, minWidth: 150, type: 'number', align: 'right', headerAlign: 'right',
+      renderCell: (params) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(params.row.totalAmount),
+    },
+    {
+      field: 'actions', headerName: 'Actions', width: 150, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => (
-        <Button
-          variant="contained"
-          size="small"
-          onClick={() => setSelectedSale(params.row)}
-        >
+        <Button variant="outlined" size="small" onClick={() => setSelectedSale(params.row)}>
           View Receipt
         </Button>
       )
     }
   ];
 
-  if (error) return <Typography color="error" sx={{ p: 3 }}>{error}</Typography>;
-
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
         Transaction Log
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        A log of all completed sales. Click "View Receipt" to see details.
+        Filter and review all completed sales transactions.
       </Typography>
 
-      <Paper sx={{ height: '75vh', width: '100%' }}>
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item size={{ xs: 12, md: 2.5 }}>
+            <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+          </Grid>
+          <Grid item size={{ xs: 12, md: 2.5 }}>
+            <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+          </Grid>
+          <Grid item size={{ xs: 12, md: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Filter by Customer</InputLabel>
+              <Select value={filterCustomer} label="Filter by Customer" onChange={(e) => setFilterCustomer(e.target.value)}>
+                <MenuItem value=""><em>All Customers</em></MenuItem>
+                {customers.map(c => <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item size={{ xs: 12, md: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Filter by Cashier</InputLabel>
+              <Select value={filterUser} label="Filter by Cashier" onChange={(e) => setFilterUser(e.target.value)}>
+                <MenuItem value=""><em>All Cashiers</em></MenuItem>
+                {users.map(u => <MenuItem key={u._id} value={u._id}>{u.fullName}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item size={{ xs: 12, md: 1 }}>
+            <Button fullWidth variant="contained" onClick={handleGenerate} disabled={isLoading}>
+              {isLoading ? <CircularProgress size={24} /> : 'Find'}
+            </Button>
+          </Grid>
+        </Grid>
+      </Paper>
+      
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      
+      <Paper sx={{ height: '70vh', width: '100%' }}>
         <DataGrid
           rows={sales}
           columns={columns}
           loading={isLoading}
           getRowId={(row) => row._id}
-          initialState={{
-            sorting: {
-              sortModel: [{ field: 'createdAt', sort: 'desc' }],
-            },
-          }}
+          initialState={{ sorting: { sortModel: [{ field: 'createdAt', sort: 'desc' }] } }}
         />
       </Paper>
+
+      {!wasGenerated && !isLoading && (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          Select your filters and click "Find" to load transactions. Leaving dates empty will search for today's records.
+        </Alert>
+      )}
 
       {selectedSale && (
         <ReceiptModal
@@ -123,7 +174,7 @@ const TransactionsPage = () => {
           onClose={() => setSelectedSale(null)}
         />
       )}
-    </Box>
+    </Container>
   );
 };
 
