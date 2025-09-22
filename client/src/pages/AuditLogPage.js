@@ -14,28 +14,55 @@ import {
   TableHead,
   TableRow,
   Chip,
-  CircularProgress
+  CircularProgress,
+  TablePagination
 } from '@mui/material';
 
 const AuditLogPage = () => {
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [totalLogs, setTotalLogs] = useState(0);
+
   useEffect(() => {
     const fetchLogs = async () => {
+      setIsLoading(true);
       try {
-        const response = await api.get('/audit-logs');
-        setLogs(response.data);
+        const response = await api.get(`/audit-logs?page=${page + 1}&limit=${rowsPerPage}`);
+        
+        // --- THIS IS THE FIX: Add a safeguard to handle different response formats ---
+        // This ensures 'logs' is always an array, preventing the .map() error.
+        const logsData = Array.isArray(response.data.logs) 
+          ? response.data.logs 
+          : (Array.isArray(response.data) ? response.data : []);
+        
+        const totalLogsData = response.data.totalLogs || logsData.length;
+
+        setLogs(logsData);
+        setTotalLogs(totalLogsData);
+
       } catch (error) {
         console.error("Failed to fetch audit logs", error);
+        setLogs([]); // Ensure logs is an empty array on error
       } finally {
         setIsLoading(false);
       }
     };
     fetchLogs();
-  }, []);
+  }, [page, rowsPerPage]);
 
-  if (isLoading) {
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  if (isLoading && logs.length === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
         <CircularProgress />
@@ -63,23 +90,39 @@ const AuditLogPage = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {logs.map(log => (
-              <TableRow
-                key={log._id}
-                sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-              >
-                <TableCell component="th" scope="row">
-                  {new Date(log.createdAt).toLocaleString()}
-                </TableCell>
-                <TableCell>{log.user?.fullName || 'N/A'}</TableCell>
-                <TableCell>
-                  <Chip label={log.action.replace('_', ' ')} size="small" />
-                </TableCell>
-                <TableCell>{log.details}</TableCell>
+            {isLoading ? (
+              <TableRow>
+                  <TableCell colSpan={4} align="center"><CircularProgress /></TableCell>
               </TableRow>
-            ))}
+            ) : (
+              logs.map(log => (
+                <TableRow
+                  key={log._id}
+                  sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                >
+                  <TableCell component="th" scope="row">
+                    {new Date(log.createdAt).toLocaleString()}
+                  </TableCell>
+                  <TableCell>{log.user?.fullName || 'N/A'}</TableCell>
+                  <TableCell>
+                    <Chip label={log.action.replace(/_/g, ' ')} size="small" />
+                  </TableCell>
+                  <TableCell>{log.details}</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
+        
+        <TablePagination
+          rowsPerPageOptions={[10, 20, 50]}
+          component="div"
+          count={totalLogs}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </TableContainer>
     </Box>
   );
