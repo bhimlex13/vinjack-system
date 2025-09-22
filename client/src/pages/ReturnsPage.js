@@ -1,25 +1,25 @@
 // client/src/pages/ReturnsPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react'; // 1. Import useMemo
 import api from '../api/axios';
 import CreateReturnModal from '../components/CreateReturnModal';
-import ReturnDetailsModal from '../components/ReturnDetailsModal'; // --- ADDED: Import the new details modal
+import ReturnDetailsModal from '../components/ReturnDetailsModal';
 import { toast } from 'react-toastify';
 
 // MUI Imports
-import { Box, Button, Typography, Paper, Stack, Container, Tooltip, IconButton } from '@mui/material';
+import { Box, Button, Typography, Paper, Stack, Container, Tooltip, IconButton, TextField, InputAdornment } from '@mui/material'; // 2. Import TextField & InputAdornment
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
-import VisibilityIcon from '@mui/icons-material/Visibility'; // --- ADDED: Icon for the details button
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import SearchIcon from '@mui/icons-material/Search'; // 3. Import SearchIcon
 import { FaUndo } from 'react-icons/fa';
 
 const ReturnsPage = () => {
   const [returns, setReturns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-  // --- ADDED: State for the details modal ---
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedReturn, setSelectedReturn] = useState(null);
+  const [searchTerm, setSearchTerm] = useState(''); // 4. Add state for the search term
 
   const fetchReturns = async () => {
     setIsLoading(true);
@@ -39,7 +39,17 @@ const ReturnsPage = () => {
     fetchReturns();
   }, []);
 
-  // --- ADDED: Handler to open the details modal ---
+  // 5. Create the filteredReturns list using useMemo
+  const filteredReturns = useMemo(() => {
+    return returns.filter(item => {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      const saleIdMatch = item.originalSale?._id?.toLowerCase().includes(lowerCaseSearchTerm);
+      const reasonMatch = item.reason?.toLowerCase().includes(lowerCaseSearchTerm);
+      const processorMatch = item.recordedBy?.fullName?.toLowerCase().includes(lowerCaseSearchTerm);
+      return saleIdMatch || reasonMatch || processorMatch;
+    });
+  }, [returns, searchTerm]);
+
   const handleViewDetails = (returnData) => {
     setSelectedReturn(returnData);
     setIsDetailsModalOpen(true);
@@ -75,7 +85,6 @@ const ReturnsPage = () => {
       width: 180,
       renderCell: (params) => params.row.recordedBy?.fullName || 'N/A'
     },
-    // --- ADDED: New "Actions" column ---
     {
       field: 'actions',
       headerName: 'Actions',
@@ -101,7 +110,6 @@ const ReturnsPage = () => {
         onReturnSuccess={fetchReturns}
       />
 
-      {/* --- ADDED: The details modal component --- */}
       <ReturnDetailsModal
         open={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
@@ -120,9 +128,28 @@ const ReturnsPage = () => {
         </Button>
       </Box>
 
-      <Paper sx={{ height: '75vh', width: '100%' }}>
+      {/* 6. Add the search bar UI */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <TextField
+          label="Search Returns (by Sale ID, Reason, or Processor)"
+          variant="outlined"
+          size="small"
+          fullWidth
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Paper>
+
+      <Paper sx={{ height: '70vh', width: '100%' }}>
         <DataGrid
-          rows={returns}
+          rows={filteredReturns} // 7. Update DataGrid to use the filtered list
           columns={columns}
           loading={isLoading}
           getRowId={(row) => row._id}
