@@ -1,6 +1,7 @@
 // client/src/pages/DeliveriesPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
 import { getDeliveries } from '../api/deliveryApi';
 import RecordDeliveryForm from '../components/RecordDeliveryForm';
 
@@ -8,25 +9,35 @@ import RecordDeliveryForm from '../components/RecordDeliveryForm';
 import { 
   Box, Button, Typography, Paper, Dialog, DialogTitle, DialogContent,
   DialogActions, Table, TableBody, TableCell, TableHead, TableRow, Chip,
-  Grid, Divider, Stack, Container // <-- IMPORTED CONTAINER
+  Grid, Divider, Stack, Container, TextField, InputAdornment, FormControl,
+  InputLabel, Select, MenuItem, Tooltip
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import SearchIcon from '@mui/icons-material/Search';
 
 const DeliveriesPage = () => {
   const [deliveries, setDeliveries] = useState([]);
+  const [suppliers, setSuppliers] = useState([]); // State for filter dropdown
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(''); // State for search
+  const [filterSupplier, setFilterSupplier] = useState(''); // State for filter
   const navigate = useNavigate();
 
   const fetchDeliveries = async () => {
     try {
       setIsLoading(true);
-      const response = await getDeliveries();
-      setDeliveries(response);
+      // Fetch both deliveries and the full list of suppliers for the filter dropdown
+      const [deliveriesResponse, suppliersResponse] = await Promise.all([
+        getDeliveries(),
+        api.get('/suppliers')
+      ]);
+      setDeliveries(deliveriesResponse);
+      setSuppliers(suppliersResponse.data);
     } catch (err) {
       setError('Failed to fetch delivery data.');
       console.error(err);
@@ -38,6 +49,19 @@ const DeliveriesPage = () => {
   useEffect(() => {
     fetchDeliveries();
   }, []);
+
+  const filteredDeliveries = useMemo(() => {
+    return deliveries.filter(delivery => {
+      const supplierMatch = filterSupplier ? delivery.supplier?._id === filterSupplier : true;
+      
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      const searchMatch = !searchTerm ||
+        (delivery.supplier?.name?.toLowerCase().includes(lowerCaseSearchTerm)) ||
+        (delivery.purchaseOrder?.poNumber?.toLowerCase().includes(lowerCaseSearchTerm));
+      
+      return supplierMatch && searchMatch;
+    });
+  }, [deliveries, searchTerm, filterSupplier]);
 
   const handleDeliveryFormClose = () => {
     setIsDeliveryModalOpen(false);
@@ -68,9 +92,11 @@ const DeliveriesPage = () => {
     {
       field: 'actions', headerName: 'Actions', width: 150, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => (
-        <Button variant="contained" size="small" onClick={() => setSelectedDelivery(params.row)}>
-          View Details
-        </Button>
+        <Tooltip title="View Details">
+            <Button variant="outlined" size="small" onClick={() => setSelectedDelivery(params.row)}>
+              View
+            </Button>
+        </Tooltip>
       )
     }
   ];
@@ -78,7 +104,6 @@ const DeliveriesPage = () => {
   if (error) return <Typography color="error" sx={{ p: 3 }}>{error}</Typography>;
 
   return (
-    // --- THIS IS THE KEY CHANGE ---
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>
@@ -108,9 +133,41 @@ const DeliveriesPage = () => {
         </Stack>
       </Box>
 
-      <Paper sx={{ height: '75vh', width: '100%' }}>
+      {/* --- Filter and Search Bar --- */}
+      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <TextField
+          label="Search by Supplier or PO Number"
+          variant="outlined"
+          size="small"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          sx={{ flexGrow: 1 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <FormControl size="small" sx={{ minWidth: 220 }}>
+          <InputLabel>Filter by Supplier</InputLabel>
+          <Select
+            value={filterSupplier}
+            label="Filter by Supplier"
+            onChange={(e) => setFilterSupplier(e.target.value)}
+          >
+            <MenuItem value=""><em>All Suppliers</em></MenuItem>
+            {suppliers.map(sup => (
+              <MenuItem key={sup._id} value={sup._id}>{sup.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Paper>
+
+      <Paper sx={{ height: '70vh', width: '100%' }}>
         <DataGrid
-          rows={deliveries}
+          rows={filteredDeliveries}
           columns={columns}
           loading={isLoading}
           getRowId={(row) => row._id}
@@ -127,11 +184,11 @@ const DeliveriesPage = () => {
               <>
                 <Box sx={{ mb: 2 }}>
                   <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
+                    <Grid item size={{ xs: 12, sm: 6 }}>
                       <Typography variant="body2" color="text.secondary">Supplier</Typography>
                       <Typography variant="h6" component="p">{selectedDelivery.supplier?.name || 'N/A'}</Typography>
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid item size={{ xs: 12, sm: 6 }}>
                       <Typography variant="body2" color="text.secondary">Origin</Typography>
                       <Typography variant="h6" component="p">
                         {selectedDelivery.purchaseOrder
