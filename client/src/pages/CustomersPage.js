@@ -1,5 +1,5 @@
 // client/src/pages/CustomersPage.js
-import React, { useState, useEffect, useCallback, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react'; // 1. Import useMemo
 import { getCustomers, deleteCustomer } from '../api/customerApi';
 import CustomerForm from '../components/CustomerForm';
 import CustomerMotorcyclesModal from '../components/CustomerMotorcyclesModal';
@@ -7,9 +7,10 @@ import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
 
 // MUI Imports
-import { Box, Button, Typography, Paper, Stack, Dialog, DialogTitle, Container } from '@mui/material';
+import { Box, Button, Typography, Paper, Stack, Dialog, DialogTitle, Container, TextField, InputAdornment } from '@mui/material'; // Added TextField & InputAdornment
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search'; // Added SearchIcon
 import { FaUserFriends, FaMotorcycle } from 'react-icons/fa';
 
 const CustomersPage = () => {
@@ -19,6 +20,7 @@ const CustomersPage = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [managingCustomer, setManagingCustomer] = useState(null);
   const { confirm } = useContext(ConfirmationContext);
+  const [searchTerm, setSearchTerm] = useState(''); // 2. Add state for the search term
 
   const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
@@ -36,6 +38,17 @@ const CustomersPage = () => {
   useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
+
+  // 4. Create the filteredCustomers list using useMemo
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(customer => {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      const nameMatch = customer.name?.toLowerCase().includes(lowerCaseSearchTerm);
+      const emailMatch = customer.email?.toLowerCase().includes(lowerCaseSearchTerm);
+      const phoneMatch = customer.phone?.toLowerCase().includes(lowerCaseSearchTerm);
+      return nameMatch || emailMatch || phoneMatch;
+    });
+  }, [customers, searchTerm]);
 
   const handleFormSubmit = () => {
     fetchCustomers();
@@ -79,7 +92,6 @@ const CustomersPage = () => {
       width: 300,
       sortable: false,
       renderCell: (params) => (
-        // --- THIS IS THE FIX for vertical alignment ---
         <Box
           sx={{
             width: "100%",
@@ -136,10 +148,29 @@ const CustomersPage = () => {
           Add Customer
         </Button>
       </Box>
+      
+      {/* 3. Add the search bar UI */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <TextField
+          label="Search Customers (by Name, Email, or Phone)"
+          variant="outlined"
+          size="small"
+          fullWidth
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Paper>
 
-      <Paper sx={{ height: '75vh', width: '100%' }}>
+      <Paper sx={{ height: '70vh', width: '100%' }}>
         <DataGrid
-          rows={customers}
+          rows={filteredCustomers} // 5. Update DataGrid to use the filtered list
           columns={columns}
           loading={isLoading}
           getRowId={(row) => row._id}
