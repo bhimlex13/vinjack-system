@@ -86,6 +86,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/adjustments', adjustmentRoutes);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // =================== PRODUCTION DEPLOYMENT CODE ===================
 if (process.env.NODE_ENV === 'production') {

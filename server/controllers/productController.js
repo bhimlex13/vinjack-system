@@ -19,8 +19,8 @@ const getProducts = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel, image } = req.body;
-    const newProduct = new Product({ name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel, image });
+    const { name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel, image, suppliers } = req.body; // Added suppliers
+    const newProduct = new Product({ name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel, image, suppliers }); // Added suppliers
     const savedProduct = await newProduct.save();
     
     if (savedProduct.quantity > 0) {
@@ -43,7 +43,6 @@ const createProduct = async (req, res) => {
         });
     }
 
-    // --- MODIFIED LINE ---
     logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`, { entityType: 'Product', entityId: savedProduct._id });
     res.status(201).json(savedProduct);
   } catch (error) {
@@ -68,6 +67,7 @@ const updateProduct = async (req, res) => {
       product.quantity = newQuantity ?? product.quantity;
       product.reorderLevel = req.body.reorderLevel ?? product.reorderLevel;
       product.image = req.body.image || product.image;
+      product.suppliers = req.body.suppliers || product.suppliers; // Added suppliers
       
       const updatedProduct = await product.save();
 
@@ -91,7 +91,6 @@ const updateProduct = async (req, res) => {
         }
       }
 
-      // --- MODIFIED LINE ---
       logAction(req.user, 'UPDATE_PRODUCT', `Updated product: '${updatedProduct.name}' (Code: ${updatedProduct.itemCode})`, { entityType: 'Product', entityId: updatedProduct._id });
       res.json(updatedProduct);
     } else {
@@ -106,12 +105,11 @@ const deleteProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
         if (product) {
-            const productId = product._id; // Save ID before deleting
+            const productId = product._id;
             const productDetails = `Deleted product: '${product.name}' (Code: ${product.itemCode})`;
             
             await product.deleteOne();
 
-            // --- MODIFIED LINE ---
             logAction(req.user, 'DELETE_PRODUCT', productDetails, { entityType: 'Product', entityId: productId });
             res.json({ message: 'Product removed' });
         } else {
@@ -133,10 +131,27 @@ const getLowStockProducts = async (req, res) => {
   }
 };
 
+
+const getProductsBySupplier = async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+    if (!supplierId) {
+        return res.status(400).json({ message: 'Supplier ID is required.' });
+    }
+    const products = await Product.find({ suppliers: supplierId })
+        .select('itemCode name cost'); 
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error while fetching products by supplier.', error: error.message });
+  }
+};
+
+
 module.exports = { 
   getProducts, 
   createProduct, 
   updateProduct, 
   deleteProduct,
   getLowStockProducts,
+  getProductsBySupplier,
 };
