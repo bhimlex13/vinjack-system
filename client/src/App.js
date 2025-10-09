@@ -32,6 +32,9 @@ import DeliveriesPage from './pages/DeliveriesPage';
 import CustomersPage from './pages/CustomersPage'; 
 import ReturnsPage from './pages/ReturnsPage'; 
 
+// --- ADDED: Import the new page for supplier reviews ---
+import SupplierPOReviewPage from './pages/SupplierPOReviewPage';
+
 
 const InnerApp = () => {
   const { user, mustChangePassword, isInitializing } = useContext(AuthContext);
@@ -59,6 +62,10 @@ const InnerApp = () => {
       />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* --- ADDED: New public route for suppliers to access their PO --- */}
+        <Route path="/supplier/po/:token" element={<SupplierPOReviewPage />} />
+
 
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>

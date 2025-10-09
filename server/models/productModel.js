@@ -1,3 +1,4 @@
+// server/models/productModel.js
 const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema({
@@ -10,7 +11,13 @@ const productSchema = new mongoose.Schema({
   quantity: { type: Number, required: true, default: 0, min: 0 },
   unit: { type: String, default: 'pc' }, 
   reorderLevel: { type: Number, default: 5, min: 0 },
-  image: { type: String, trim: true, default: '' }, // <-- RENAMED from imageUrl
+  image: { type: String, trim: true, default: '' },
+
+  suppliers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Supplier'
+  }]
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Product', productSchema);

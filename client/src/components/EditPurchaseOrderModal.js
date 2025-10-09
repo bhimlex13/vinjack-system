@@ -1,13 +1,13 @@
 // client/src/components/EditPurchaseOrderModal.js
 import React, { useState, useEffect } from 'react';
-import api from '../api/axios';
+import { getProductsBySupplier } from '../api/productApi'; // Assuming you have this API function
 import { updatePurchaseOrder } from '../api/purchaseOrderApi';
 import { toast } from 'react-toastify';
 
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, TextField, Button,
-  Grid, Autocomplete, IconButton, Typography, Divider, Alert
+  Grid, Autocomplete, IconButton, Typography, Divider, Alert, CircularProgress
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -17,43 +17,50 @@ const EditPurchaseOrderModal = ({ open, onClose, poData, onSuccess }) => {
   const [notes, setNotes] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false); // State for product loading
 
   useEffect(() => {
-    // When the poData prop changes (i.e., when the modal opens), initialize the form state
     if (poData) {
       const initialItems = poData.items.map(item => ({
-        // Ensure the product object is what Autocomplete expects
         product: item.product, 
         quantity: item.quantity,
         cost: item.cost,
       }));
       setItems(initialItems);
       setNotes(poData.notes || '');
-      setReason(''); // Reset reason every time the modal opens
+      setReason('');
       setError('');
     }
   }, [poData]);
 
+  // --- THIS ENTIRE useEffect BLOCK IS UPDATED ---
   useEffect(() => {
-    // Fetch the full list of products to populate the dropdowns
-    const fetchProducts = async () => {
+    // Fetch products specifically for the selected supplier
+    const fetchProductsForSupplier = async () => {
+      if (!poData?.supplier?._id) return; // Don't fetch if there's no supplier
+      
+      setIsLoadingProducts(true);
+      setError('');
       try {
-        const response = await api.get('/products');
-        setProducts(response.data);
+        // Use the new API endpoint
+        const response = await getProductsBySupplier(poData.supplier._id);
+        setProducts(response);
       } catch (err) {
-        console.error("Failed to fetch products", err);
-        setError("Could not load product list.");
+        console.error("Failed to fetch products for supplier", err);
+        setError(`Could not load product list for ${poData.supplier.name}.`);
+      } finally {
+        setIsLoadingProducts(false);
       }
     };
+
     if (open) {
-      fetchProducts();
+      fetchProductsForSupplier();
     }
-  }, [open]);
+  }, [open, poData?.supplier?._id]); // Re-run if modal opens or supplier ID changes
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
     if (field === 'product') {
-      // When a new product is selected, update the cost to its default cost
       newItems[index] = { ...newItems[index], product: value, cost: value?.cost || 0 };
     } else {
       newItems[index] = { ...newItems[index], [field]: value };
@@ -94,11 +101,24 @@ const EditPurchaseOrderModal = ({ open, onClose, poData, onSuccess }) => {
     try {
       const updatedPO = await updatePurchaseOrder(poData._id, payload);
       toast.success('Purchase Order updated successfully!');
-      onSuccess(updatedPO); // Pass the updated data back to the parent page
+      onSuccess(updatedPO);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update Purchase Order.');
     }
   };
+
+  // --- Helper API function (add this to your productApi.js file) ---
+  // You will need to create a file like `client/src/api/productApi.js`
+  // and add this function there, then import it at the top of this file.
+  /*
+  // In client/src/api/productApi.js
+  import api from './axios';
+  
+  export const getProductsBySupplier = async (supplierId) => {
+    const { data } = await api.get(`/products/by-supplier/${supplierId}`);
+    return data;
+  };
+  */
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
@@ -108,23 +128,38 @@ const EditPurchaseOrderModal = ({ open, onClose, poData, onSuccess }) => {
         <Box component="form" noValidate autoComplete="off" sx={{ mt: 2 }}>
           {items.map((item, index) => (
             <Grid container spacing={2} key={index} alignItems="center" sx={{ mb: 2 }}>
-              <Grid item size={{ xs: 12, md: 6 }}>
+              <Grid item xs={12} md={6}>
                 <Autocomplete
                   options={products}
                   getOptionLabel={(option) => option.name || ''}
                   value={item.product}
                   isOptionEqualToValue={(option, value) => option._id === value?._id}
                   onChange={(e, newValue) => handleItemChange(index, 'product', newValue)}
-                  renderInput={(params) => <TextField {...params} label="Product" />}
+                  loading={isLoadingProducts}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      label="Product" 
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {isLoadingProducts ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
                 />
               </Grid>
-              <Grid item size={{ xs: 5, md: 2 }}>
+              <Grid item xs={5} md={2}>
                 <TextField type="number" label="Quantity" value={item.quantity} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} fullWidth inputProps={{ min: 1 }} />
               </Grid>
-              <Grid item size={{ xs: 5, md: 3 }}>
+              <Grid item xs={5} md={3}>
                 <TextField type="number" label="Unit Cost" value={item.cost} onChange={(e) => handleItemChange(index, 'cost', e.target.value)} fullWidth inputProps={{ step: "0.01", min: 0 }}/>
               </Grid>
-              <Grid item size={{ xs: 2, md: 1 }} sx={{ textAlign: 'center' }}>
+              <Grid item xs={2} md={1} sx={{ textAlign: 'center' }}>
                 <IconButton onClick={() => handleRemoveItem(index)} color="error"><DeleteIcon /></IconButton>
               </Grid>
             </Grid>
