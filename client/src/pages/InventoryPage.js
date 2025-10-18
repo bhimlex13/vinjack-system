@@ -6,13 +6,12 @@ import AuthContext from '../context/AuthContext';
 import StockAdjustmentModal from '../components/StockAdjustmentModal';
 import MovementHistoryModal from '../components/MovementHistoryModal';
 import StockGauge from '../components/StockGauge';
-import { toast } from 'react-toastify'; // <-- This can stay
 
 // MUI Imports
 import {
   Box, Button, Typography, TextField, Select, MenuItem, FormControl, InputLabel,
   Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent,
-  Container, Tooltip, IconButton, Stack // <-- Stack stays
+  Container, Tooltip, IconButton, Stack
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
@@ -20,7 +19,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import TuneIcon from '@mui/icons-material/Tune';
 import HistoryIcon from '@mui/icons-material/History';
-// <-- SyncIcon import removed
 
 const InventoryPage = () => {
   const { user } = useContext(AuthContext);
@@ -90,8 +88,6 @@ const InventoryPage = () => {
     setAdjustmentProduct(null);
     fetchInitialData();
   };
-
-  // <-- handleSyncStatuses function removed ---
 
   const openProductModalForEdit = (product) => {
     setEditingProduct(product);
@@ -192,14 +188,12 @@ const InventoryPage = () => {
         />
       )}
 
-      {/* --- MODIFIED HEADER --- */}
       <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
           Inventory Management
         </Typography>
         
         <Stack direction="row" spacing={2}>
-          {/* <-- Sync Button Removed --> */}
           {user && (user.role === 'Owner' || user.role === 'Clerk') && (
             <Button variant="contained" startIcon={<AddIcon />} onClick={openProductModalForAdd}>
               Add New Product
@@ -207,11 +201,10 @@ const InventoryPage = () => {
           )}
         </Stack>
       </Box>
-      {/* --- END MODIFICATION --- */}
-
 
       <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <TextField label="Search" variant="outlined" size="small" value={searchTerm} onChange={(e) => setSearchTerm(e.g.value)}
+        <TextField label="Search" variant="outlined" size="small" value={searchTerm} 
+          onChange={(e) => setSearchTerm(e.target.value)} // <-- FIX HERE
           sx={{ flexGrow: 1 }} InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
         />
         <FormControl size="small" sx={{ minWidth: 200 }}>

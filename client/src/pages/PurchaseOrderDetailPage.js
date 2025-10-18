@@ -1,5 +1,5 @@
 // client/src/pages/PurchaseOrderDetailPage.js
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getPurchaseOrderById, approveSupplierChanges } from '../api/purchaseOrderApi';
 import ConfirmationContext from '../context/ConfirmationContext';
@@ -12,7 +12,7 @@ import {
   Container, Typography, Box, Paper, Grid, Button, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
   Dialog, DialogContent, DialogActions, Chip, Link as MuiLink, IconButton,
-  Tooltip // <-- ADDED Tooltip
+  Tooltip
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
@@ -36,7 +36,7 @@ const PurchaseOrderDetailPage = () => {
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const printoutRef = useRef();
 
-  const fetchPo = async () => {
+  const fetchPo = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getPurchaseOrderById(id);
@@ -48,11 +48,11 @@ const PurchaseOrderDetailPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchPo();
-  }, [id]);
+  }, [fetchPo]);
 
   const handleApprove = async () => {
     const isConfirmed = await confirm(
@@ -63,7 +63,7 @@ const PurchaseOrderDetailPage = () => {
       try {
         await approveSupplierChanges(id);
         toast.success('Purchase Order has been approved!');
-        fetchPo(); // Refresh the data to show the new "Approved" status
+        fetchPo();
       } catch (err) {
         toast.error(err.response?.data?.message || 'Failed to approve order.');
       }
@@ -76,7 +76,7 @@ const PurchaseOrderDetailPage = () => {
     document.body.innerHTML = `<div class="print-container">${printContents}</div>`;
     window.print();
     document.body.innerHTML = originalContents;
-    window.location.reload(); // Reload to restore event listeners etc.
+    window.location.reload();
   };
 
   const formatCurrency = (amount) => {
@@ -222,7 +222,7 @@ const PurchaseOrderDetailPage = () => {
                     key={index}
                     sx={isUnavailable ? { textDecoration: 'line-through', color: 'text.disabled', '& .MuiTableCell-root': { color: 'inherit' } } : {}}
                   >
-                    <TableCell>{item.product?.name || 'Product not found'}</TableCell> {/* Added fallback */}
+                    <TableCell>{item.product?.name || 'Product not found'}</TableCell>
                     <TableCell align="right">{item.quantity}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>{item.quantityReceived || 0}</TableCell>
                     <TableCell align="right">
