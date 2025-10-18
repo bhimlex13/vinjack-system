@@ -5,20 +5,23 @@ import { getPurchaseOrderById, approveSupplierChanges } from '../api/purchaseOrd
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
 import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
-import ReceiveStockModal from '../components/ReceiveStockModal'; // --- ADDED: Import the new modal ---
+import ReceiveStockModal from '../components/ReceiveStockModal';
 
 // MUI Imports
 import {
   Container, Typography, Box, Paper, Grid, Button, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
-  Dialog, DialogContent, DialogActions, Chip, Link as MuiLink
+  Dialog, DialogContent, DialogActions, Chip, Link as MuiLink, IconButton,
+  Tooltip // <-- ADDED Tooltip
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import InfoIcon from '@mui/icons-material/Info';
-import ReceiptIcon from '@mui/icons-material/Receipt'; // --- ADDED: More icons ---
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import InventoryIcon from '@mui/icons-material/Inventory';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import LinkIcon from '@mui/icons-material/Link';
 
 
 const PurchaseOrderDetailPage = () => {
@@ -28,9 +31,9 @@ const PurchaseOrderDetailPage = () => {
   const [po, setPo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false); // --- ADDED: State for the receive modal ---
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const printoutRef = useRef();
 
   const fetchPo = async () => {
@@ -50,7 +53,7 @@ const PurchaseOrderDetailPage = () => {
   useEffect(() => {
     fetchPo();
   }, [id]);
-  
+
   const handleApprove = async () => {
     const isConfirmed = await confirm(
       'Approve Supplier Changes?',
@@ -73,11 +76,23 @@ const PurchaseOrderDetailPage = () => {
     document.body.innerHTML = `<div class="print-container">${printContents}</div>`;
     window.print();
     document.body.innerHTML = originalContents;
-    window.location.reload(); 
+    window.location.reload(); // Reload to restore event listeners etc.
   };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount || 0);
+  };
+
+  const handleCopyLink = () => {
+    if (po && po.supplierResponseToken) {
+      const link = `${window.location.origin}/supplier/po/${po.supplierResponseToken}`;
+      navigator.clipboard.writeText(link).then(() => {
+        toast.success('Supplier link copied to clipboard!');
+      }, (err) => {
+        toast.error('Failed to copy link.');
+        console.error('Copy failed:', err);
+      });
+    }
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
@@ -97,15 +112,16 @@ const PurchaseOrderDetailPage = () => {
     return <Chip label={style.label} color={style.color} sx={{ fontWeight: 'bold' }}/>;
   };
 
+  const supplierLink = po?.supplierResponseToken ? `${window.location.origin}/supplier/po/${po.supplierResponseToken}` : null;
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* --- ADDED: Render the new ReceiveStockModal --- */}
       <ReceiveStockModal
         open={isReceiveModalOpen}
         onClose={() => setIsReceiveModalOpen(false)}
         poData={po}
         onSuccess={() => {
-          fetchPo(); // Refresh the page data after receiving stock
+          fetchPo();
         }}
       />
 
@@ -134,6 +150,7 @@ const PurchaseOrderDetailPage = () => {
             <Typography variant="h6">Supplier Details</Typography>
             <Typography><strong>Name:</strong> {po.supplier.name}</Typography>
             <Typography><strong>Contact:</strong> {po.supplier.contactPerson || 'N/A'}</Typography>
+             <Typography><strong>Email:</strong> {po.supplier.email || 'N/A'}</Typography>
           </Grid>
           <Grid item xs={12} md={6}>
             <Typography variant="h6">Order Summary</Typography>
@@ -143,7 +160,27 @@ const PurchaseOrderDetailPage = () => {
             <Typography><strong>Total Amount:</strong> {formatCurrency(po.totalAmount)}</Typography>
           </Grid>
 
-            {/* --- ADDED: Section to display uploaded receipt if it exists --- */}
+          {supplierLink && ['Pending', 'Awaiting Approval'].includes(po.status) && (
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LinkIcon /> Supplier Review Link
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                <MuiLink href={supplierLink} target="_blank" rel="noopener noreferrer" sx={{ wordBreak: 'break-all' }}>
+                  {supplierLink}
+                </MuiLink>
+                <Tooltip title="Copy Link">
+                  <IconButton size="small" onClick={handleCopyLink}>
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Typography variant="caption" color="textSecondary">
+                This link {po.supplier.email ? `was sent to the supplier's email (${po.supplier.email}).` : 'could not be sent automatically (no supplier email).'} You can copy and send it manually.
+              </Typography>
+            </Grid>
+          )}
+
             {po.receiptImageUrl && (
                 <Grid item xs={12}>
                     <Typography variant="h6">Attachments</Typography>
@@ -154,7 +191,7 @@ const PurchaseOrderDetailPage = () => {
                 </Grid>
             )}
         </Grid>
-        
+
         {po.status === 'Awaiting Approval' && po.supplierNotes && (
           <Alert severity="info" icon={<InfoIcon />} sx={{ mt: 3 }}>
             <Typography variant="h6" component="div">Notes from Supplier</Typography>
@@ -165,7 +202,7 @@ const PurchaseOrderDetailPage = () => {
         <Divider sx={{ my: 3 }} />
         <Typography variant="h6" gutterBottom>Items</Typography>
         <TableContainer component={Paper} variant="outlined">
-          <Table>
+           <Table>
             <TableHead>
               <TableRow>
                 <TableCell>Product Name</TableCell>
@@ -179,13 +216,13 @@ const PurchaseOrderDetailPage = () => {
               {po.items.map((item, index) => {
                 const isChanged = po.status === 'Awaiting Approval' && typeof item.supplierUpdatedCost === 'number' && item.supplierUpdatedCost !== item.cost;
                 const isUnavailable = po.status === 'Awaiting Approval' && !item.isAvailable;
-                
+
                 return (
-                  <TableRow 
+                  <TableRow
                     key={index}
                     sx={isUnavailable ? { textDecoration: 'line-through', color: 'text.disabled', '& .MuiTableCell-root': { color: 'inherit' } } : {}}
                   >
-                    <TableCell>{item.product.name}</TableCell>
+                    <TableCell>{item.product?.name || 'Product not found'}</TableCell> {/* Added fallback */}
                     <TableCell align="right">{item.quantity}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>{item.quantityReceived || 0}</TableCell>
                     <TableCell align="right">
@@ -211,7 +248,6 @@ const PurchaseOrderDetailPage = () => {
           </Table>
         </TableContainer>
 
-        {/* --- MODIFIED: Action box now handles multiple statuses --- */}
         <Box sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'grey.300', borderRadius: 1 }}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, alignItems: 'center' }}>
                 {po.status === 'Awaiting Approval' && (

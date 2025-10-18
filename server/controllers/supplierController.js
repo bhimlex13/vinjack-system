@@ -13,8 +13,10 @@ const getSuppliers = async (req, res) => {
 
 const createSupplier = async (req, res) => {
   try {
-    const { name, contactPerson, contactNumber, address } = req.body;
-    const newSupplier = new Supplier({ name, contactPerson, contactNumber, address });
+    // --- ADDED email ---
+    const { name, email, contactPerson, contactNumber, address } = req.body;
+    // --- ADDED email ---
+    const newSupplier = new Supplier({ name, email, contactPerson, contactNumber, address });
     const savedSupplier = await newSupplier.save();
 
     // Log the action
@@ -22,13 +24,25 @@ const createSupplier = async (req, res) => {
 
     res.status(201).json(savedSupplier);
   } catch (error) {
-    res.status(400).json({ message: 'Error creating supplier' });
+    // Basic duplicate name check
+    if (error.code === 11000 && error.keyPattern && error.keyPattern.name) {
+       return res.status(400).json({ message: 'Supplier name already exists.' });
+    }
+    // Basic email validation check from model
+    if (error.errors && error.errors.email) {
+        return res.status(400).json({ message: error.errors.email.message });
+    }
+    res.status(400).json({ message: 'Error creating supplier', error: error.message });
   }
 };
 
 const updateSupplier = async (req, res) => {
   try {
-    const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // req.body will contain the email field if it's sent from the form
+    const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, {
+        new: true,
+        runValidators: true // Ensure email validation runs on update
+    });
     if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
     
     // Log the action
@@ -36,7 +50,15 @@ const updateSupplier = async (req, res) => {
 
     res.json(supplier);
   } catch (error) {
-    res.status(400).json({ message: 'Error updating supplier' });
+     // Basic email validation check from model
+    if (error.errors && error.errors.email) {
+        return res.status(400).json({ message: error.errors.email.message });
+    }
+     // Basic duplicate name check
+    if (error.code === 11000 && error.keyPattern && error.keyPattern.name) {
+       return res.status(400).json({ message: 'Supplier name already exists.' });
+    }
+    res.status(400).json({ message: 'Error updating supplier', error: error.message });
   }
 };
 

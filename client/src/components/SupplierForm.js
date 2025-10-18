@@ -16,6 +16,8 @@ import {
 const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
   const [formData, setFormData] = useState({
     name: '',
+    // --- 1. ADDED email ---
+    email: '',
     contactPerson: '',
     contactNumber: '',
     address: ''
@@ -26,12 +28,15 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
     if (supplierToEdit) {
       setFormData({
         name: supplierToEdit.name || '',
+        // --- 2. ADDED email ---
+        email: supplierToEdit.email || '',
         contactPerson: supplierToEdit.contactPerson || '',
         contactNumber: supplierToEdit.contactNumber || '',
         address: supplierToEdit.address || ''
       });
     } else {
-      setFormData({ name: '', contactPerson: '', contactNumber: '', address: '' });
+      // --- Also add email here for resetting ---
+      setFormData({ name: '', email: '', contactPerson: '', contactNumber: '', address: '' });
     }
   }, [supplierToEdit]);
 
@@ -54,8 +59,6 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
     }
   };
 
-  // This component now returns DialogContent and DialogActions
-  // to be used within a parent Dialog component.
   return (
     <Box component="form" onSubmit={handleSubmit}>
       <DialogContent>
@@ -72,6 +75,18 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
           value={formData.name}
           onChange={handleChange}
         />
+        {/* --- 3. ADDED EMAIL FIELD --- */}
+        <TextField
+          margin="dense"
+          name="email"
+          label="Email Address"
+          type="email" // Use type="email" for basic validation
+          fullWidth
+          variant="outlined"
+          value={formData.email}
+          onChange={handleChange}
+        />
+        {/* --- END ADDED FIELD --- */}
         <TextField
           margin="dense"
           name="contactPerson"

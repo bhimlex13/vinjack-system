@@ -8,6 +8,18 @@ const supplierSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  // --- NEW FIELD START ---
+  email: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    // Basic email format validation
+    match: [
+      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+      'Please fill a valid email address'
+    ]
+  },
+  // --- NEW FIELD END ---
   contactPerson: {
     type: String,
     trim: true
