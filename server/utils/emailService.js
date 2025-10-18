@@ -9,12 +9,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-/**
- * Sends a profile update verification code email.
- * @param {string} recipientEmail - The email address to send the code to.
- * @param {string} code - The verification code.
- */
 const sendVerificationEmail = async (recipientEmail, code) => {
+  // ... (sendVerificationEmail function remains the same)
   const mailOptions = {
     from: `"VinJack System" <${process.env.EMAIL_USER}>`,
     to: recipientEmail,
@@ -36,11 +32,8 @@ const sendVerificationEmail = async (recipientEmail, code) => {
 };
 
 
-/**
- * Sends a low stock summary email.
- * @param {Array} lowStockItems - An array of products that are low on stock.
- */
 const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
+  // ... (sendLowStockEmail function remains the same)
   if (!lowStockItems || lowStockItems.length === 0) {
     console.log('No low stock items to report. Email not sent.');
     return;
@@ -60,7 +53,7 @@ const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
       <ul>${itemsHtml}</ul>
       <p>Please reorder these items soon.</p>
     `,
-  };  
+  };
 
   try {
     await transporter.sendMail(mailOptions);
@@ -70,4 +63,41 @@ const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
   }
 };
 
-module.exports = { sendLowStockEmail, sendVerificationEmail };
+
+const sendPoLink = async (supplierEmail, supplierName, poNumber, token) => {
+  // --- THIS LINE IS FIXED ---
+  const link = `${process.env.CLIENT_URL}/supplier/po/${token}`; // Changed path
+
+  const mailOptions = {
+    from: `"Vinjack System" <${process.env.EMAIL_USER}>`,
+    to: supplierEmail,
+    subject: `New Purchase Order from Vinjack Sales: ${poNumber}`,
+    html: `
+      <p>Hello ${supplierName},</p>
+      <p>You have received a new Purchase Order (${poNumber}) from Vinjack Sales and Inventory Management System.</p>
+      <p>Please review the order, update item availability and costs, and submit your response by clicking the link below:</p>
+      <p>
+        <a
+          href="${link}"
+          style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;"
+        >
+          View Purchase Order
+        </a>
+      </p>
+      <p>If you cannot click the link, please copy and paste this URL into your browser:</p>
+      <p>${link}</p>
+      <p>Thank you,</p>
+      <p>Vinjack Sales and Inventory Management System</p>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`PO email sent successfully to ${supplierEmail}`);
+  } catch (error) {
+    console.error(`Error sending PO email to ${supplierEmail}:`, error);
+    // Log the error but don't stop PO creation
+  }
+};
+
+module.exports = { sendLowStockEmail, sendVerificationEmail, sendPoLink };
