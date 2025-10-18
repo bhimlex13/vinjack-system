@@ -9,9 +9,10 @@ import { toast } from 'react-toastify';
 import {
   Box, Button, TextField, FormControl, InputLabel, Select, MenuItem,
   Grid, ToggleButtonGroup, ToggleButton, Alert, Stack, InputAdornment, IconButton,
-  Typography, Tooltip
+  Typography, Tooltip, FormHelperText
 } from '@mui/material';
-import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+// --- THIS LINE IS FIXED ---
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'; 
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) => {
@@ -19,7 +20,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
   const { user } = useContext(AuthContext);
   const [formData, setFormData] = useState({
     itemCode: '', name: '', category: '', brand: '',
-    cost: '', price: '', quantity: '', reorderLevel: 5, image: ''
+    cost: '', price: '', quantity: '', reorderLevel: 5, maxStock: '', image: ''
   });
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -37,10 +38,11 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
       price: productToEdit.price,
       quantity: productToEdit.quantity,
       reorderLevel: productToEdit.reorderLevel,
+      maxStock: productToEdit.maxStock || '',
       image: productToEdit.image || '',
     } : {
       itemCode: '', name: '', category: '', brand: '',
-      cost: '', price: '', quantity: '', reorderLevel: 5, image: ''
+      cost: '', price: '', quantity: '', reorderLevel: 5, maxStock: '', image: ''
     };
     setFormData(initialData);
     setUploadedFileName('');
@@ -185,11 +187,29 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductDelete }) 
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="cost" label="Cost" value={formData.cost} onChange={handleChange} inputProps={{ step: "0.01" }} /></Grid>
-            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="price" label="Price" value={formData.price} onChange={handleChange} inputProps={{ step: "0.01" }} /></Grid>
-            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="quantity" label="Quantity" value={formData.quantity} onChange={handleChange} /></Grid>
-            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="reorderLevel" label="Reorder Level" value={formData.reorderLevel} onChange={handleChange} /></Grid>
             
+            {/* --- UPDATED --- */}
+            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="cost" label="Cost" value={formData.cost} onChange={handleChange} inputProps={{ step: "0.01", min: 0 }} /></Grid>
+            <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="price" label="Price" value={formData.price} onChange={handleChange} inputProps={{ step: "0.01", min: 0 }} /></Grid>
+            
+            {/* --- UPDATED ROW --- */}
+            <Grid item size={{ xs: 4 }}><TextField fullWidth required type="number" name="quantity" label="Quantity" value={formData.quantity} onChange={handleChange} inputProps={{ min: 0 }} /></Grid>
+            <Grid item size={{ xs: 4 }}><TextField fullWidth required type="number" name="maxStock" label="Max Stock" value={formData.maxStock} onChange={handleChange} inputProps={{ min: 1 }} /></Grid>
+            <Grid item size={{ xs: 4 }}><TextField fullWidth required type="number" name="reorderLevel" label="Reorder Level" value={formData.reorderLevel} onChange={handleChange} inputProps={{ min: 0 }} /></Grid>
+            {/* --- END UPDATED ROW --- */}
+
+            {/* --- NEW HELPER TEXT BLOCK --- */}
+            <Grid item size={{ xs: 12 }} sx={{ mt: -1.5, pl: 1, pr: 1 }}>
+              {formData.maxStock > 0 && (
+                <FormHelperText>
+                  Thresholds based on {formData.maxStock} units:
+                  <strong> Low</strong> status at &le; {Math.floor(formData.maxStock * 0.25)} |
+                  <strong> Critical</strong> status at &le; {Math.floor(formData.maxStock * 0.10)}
+                </FormHelperText>
+              )}
+            </Grid>
+            {/* --- END NEW HELPER TEXT --- */}
+
             <Grid item size={{ xs: 12 }}>
               <FormControl fullWidth>
                 <ToggleButtonGroup value={imageSource} exclusive onChange={(e, val) => val && setImageSource(val)} size="small">

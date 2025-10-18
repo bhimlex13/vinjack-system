@@ -9,8 +9,23 @@ const productSchema = new mongoose.Schema({
   cost: { type: Number, required: true, min: 0 }, 
   price: { type: Number, required: true, min: 0 },
   quantity: { type: Number, required: true, default: 0, min: 0 },
+  
+  // --- NEW FIELDS START ---
+  maxStock: { 
+    type: Number, 
+    required: [true, 'Max stock capacity is required'], 
+    default: 1, 
+    min: [1, 'Max stock must be at least 1'] 
+  },
+  stockStatus: {
+    type: String,
+    enum: ['Healthy', 'Low', 'Critical', 'Out of Stock'],
+    default: 'Out of Stock' // Defaulting to this as quantity defaults to 0
+  },
+  // --- NEW FIELDS END ---
+
   unit: { type: String, default: 'pc' }, 
-  reorderLevel: { type: Number, default: 5, min: 0 },
+  reorderLevel: { type: Number, default: 5, min: 0 }, // We can keep this
   image: { type: String, trim: true, default: '' },
 
   suppliers: [{

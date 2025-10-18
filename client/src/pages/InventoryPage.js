@@ -5,12 +5,14 @@ import ProductForm from '../components/ProductForm';
 import AuthContext from '../context/AuthContext';
 import StockAdjustmentModal from '../components/StockAdjustmentModal';
 import MovementHistoryModal from '../components/MovementHistoryModal';
+import StockGauge from '../components/StockGauge';
+import { toast } from 'react-toastify'; // <-- This can stay
 
 // MUI Imports
 import {
   Box, Button, Typography, TextField, Select, MenuItem, FormControl, InputLabel,
-  Chip, Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent,
-  Container, Tooltip, IconButton
+  Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent,
+  Container, Tooltip, IconButton, Stack // <-- Stack stays
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
@@ -18,6 +20,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import TuneIcon from '@mui/icons-material/Tune';
 import HistoryIcon from '@mui/icons-material/History';
+// <-- SyncIcon import removed
 
 const InventoryPage = () => {
   const { user } = useContext(AuthContext);
@@ -70,12 +73,25 @@ const InventoryPage = () => {
     });
   }, [products, searchTerm, filterCategory, filterBrand]);
 
-  const handleProductFormSubmit = () => fetchInitialData();
+  const handleProductFormSubmit = (productData) => {
+    const existingProductIndex = products.findIndex(p => p._id === productData._id);
+    if (existingProductIndex > -1) {
+      setProducts(prevProducts => {
+        const newProducts = [...prevProducts];
+        newProducts[existingProductIndex] = productData;
+        return newProducts;
+      });
+    } else {
+      setProducts(prevProducts => [productData, ...prevProducts]);
+    }
+  };
 
   const handleAdjustmentSuccess = () => {
     setAdjustmentProduct(null);
     fetchInitialData();
   };
+
+  // <-- handleSyncStatuses function removed ---
 
   const openProductModalForEdit = (product) => {
     setEditingProduct(product);
@@ -96,28 +112,29 @@ const InventoryPage = () => {
     }
   };
 
-  const getStatusChip = (params) => {
-    if (!params.row) return null;
-    const { quantity, reorderLevel } = params.row;
-    if (quantity === 0) return <Chip label="Out of Stock" color="error" size="small" />;
-    if (reorderLevel && quantity <= reorderLevel) return <Chip label="Low Stock" color="warning" size="small" />;
-    return <Chip label="In Stock" color="success" size="small" />;
-  };
-  
-  // 1. Function to return a class name for out-of-stock rows
   const getRowClassName = (params) => {
-    return params.row.quantity === 0 ? 'out-of-stock-row' : '';
+    return params.row.stockStatus === 'Out of Stock' ? 'out-of-stock-row' : '';
   };
 
   const columns = [
     { field: 'image', headerName: 'Image', width: 80, renderCell: (params) => <Avatar variant="rounded" src={params.row?.image || 'https://placehold.co/60x40'} />, sortable: false },
     { field: 'itemCode', headerName: 'Item Code', width: 130 },
     { field: 'name', headerName: 'Product Name', width: 250 },
-    { field: 'category', headerName: 'Category', width: 150, renderCell: (params) => { const catId = params.row.category?._id || params.row.category; const cat = categories.find(c => c._id === catId); return cat ? cat.name : 'N/A'; } },
-    { field: 'brand', headerName: 'Brand', width: 150, renderCell: (params) => { const brandId = params.row.brand?._id || params.row.brand; const brand = brands.find(b => b._id === brandId); return brand ? brand.name : 'N/A'; } },
+    { field: 'category', headerName: 'Category', width: 150, renderCell: (params) => params.row.category?.name || 'N/A' },
+    { field: 'brand', headerName: 'Brand', width: 150, renderCell: (params) => params.row.brand?.name || 'N/A' },
     { field: 'price', headerName: 'Price', width: 120, renderCell: (params) => `₱${(params.row?.price || 0).toFixed(2)}` },
-    { field: 'quantity', headerName: 'Quantity', width: 120 },
-    { field: 'status', headerName: 'Status', width: 150, renderCell: getStatusChip },
+    { 
+      field: 'status', 
+      headerName: 'Stock Level', 
+      width: 200, 
+      renderCell: (params) => (
+        <StockGauge 
+          quantity={params.row.quantity}
+          maxStock={params.row.maxStock}
+          stockStatus={params.row.stockStatus}
+        />
+      ) 
+    },
     {
       field: 'actions', headerName: 'Actions', width: 180, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => (
@@ -175,19 +192,26 @@ const InventoryPage = () => {
         />
       )}
 
+      {/* --- MODIFIED HEADER --- */}
       <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
           Inventory Management
         </Typography>
-        {user && (user.role === 'Owner' || user.role === 'Clerk') && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openProductModalForAdd}>
-            Add New Product
-          </Button>
-        )}
+        
+        <Stack direction="row" spacing={2}>
+          {/* <-- Sync Button Removed --> */}
+          {user && (user.role === 'Owner' || user.role === 'Clerk') && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={openProductModalForAdd}>
+              Add New Product
+            </Button>
+          )}
+        </Stack>
       </Box>
+      {/* --- END MODIFICATION --- */}
+
 
       <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <TextField label="Search" variant="outlined" size="small" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+        <TextField label="Search" variant="outlined" size="small" value={searchTerm} onChange={(e) => setSearchTerm(e.g.value)}
           sx={{ flexGrow: 1 }} InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
         />
         <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -206,16 +230,15 @@ const InventoryPage = () => {
         </FormControl>
       </Paper>
       
-      {/* 2. Style the out-of-stock-row class */}
       <Paper sx={{
           height: '70vh',
           width: '100%',
           '& .out-of-stock-row': {
-            backgroundColor: '#fafafa', // Light grey background
-            color: '#9e9e9e', // Dim the text
+            backgroundColor: '#fafafa',
+            color: '#9e9e9e',
           },
           '& .out-of-stock-row:hover': {
-            backgroundColor: '#f0f0f0', // Slightly darker grey on hover
+            backgroundColor: '#f0f0f0',
           },
       }}>
         <DataGrid
@@ -224,7 +247,7 @@ const InventoryPage = () => {
           loading={isLoading}
           getRowId={(row) => row._id}
           initialState={{ sorting: { sortModel: [{ field: 'status', sort: 'desc' }] }, }}
-          getRowClassName={getRowClassName} // 3. Apply the function to the DataGrid
+          getRowClassName={getRowClassName}
         />
       </Paper>
     </Container>

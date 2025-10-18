@@ -8,6 +8,7 @@ const {
   deleteProduct,
   getLowStockProducts,
   getProductsBySupplier,
+  recalculateAllProductStatuses, // <-- 1. IMPORTED
 } = require('../controllers/productController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -23,6 +24,10 @@ router.route('/low-stock').get(protect, getLowStockProducts);
 
 router.route('/by-supplier/:supplierId')
   .get(protect, getProductsBySupplier);
+
+// --- 2. NEW ROUTE ADDED ---
+router.route('/recalculate-statuses')
+  .post(protect, authorize('Owner'), recalculateAllProductStatuses);
 
 
 module.exports = router;
