@@ -6,6 +6,8 @@ const Product = require('../models/productModel');
 const Delivery = require('../models/deliveryModel');
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
+// --- 1. IMPORT THE STOCK MANAGER ---
+const { checkStockLevelAndNotify } = require('../utils/stockManager');
 
 async function getNextSequenceValue(sequenceName) {
   const sequenceDocument = await Counter.findByIdAndUpdate(
@@ -203,8 +205,10 @@ const updatePurchaseOrder = async (req, res) => {
     }
 };
 
-// --- THIS FUNCTION CONTAINS THE FIXES AND ADDITIONS ---
+// --- THIS FUNCTION CONTAINS THE FIXES ---
 const receivePurchaseOrder = async (req, res) => {
+  // --- 2. GET THE SOCKET.IO INSTANCE ---
+  const io = req.app.get('socketio');
   try {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) {
@@ -222,22 +226,30 @@ const receivePurchaseOrder = async (req, res) => {
         const qtyToReceive = Number(receivedItem.quantityReceived);
         
         if (qtyToReceive > 0) {
-            // Update product inventory
-            await Product.findByIdAndUpdate(receivedItem.productId, {
-              $inc: { quantityInStock: qtyToReceive }
-            });
+            // --- FIX 1: UPDATE 'quantity' IN THE PRODUCT MODEL ---
+            const product = await Product.findById(receivedItem.productId);
+            if (!product) continue; // Skip if product was deleted
+
+            const stockBefore = product.quantity;
+            // Use Number() to ensure math, not string concatenation
+            product.quantity = Number(product.quantity) + qtyToReceive; 
+            await product.save();
             
-            // FIX: Safely update the quantity received on the PO item
+            // --- FIX 2: CALL THE STOCK STATUS MANAGER ---
+            await checkStockLevelAndNotify(product, io);
+            
+            // Update the quantity received on the PO item
             poItem.quantityReceived = (poItem.quantityReceived || 0) + qtyToReceive;
 
-            // ADDED: Log the inventory change as a movement
-            await logMovement(
-              receivedItem.productId,
-              qtyToReceive,
-              'Stock In (PO)',
-              req.user._id,
-              po.poNumber
-            );
+            // --- FIX 3: LOG THE MOVEMENT WITH THE CORRECT OBJECT FORMAT ---
+            await logMovement({
+              product: receivedItem.productId,
+              type: 'DELIVERY (PO)',
+              quantityChange: qtyToReceive,
+              stockBefore: stockBefore,
+              referenceId: po._id, // Link to the Purchase Order
+              recordedBy: req.user.id
+            });
         }
       }
     }
@@ -253,20 +265,26 @@ const receivePurchaseOrder = async (req, res) => {
     po.history.push({
       status: po.status,
       notes: `Received stock. Receipt: ${req.file ? req.file.filename : 'Not uploaded.'}`,
-      updatedBy: req.user.name
+      updatedBy: req.user.name // Assumes user.name is available
     });
 
     const updatedPO = await po.save();
 
     logAction(req.user, 'RECEIVE_PO_STOCK', `Received stock for PO #${po.poNumber}`, { entityType: 'PurchaseOrder', entityId: updatedPO._id });
 
-    res.json({ message: 'Stock received and inventory updated successfully!', purchaseOrder: updatedPO });
+    // Populate the response to update the UI
+    const populatedPO = await PurchaseOrder.findById(updatedPO._id)
+      .populate('supplier')
+      .populate('items.product');
+
+    res.json({ message: 'Stock received and inventory updated successfully!', purchaseOrder: populatedPO });
 
   } catch (error) {
     console.error('Error receiving stock:', error);
     res.status(500).json({ message: 'Server error while receiving stock.', error: error.message });
   }
 };
+// --- END OF FIXES ---
 
 const cancelPurchaseOrder = async (req, res) => {
     try {

@@ -5,7 +5,8 @@ const Service = require('../models/serviceModel');
 const Customer = require('../models/customerModel');
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
-const { createNotification } = require('../utils/notificationManager');
+// --- MODIFIED ---
+const { checkStockLevelAndNotify } = require('../utils/stockManager');
 
 const createSale = async (req, res) => {
   const io = req.app.get('socketio');
@@ -45,32 +46,9 @@ const createSale = async (req, res) => {
           await product.save();
           calculatedTotal += item.quantity * product.price;
           
-          const warningPayload = {
-            productName: product.name,
-            remainingQuantity: product.quantity,
-            image: product.image,
-          };
-
-          if (product.quantity === 0 && stockBefore > 0) {
-            const newNotifications = await createNotification({
-                recipientRole: 'Owner', message: `${product.name} is now OUT OF STOCK.`,
-                type: 'OUT_OF_STOCK', link: '/inventory'
-            });
-            if (newNotifications && newNotifications.length) {
-                newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification));
-            }
-            io.emit('stock_level_warning', { ...warningPayload, type: 'OUT_OF_STOCK', message: `${product.name} is now OUT OF STOCK.` });
-          } 
-          else if (product.quantity <= product.reorderLevel && stockBefore > product.reorderLevel) {
-            const newNotifications = await createNotification({
-                recipientRole: 'Owner', message: `${product.name} is low on stock (${product.quantity} remaining).`,
-                type: 'LOW_STOCK', link: '/inventory'
-            });
-            if (newNotifications && newNotifications.length) {
-                newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification));
-            }
-            io.emit('stock_level_warning', { ...warningPayload, type: 'LOW_STOCK', message: `${product.name} is low on stock (${product.quantity} remaining).` });
-          }
+          // --- MODIFIED: Replaced old notification block with this one line ---
+          await checkStockLevelAndNotify(product, io);
+          // --- END MODIFICATION ---
           
           processedItems.push({
             product: item.product, quantity: item.quantity,
@@ -143,7 +121,8 @@ const getSaleById = async (req, res) => {
         
         if (!sale) return res.status(404).json({ message: 'Sale not found.' });
         res.json(sale);
-    } catch (error) {
+    } catch (error)
+ {
         res.status(500).json({ message: 'Server error fetching sale details.', error: error.message });
     }
 };

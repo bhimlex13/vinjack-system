@@ -3,10 +3,12 @@ const Delivery = require('../models/deliveryModel');
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger'); 
 const logMovement = require('../utils/movementLogger');
-const { createNotification } = require('../utils/notificationManager');
+const { checkStockLevelAndNotify } = require('../utils/stockManager');
 
 const createDelivery = async (req, res) => {
-  const { supplier, productsReceived, recordedBy } = req.body;
+  const io = req.app.get('socketio');
+  // --- MODIFICATION: Added purchaseOrder for linking ---
+  const { supplier, productsReceived, recordedBy, purchaseOrderId } = req.body;
 
   if (!productsReceived || productsReceived.length === 0) {
     return res.status(400).json({ message: 'Delivery must include at least one product.' });
@@ -22,7 +24,12 @@ const createDelivery = async (req, res) => {
       }
 
       const stockBefore = product.quantity;
-      product.quantity += item.quantity;
+      
+      // --- THIS IS THE FIX ---
+      // Changed from += to explicit Number conversion to prevent string concatenation
+      product.quantity = Number(product.quantity) + Number(item.quantity);
+      // --- END OF FIX ---
+
       if (item.costAtTime) { 
         product.cost = item.costAtTime;
       }
@@ -37,20 +44,15 @@ const createDelivery = async (req, res) => {
 
       await product.save();
 
-      if (product.quantity <= product.reorderLevel && stockBefore > product.reorderLevel) {
-        await createNotification({
-            recipientRole: 'Owner',
-            message: `${product.name} is now low on stock (${product.quantity} remaining).`,
-            type: 'LOW_STOCK',
-            link: '/inventory'
-        });
-      }
+      await checkStockLevelAndNotify(product, io);
     }
 
     const delivery = new Delivery({
       supplier,
       productsReceived,
       recordedBy: req.user.id,
+      // --- MODIFICATION: Link to PO if ID is provided ---
+      purchaseOrder: purchaseOrderId || undefined
     });
     const createdDelivery = await delivery.save();
 
@@ -79,15 +81,13 @@ const getDeliveries = async (req, res) => {
             .sort({ createdAt: -1 })
             .populate('supplier', 'name')
             .populate('recordedBy', 'fullName')
-            // --- FIX: Populate the nested product details ---
             .populate({
                 path: 'productsReceived.product',
-                select: 'name' // We only need the product name
+                select: 'name' 
             })
-            // --- FIX: Populate the purchase order details ---
-            .populate('purchaseOrder', 'poNumber'); // We only need the PO number
+            .populate('purchaseOrder', 'poNumber'); 
 
-        res.json(deliveries); // Changed to res.json({ data: deliveries }) for consistency
+        res.json(deliveries);
     } catch (error) {
         res.status(500).json({ message: 'Server Error' });
     }
