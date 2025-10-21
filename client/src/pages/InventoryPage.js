@@ -19,6 +19,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import TuneIcon from '@mui/icons-material/Tune';
 import HistoryIcon from '@mui/icons-material/History';
+// --- NEW: Import Sync Icon ---
+import SyncIcon from '@mui/icons-material/Sync';
 
 const InventoryPage = () => {
   const { user } = useContext(AuthContext);
@@ -57,6 +59,25 @@ const InventoryPage = () => {
   useEffect(() => {
     fetchInitialData();
   }, []);
+
+  // --- NEW: Function to run the status recalculation ---
+  const handleSyncStatuses = async () => {
+    const isConfirmed = window.confirm(
+      "Are you sure you want to recalculate all product stock statuses? This will fix any out-of-sync items based on their current quantity and max stock."
+    );
+    if (isConfirmed) {
+      setIsLoading(true);
+      try {
+        const response = await api.post('/products/recalculate-statuses');
+        alert(response.data.message || "Statuses re-synced successfully!");
+        await fetchInitialData(); // This will re-fetch and set loading to false
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to sync statuses.');
+        setIsLoading(false); // Make sure to stop loading on error
+      }
+    }
+  };
+  // --- END NEW FUNCTION ---
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
@@ -194,6 +215,20 @@ const InventoryPage = () => {
         </Typography>
         
         <Stack direction="row" spacing={2}>
+          {/* --- NEW SYNC BUTTON (Owner Only) --- */}
+          {user && user.role === 'Owner' && (
+            <Tooltip title="Recalculate stock status for all products">
+              <Button 
+                variant="outlined" 
+                startIcon={<SyncIcon />} 
+                onClick={handleSyncStatuses}
+              >
+                Sync Statuses
+              </Button>
+            </Tooltip>
+          )}
+          {/* --- END NEW BUTTON --- */}
+          
           {user && (user.role === 'Owner' || user.role === 'Clerk') && (
             <Button variant="contained" startIcon={<AddIcon />} onClick={openProductModalForAdd}>
               Add New Product

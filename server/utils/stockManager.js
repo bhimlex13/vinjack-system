@@ -81,12 +81,15 @@ const checkStockLevelAndNotify = async (product, io) => {
       recipientRole: 'Owner', // Or 'Admin', adjust as needed
       message: message,
       type: type,
-      link: '/inventory'
+      link: '/inventory',
+      // --- NEW: Pass the product image to the notification ---
+      image: product.image
     });
     
     // 2. Emit real-time notification to specific users
     if (newNotifications && newNotifications.length) {
       newNotifications.forEach(notification => {
+        // --- MODIFIED: Ensure the full notification object (with image) is emitted ---
         io.to(notification.user.toString()).emit('new_notification', notification);
       });
     }

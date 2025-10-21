@@ -15,7 +15,8 @@ const MainLayout = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    // --- MODIFIED: Added height: '100vh' to prevent double scrollbars ---
+    <Box sx={{ display: 'flex', height: '100vh' }}>
       <Navbar isSidebarCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
       <Sidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
       

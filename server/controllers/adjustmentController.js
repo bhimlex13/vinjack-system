@@ -2,8 +2,13 @@
 const Product = require('../models/productModel');
 const logMovement = require('../utils/movementLogger');
 const logAction = require('../utils/logger');
+// --- NEW: Import the stock manager ---
+const { checkStockLevelAndNotify } = require('../utils/stockManager');
 
 exports.createStockAdjustment = async (req, res) => {
+  // --- NEW: Get socket.io instance ---
+  const io = req.app.get('socketio');
+  
   const { productId, adjustmentType, quantity, reason } = req.body;
   if (!productId || !adjustmentType || !quantity || !reason) {
     return res.status(400).json({ message: 'Product, adjustment type, quantity, and reason are required.' });
@@ -34,7 +39,10 @@ exports.createStockAdjustment = async (req, res) => {
       return res.status(400).json({ message: "Invalid adjustment type. Must be 'increase' or 'decrease'." });
     }
     
-    await product.save();
+    // --- MODIFIED: Instead of product.save(), we call the stock manager. ---
+    // This function will check the status, save the product, AND send notifications.
+    const updatedProduct = await checkStockLevelAndNotify(product, io);
+    // --- END MODIFICATION ---
 
     await logMovement({
       product: product._id,
@@ -51,9 +59,10 @@ exports.createStockAdjustment = async (req, res) => {
       `Adjusted stock for '${product.name}' by ${quantityChange}. Reason: ${reason}`
     );
 
-    res.status(200).json({ message: 'Stock adjusted successfully.', product });
+    // --- MODIFIED: Send back the fully updated product ---
+    res.status(200).json({ message: 'Stock adjusted successfully.', product: updatedProduct });
 
   } catch (error) {
-    res.status(500).json({ message: 'Server error while adjusting stock.', error: error.message });
+    res.status(5.00).json({ message: 'Server error while adjusting stock.', error: error.message });
   }
 };

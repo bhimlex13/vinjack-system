@@ -12,6 +12,8 @@ import {
   Box,
   Typography,
 } from '@mui/material';
+// --- NEW: Import grey color ---
+import { grey } from '@mui/material/colors';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
@@ -22,7 +24,18 @@ const WarningModal = () => {
     return null;
   }
 
-  const isOutOfStock = warning.type === 'OUT_OF_STOCK';
+  // --- MODIFIED: Logic to determine color and icon ---
+  let titleColor = 'warning.main'; // Default to 'Low' (orange)
+  let TitleIcon = WarningAmberIcon;
+
+  if (warning.type === 'OUT_OF_STOCK') {
+    titleColor = grey[700]; // Dark Grey
+    TitleIcon = ErrorOutlineIcon;
+  } else if (warning.type === 'CRITICAL_STOCK') {
+    titleColor = 'error.main'; // Red
+    TitleIcon = ErrorOutlineIcon;
+  }
+  // --- END MODIFICATION ---
 
   return (
     <Dialog open={true} onClose={hideWarning} maxWidth="xs">
@@ -31,14 +44,12 @@ const WarningModal = () => {
           display: 'flex',
           alignItems: 'center',
           color: 'white',
-          backgroundColor: isOutOfStock ? 'error.main' : 'warning.main',
+          // --- MODIFIED: Use the new titleColor variable ---
+          backgroundColor: titleColor,
         }}
       >
-        {isOutOfStock ? (
-          <ErrorOutlineIcon sx={{ mr: 1 }} />
-        ) : (
-          <WarningAmberIcon sx={{ mr: 1 }} />
-        )}
+        {/* --- MODIFIED: Use the new TitleIcon variable --- */}
+        <TitleIcon sx={{ mr: 1 }} />
         Stock Level Warning
       </DialogTitle>
       <DialogContent sx={{ mt: 2 }}>

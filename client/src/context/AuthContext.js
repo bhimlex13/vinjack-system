@@ -128,13 +128,18 @@ export const AuthProvider = ({ children }) => {
         console.log('Real-time notification received:', notification);
         dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
         
+        // --- MODIFIED: To match new color scheme ---
         switch (notification.type) {
           case 'LOW_STOCK':
-            toast.warn(notification.message);
+            toast.warn(notification.message); // Orange
+            break;
+          case 'CRITICAL_STOCK': // Added this case
+            toast.error(notification.message); // Red
             break;
           case 'OUT_OF_STOCK':
-            toast.error(notification.message);
+            toast.dark(notification.message); // Grey/Dark
             break;
+          // --- END MODIFICATION ---
           case 'USER_ACTION':
           case 'REQUEST_STATUS':
           default:

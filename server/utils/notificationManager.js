@@ -7,7 +7,8 @@ const User = require('../models/userModel');
  * Can target a specific user, all users with a specific role, or a list of users.
  */
 const createNotification = async (notificationData) => {
-  const { recipientId, recipientRole, message, type, link } = notificationData;
+  // --- MODIFIED: Destructure the new 'image' field ---
+  const { recipientId, recipientRole, message, type, link, image } = notificationData;
   
   try {
     let recipients = [];
@@ -24,6 +25,7 @@ const createNotification = async (notificationData) => {
       message,
       type,
       link,
+      image: image || '', // --- MODIFIED: Add the image to the notification object ---
     }));
     
     // MODIFIED: Capture the result of the database operation
