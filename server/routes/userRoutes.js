@@ -1,12 +1,12 @@
 // server/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
-const { 
+const {
     createUserByAdmin,
-    loginUser, 
+    loginUser,
     forceChangePassword,
-    getAllUsers, 
-    updateUser, 
+    getAllUsers,
+    updateUser,
     deleteUser,
     requestProfileUpdate,
     approveUserUpdate,
@@ -14,7 +14,9 @@ const {
     getMe,
     verifyOwnerUpdate,
     getUserDetails,
-    adminResetPassword // <-- 1. IMPORT THE NEW CONTROLLER
+    adminResetPassword,
+    // --- NEW: Import logoutUser ---
+    logoutUser
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -27,6 +29,10 @@ router.put('/profile', protect, requestProfileUpdate);
 router.post('/profile/verify', protect, verifyOwnerUpdate);
 router.put('/force-change-password', protect, forceChangePassword);
 
+// --- NEW: Add Logout Route ---
+router.post('/logout', protect, logoutUser);
+// --- END NEW ---
+
 // --- Admin (Owner) routes ---
 router.route('/')
     .get(protect, authorize('Owner'), getAllUsers);
@@ -34,7 +40,7 @@ router.route('/')
 router.post('/create', protect, authorize('Owner'), createUserByAdmin);
 
 router.route('/:id')
-    .put(protect, authorize('Owner'), updateUser) 
+    .put(protect, authorize('Owner'), updateUser)
     .delete(protect, authorize('Owner'), deleteUser);
 
 router.get('/details/:id', protect, authorize('Owner'), getUserDetails);
@@ -42,7 +48,6 @@ router.get('/details/:id', protect, authorize('Owner'), getUserDetails);
 router.post('/:id/approve', protect, authorize('Owner'), approveUserUpdate);
 router.post('/:id/reject', protect, authorize('Owner'), rejectUserUpdate);
 
-// --- 2. ADD THE NEW ROUTE FOR ADMIN PASSWORD RESET ---
 router.post('/:id/admin-reset-password', protect, authorize('Owner'), adminResetPassword);
 
 module.exports = router;

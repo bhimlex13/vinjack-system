@@ -7,7 +7,8 @@ const { sendVerificationEmail } = require('../utils/emailService');
 const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
 
-// ... (createUserByAdmin remains unchanged, it already has logging)
+// ... (createUserByAdmin, loginUser, forceChangePassword, getMe, requestProfileUpdate, verifyOwnerUpdate, approveUserUpdate, rejectUserUpdate, getAllUsers, updateUser, deleteUser, generateToken, getUserDetails, adminResetPassword functions remain unchanged from the previous version you have)
+
 const createUserByAdmin = async (req, res) => {
   try {
     const { fullName, email, role } = req.body;
@@ -60,10 +61,10 @@ const loginUser = async (req, res) => {
           logAction(user, 'LOGIN_FAILED', `Login attempt failed: Account inactive for user '${username}'.`);
           return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
         }
-        
+
         // --- NEW: Log successful login ---
         logAction(user, 'LOGIN', `User '${username}' logged in successfully.`, { entityType: 'User', entityId: user._id });
-        
+
         res.json({
           _id: user._id,
           fullName: user.fullName,
@@ -89,7 +90,6 @@ const loginUser = async (req, res) => {
   }
 };
 
-// ... (forceChangePassword remains unchanged, it already has logging)
 const forceChangePassword = async (req, res) => {
     try {
         const { newPassword, confirmPassword } = req.body;
@@ -113,7 +113,6 @@ const forceChangePassword = async (req, res) => {
     }
 };
 
-// ... (getMe remains unchanged)
 const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -150,7 +149,7 @@ const requestProfileUpdate = async (req, res) => {
       }
       const salt = await bcrypt.genSalt(10);
       requestedChanges.password = await bcrypt.hash(newPassword, salt);
-      
+
       // --- NEW: Log password change request ---
       logAction(req.user, 'USER_PASSWORD_CHANGE', `User requested to change their password.`, { entityType: 'User', entityId: user._id });
     }
@@ -160,13 +159,13 @@ const requestProfileUpdate = async (req, res) => {
     if (user.role === 'Owner') {
       const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       user.verificationCode = verificationCode;
-      user.verificationCodeExpires = Date.now() + 5 * 60 * 1000;
+      user.verificationCodeExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
       user.pendingChanges = requestedChanges;
       await user.save();
       await sendVerificationEmail(user.email, verificationCode);
-      res.json({ 
+      res.json({
         message: 'Verification code sent to your email. Please check your inbox.',
-        requiresVerification: true 
+        requiresVerification: true
       });
     } else {
       await User.findByIdAndUpdate(req.user.id, {
@@ -194,7 +193,6 @@ const requestProfileUpdate = async (req, res) => {
   }
 };
 
-// ... (verifyOwnerUpdate remains unchanged)
 const verifyOwnerUpdate = async (req, res) => {
   try {
     const { code } = req.body;
@@ -223,11 +221,11 @@ const verifyOwnerUpdate = async (req, res) => {
 const approveUserUpdate = async (req, res) => {
   const io = req.app.get('socketio');
   try {
-    const user = await User.findById(req.params.id); 
+    const user = await User.findById(req.params.id);
     if (!user || !user.hasPendingChanges) {
       return res.status(400).json({ message: 'No pending changes found for this user.' });
     }
-    
+
     // --- NEW: Log action ---
     logAction(req.user, 'UPDATE_USER', `Approved profile changes for user ${user.username}.`, { entityType: 'User', entityId: user._id });
 
@@ -255,7 +253,6 @@ const approveUserUpdate = async (req, res) => {
   }
 };
 
-// ... (rejectUserUpdate remains unchanged, it already has logging)
 const rejectUserUpdate = async (req, res) => {
     const io = req.app.get('socketio');
     try {
@@ -284,7 +281,6 @@ const rejectUserUpdate = async (req, res) => {
     }
 };
 
-// ... (getAllUsers remains unchanged)
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({}).select('-password');
@@ -299,7 +295,7 @@ const updateUser = async (req, res) => {
     const { role, status } = req.body;
     const user = await User.findById(req.params.id);
     if (user) {
-      
+
       // --- NEW: Log action ---
       let details = [];
       if (role && user.role !== role) details.push(`role to '${role}'`);
@@ -308,7 +304,7 @@ const updateUser = async (req, res) => {
         logAction(req.user, 'UPDATE_USER', `Updated user ${user.fullName}'s ${details.join(' and ')}.`, { entityType: 'User', entityId: user._id });
       }
       // --- End Log ---
-      
+
       user.role = role || user.role;
       user.status = status || user.status;
       const updatedUser = await user.save();
@@ -328,7 +324,6 @@ const updateUser = async (req, res) => {
   }
 };
 
-// ... (deleteUser remains unchanged, it already has logging)
 const deleteUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -347,19 +342,41 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// ... (generateToken remains unchanged)
+// --- THIS IS THE LOGOUT FUNCTION ---
+const logoutUser = (req, res) => { // Renamed from just 'logout' to avoid conflict
+  try {
+    // --- NEW: Add logAction ---
+    // Note: req.user might not always be available depending on how logout is called.
+    // If it's a protected route, req.user will exist. If not, logAction handles null.
+    const userFullName = req.user ? req.user.fullName : 'Unknown User';
+    const userId = req.user ? req.user._id : null;
+    logAction(req.user, 'LOGOUT', `User '${userFullName}' logged out.`, { entityType: 'User', entityId: userId });
+    // --- END NEW ---
+
+    // The actual logout mechanism depends on your client-side implementation.
+    // Usually, the client just discards the token.
+    // Sending a success message is good practice.
+    res.status(200).json({ message: 'Logout successful' });
+
+  } catch (error) {
+    console.error("Error during logout:", error);
+    // Even if logging fails, try to send a response
+    res.status(500).json({ message: 'Server error during logout.' });
+  }
+};
+// --- END LOGOUT FUNCTION ---
+
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '7d',
   });
 };
 
-// ... (getUserDetails remains unchanged)
 const getUserDetails = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
     if (!user) {
-      return res.status(4404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'User not found' });
     }
     res.json(user);
   } catch (error) {
@@ -368,7 +385,6 @@ const getUserDetails = async (req, res) => {
   }
 };
 
-// ... (adminResetPassword remains unchanged, it already has logging)
 const adminResetPassword = async (req, res) => {
     try {
         const { adminPassword } = req.body;
@@ -401,7 +417,7 @@ const adminResetPassword = async (req, res) => {
         targetUser.password = temporaryPassword;
         targetUser.mustChangePassword = true;
         await targetUser.save();
-        
+
         // Step 4: Log the action
         logAction(req.user, 'ADMIN_RESET_PASSWORD', `Reset password for user ${targetUser.fullName}.`, { entityType: 'User', entityId: targetUser._id });
 
@@ -418,19 +434,20 @@ const adminResetPassword = async (req, res) => {
     }
 };
 
-
 module.exports = {
-  createUserByAdmin, 
+  createUserByAdmin,
   loginUser,
-  forceChangePassword, 
+  forceChangePassword,
   getMe,
   getAllUsers,
   updateUser,
   deleteUser,
-  requestProfileUpdate, 
+  requestProfileUpdate,
   verifyOwnerUpdate,
-  approveUserUpdate,    
+  approveUserUpdate,
   rejectUserUpdate,
   getUserDetails,
-  adminResetPassword // <-- 4. EXPORT THE NEW FUNCTION
+  adminResetPassword,
+  // --- NEW: Export the logout function ---
+  logoutUser
 };

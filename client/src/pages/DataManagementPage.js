@@ -1,23 +1,27 @@
 // client/src/pages/DataManagementPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react'; // Added useContext
 import api from '../api/axios';
 import { getServices, createService, updateService, deleteService } from '../api/serviceApi';
+import AuthContext from '../context/AuthContext'; // Added AuthContext
 
 // MUI Imports
 import {
   Box, Typography, Tabs, Tab, Button, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, TextField, IconButton, Switch, FormControlLabel,
-  Tooltip
+  Tooltip,
+  Divider // Added Divider
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download'; // Added Download Icon
 
 // Initial state for the form
 const emptyFormState = { name: '', description: '', charge: '', status: 'active' };
 
 const DataManagementPage = () => {
+  const { user } = useContext(AuthContext); // Get user from AuthContext
   const [activeTab, setActiveTab] = useState('categories');
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -26,6 +30,7 @@ const DataManagementPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formState, setFormState] = useState(emptyFormState);
+  const [isDownloading, setIsDownloading] = useState(false); // State for download button
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -76,7 +81,6 @@ const DataManagementPage = () => {
   };
 
   const handleFormChange = (e) => {
-    // --- 'type' variable removed from this line ---
     const { name, value, checked } = e.target;
     if (activeTab === 'services' && name === 'status') {
       setFormState(prev => ({ ...prev, status: checked ? 'active' : 'inactive' }));
@@ -116,7 +120,7 @@ const DataManagementPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this item?')) {
+    if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
       try {
         switch (activeTab) {
           case 'categories':
@@ -133,10 +137,50 @@ const DataManagementPage = () => {
         }
         fetchData();
       } catch (error) {
-        alert(`Failed to delete: ${error.response?.data?.message || 'Server error'}`);
+        alert(`Failed to delete: ${error.response?.data?.message || 'Item might be in use.'}`);
       }
     }
   };
+
+  // --- NEW: Function to handle backup download ---
+  const handleDownloadBackup = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await api.get('/settings/backup/create', {
+        responseType: 'blob', // Important for file downloads
+      });
+
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Extract filename from content-disposition header
+      const contentDisposition = response.headers['content-disposition'];
+      let fileName = 'vinjack-backup.json'; // Default filename
+      if (contentDisposition) {
+        const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (fileNameMatch && fileNameMatch.length === 2) {
+          fileName = fileNameMatch[1];
+        }
+      }
+
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error("Backup failed:", error);
+      alert('Failed to download backup. Check server logs for details.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+  // --- END NEW ---
 
   const renderTable = () => {
     const data = { categories, brands, services }[activeTab];
@@ -189,29 +233,54 @@ const DataManagementPage = () => {
         Data Management
       </Typography>
 
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange}>
+      <Paper sx={{ mb: 3 }}>
+        <Tabs value={activeTab} onChange={handleTabChange} centered>
           <Tab label="Categories" value="categories" />
           <Tab label="Brands" value="brands" />
           <Tab label="Services" value="services" />
         </Tabs>
-      </Box>
 
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => openModal()}>
-          Add New {{ categories: 'Category', brands: 'Brand', services: 'Service' }[activeTab]}
-        </Button>
-      </Box>
+        <Box sx={{ p: 2 }}>
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => openModal()}>
+              Add New {{ categories: 'Category', brands: 'Brand', services: 'Service' }[activeTab]}
+            </Button>
+          </Box>
 
-      {isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>
-      ) : renderTable()}
+          {isLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>
+          ) : renderTable()}
+        </Box>
+      </Paper>
+
+      {/* --- NEW: Backup Section (Owner Only) --- */}
+      {user?.role === 'Owner' && (
+        <Paper sx={{ p: 3, mt: 4 }}>
+          <Typography variant="h6" gutterBottom>Backup & Export</Typography>
+          <Divider sx={{ mb: 2 }}/>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Download a full backup of the system data (Products, Sales, Customers, etc.) as a JSON file.
+            Store this file securely offline.
+          </Typography>
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={isDownloading ? <CircularProgress size={20} color="inherit" /> : <DownloadIcon />}
+            onClick={handleDownloadBackup}
+            disabled={isDownloading}
+          >
+            {isDownloading ? 'Generating Backup...' : 'Download Full Backup'}
+          </Button>
+        </Paper>
+      )}
+      {/* --- END NEW --- */}
+
 
       {/* Add/Edit Modal */}
       <Dialog open={isModalOpen} onClose={closeModal} fullWidth maxWidth="sm">
         <DialogTitle>{getModalTitle()}</DialogTitle>
         <DialogContent>
-          <TextField autoFocus margin="dense" label="Name" type="text" fullWidth variant="outlined"
+          <TextField autoFocus required margin="dense" label="Name" type="text" fullWidth variant="outlined"
             name="name" value={formState.name} onChange={handleFormChange}
           />
           {activeTab === 'services' && (
@@ -221,6 +290,7 @@ const DataManagementPage = () => {
               />
               <TextField margin="dense" label="Charge (₱)" type="number" fullWidth variant="outlined"
                 name="charge" value={formState.charge} onChange={handleFormChange}
+                InputProps={{ inputProps: { min: 0, step: "0.01" } }} // Added input props
               />
               <FormControlLabel
                 control={<Switch checked={formState.status === 'active'} onChange={handleFormChange} name="status" />}
