@@ -2,13 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import ReceiptModal from '../components/ReceiptModal';
+import UploadReceiptModal from '../components/UploadReceiptModal';
+import ImageViewModal from '../components/ImageViewModal';
 
 // MUI Imports
 import {
   Box, Button, Typography, Paper, Container, Grid, TextField, FormControl,
-  InputLabel, Select, MenuItem, Alert, CircularProgress
+  InputLabel, Select, MenuItem, Alert, CircularProgress,
+  IconButton, Tooltip
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ImageIcon from '@mui/icons-material/Image';
 
 const TransactionsPage = () => {
   const today = new Date().toISOString().split('T')[0];
@@ -17,15 +23,19 @@ const TransactionsPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedSale, setSelectedSale] = useState(null);
+  const [uploadSaleId, setUploadSaleId] = useState(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isImageViewOpen, setIsImageViewOpen] = useState(false);
+  const [imageViewUrl, setImageViewUrl] = useState('');
 
   // State for filters
   const [customers, setCustomers] = useState([]);
   const [users, setUsers] = useState([]);
-  const [startDate, setStartDate] = useState(today); // --- Set initial start date to today ---
-  const [endDate, setEndDate] = useState(today);   // --- Set initial end date to today ---
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterUser, setFilterUser] = useState('');
-  
+
   // Fetch data for filter dropdowns
   useEffect(() => {
     const fetchFilterData = async () => {
@@ -35,7 +45,7 @@ const TransactionsPage = () => {
           api.get('/users')
         ]);
         setCustomers(customersRes.data);
-        setUsers(usersRes.data);
+        setUsers(usersRes.data.filter(u => u.status === 'active'));
       } catch (err) {
         console.error("Failed to fetch filter data", err);
         setError("Could not load filter options.");
@@ -44,18 +54,17 @@ const TransactionsPage = () => {
     fetchFilterData();
   }, []);
 
-  // --- Fetch today's sales on initial page load ---
+  // Fetch sales based on initial date range
   useEffect(() => {
     handleGenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []); // Run only on mount
 
   const handleGenerate = async () => {
     setIsLoading(true);
     setError('');
     try {
       const params = new URLSearchParams();
-      // Use today's date if the fields are cleared, otherwise use the selected dates
       const sDate = startDate || today;
       const eDate = endDate || today;
 
@@ -64,43 +73,117 @@ const TransactionsPage = () => {
       if (filterCustomer) params.append('customerId', filterCustomer);
       if (filterUser) params.append('userId', filterUser);
 
-      const response = await api.get(`/reports/sales?${params.toString()}`);
-      setSales(response.data);
+      const response = await api.get(`/sales/search?${params.toString()}`);
+      // Log received data for debugging
+      // console.log("Fetched Sales Data:", response.data);
+      setSales(response.data || []);
     } catch (err) {
       setError('Failed to fetch transaction data.');
       console.error(err);
+      setSales([]);
     } finally {
       setIsLoading(false);
     }
   };
 
+
+  const handleOpenUploadModal = (saleId) => {
+    setUploadSaleId(saleId);
+    setIsUploadModalOpen(true);
+  };
+
+  const handleUploadSuccess = (updatedSale) => {
+    setSales(prevSales =>
+        prevSales.map(sale =>
+            sale._id === updatedSale._id ? updatedSale : sale
+        )
+    );
+    if (selectedSale && selectedSale._id === updatedSale._id) {
+        setSelectedSale(updatedSale);
+    }
+    if (isImageViewOpen && uploadSaleId === updatedSale._id) {
+        const imageBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        setImageViewUrl(updatedSale.customerReceiptImage ? `${imageBaseUrl}${updatedSale.customerReceiptImage}` : '');
+    }
+  };
+
+  const handleOpenImageView = (imageUrl) => {
+    if (!imageUrl) return;
+    const imageBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    setImageViewUrl(`${imageBaseUrl}${imageUrl}`);
+    setIsImageViewOpen(true);
+  };
+
   const columns = [
     {
-      field: 'createdAt', headerName: 'Date', flex: 1, minWidth: 200,
-      renderCell: (params) => new Date(params.value).toLocaleString('en-US', {
-        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-      }),
+      field: 'createdAt', headerName: 'Date', width: 170,
+      renderCell: (params) => params?.value ? new Date(params.value).toLocaleString('en-US', { // Safer access
+        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
+      }) : 'N/A',
     },
-    { field: '_id', headerName: 'Sale ID', flex: 1, minWidth: 220 },
+    { field: '_id', headerName: 'Sale ID', width: 220 },
     {
-      field: 'customer', headerName: 'Customer', flex: 1, minWidth: 180,
-      renderCell: (params) => params.row.customer?.name || 'Walk-in'
-    },
-    {
-      field: 'recordedBy', headerName: 'Cashier', flex: 1, minWidth: 180,
-      renderCell: (params) => params.row.recordedBy?.fullName || 'N/A'
+      field: 'customer', headerName: 'Customer', width: 180,
+      // --- MODIFIED: Added check for params ---
+      valueGetter: (params) => params?.row?.customer?.name || 'Walk-in'
     },
     {
-      field: 'totalAmount', headerName: 'Total Amount', flex: 1, minWidth: 150, type: 'number', align: 'right', headerAlign: 'right',
-      renderCell: (params) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(params.row.totalAmount),
+      field: 'recordedBy', headerName: 'Cashier', width: 180,
+      // --- MODIFIED: Added check for params ---
+      valueGetter: (params) => params?.row?.recordedBy?.fullName || 'N/A'
     },
     {
-      field: 'actions', headerName: 'Actions', width: 150, sortable: false, align: 'center', headerAlign: 'center',
-      renderCell: (params) => (
-        <Button variant="outlined" size="small" onClick={() => setSelectedSale(params.row)}>
-          View Receipt
-        </Button>
-      )
+      field: 'totalAmount', headerName: 'Total Amount', width: 150, type: 'number', align: 'right', headerAlign: 'right',
+      // --- MODIFIED: Added check for params.value ---
+      renderCell: (params) => params?.value != null ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(params.value) : 'N/A',
+      // Also add a safe valueGetter for sorting/filtering
+      valueGetter: (params) => params?.row?.totalAmount ?? 0,
+    },
+    {
+      field: 'actions', headerName: 'Actions', width: 200, sortable: false, align: 'center', headerAlign: 'center',
+      renderCell: (params) => {
+        // --- MODIFIED: Ensure params.row exists before rendering actions ---
+        if (!params?.row) {
+          return null; // Or some placeholder/loading state
+        }
+        return (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Tooltip title="View Details">
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setSelectedSale(params.row)}
+                sx={{ mr: 0.5 }}
+              >
+                View
+              </Button>
+            </Tooltip>
+            <Tooltip title={params.row.customerReceiptImage ? "Replace Receipt Image" : "Upload Receipt Image"}>
+              <span>
+                  <IconButton
+                      size="small"
+                      color="secondary"
+                      onClick={() => handleOpenUploadModal(params.row._id)}
+                  >
+                     <FileUploadIcon />
+                  </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="View Uploaded Receipt">
+              <span>
+                <IconButton
+                  size="small"
+                  color="info"
+                  onClick={() => handleOpenImageView(params.row.customerReceiptImage)}
+                  disabled={!params.row.customerReceiptImage}
+                >
+                    <ImageIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        );
+      }
     }
   ];
 
@@ -146,9 +229,9 @@ const TransactionsPage = () => {
           </Grid>
         </Grid>
       </Paper>
-      
+
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      
+
       <Paper sx={{ height: '70vh', width: '100%' }}>
         <DataGrid
           rows={sales}
@@ -156,15 +239,36 @@ const TransactionsPage = () => {
           loading={isLoading}
           getRowId={(row) => row._id}
           initialState={{ sorting: { sortModel: [{ field: 'createdAt', sort: 'desc' }] } }}
+          density="compact"
         />
       </Paper>
 
+      {/* Receipt Modal */}
       {selectedSale && (
         <ReceiptModal
           saleData={selectedSale}
           onClose={() => setSelectedSale(null)}
+          onViewImage={handleOpenImageView}
         />
       )}
+
+      {/* Upload Receipt Modal */}
+      {isUploadModalOpen && (
+        <UploadReceiptModal
+          open={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          saleId={uploadSaleId}
+          onUploadSuccess={handleUploadSuccess}
+        />
+      )}
+
+      {/* Image View Modal */}
+      <ImageViewModal
+        open={isImageViewOpen}
+        onClose={() => setIsImageViewOpen(false)}
+        imageUrl={imageViewUrl}
+      />
+
     </Container>
   );
 };

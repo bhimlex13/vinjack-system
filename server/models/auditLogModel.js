@@ -25,11 +25,9 @@ const auditLogSchema = new mongoose.Schema({
       'CREATE_PO', 'UPDATE_PO', 'CANCEL_PO',
       'STOCK_ADJUSTMENT',
       'ADMIN_RESET_PASSWORD',
-      'SYNC_STOCK_STATUS', // From productController
-      
-      // --- NEWLY ADDED ---
-      'APPROVE_PO', // From purchaseOrderController
-      'RECEIVE_PO_STOCK', // From purchaseOrderController
+      'SYNC_STOCK_STATUS',
+      'APPROVE_PO',
+      'RECEIVE_PO_STOCK',
       'LOGIN', 'LOGOUT', 'LOGIN_FAILED',
       'UPDATE_USER',
       'USER_PASSWORD_CHANGE',
@@ -37,7 +35,11 @@ const auditLogSchema = new mongoose.Schema({
       'CREATE_BRAND', 'UPDATE_BRAND', 'DELETE_BRAND',
       'CREATE_MOTORCYCLE', 'UPDATE_MOTORCYCLE', 'DELETE_MOTORCYCLE',
       'UPDATE_APP_SETTINGS',
-      'DATA_EXPORT', 'DATA_CLEANUP'
+      'DATA_EXPORT', 'DATA_CLEANUP',
+
+      // --- NEWLY ADDED ---
+      'UPLOAD_SALE_RECEIPT' // For customer receipt uploads
+
     ]
   },
   details: {
