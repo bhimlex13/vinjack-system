@@ -5,7 +5,9 @@ import AuthContext from '../context/AuthContext';
 
 // MUI Imports
 import {
-  AppBar as MuiAppBar, Toolbar, IconButton, Typography, Box, Badge, Menu, MenuItem, Tooltip, Divider
+  AppBar as MuiAppBar, Toolbar, IconButton, Typography, Box, Badge, Menu, MenuItem, Tooltip, Divider,
+  // --- NEW: Import Avatar ---
+  Avatar
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -127,8 +129,27 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
                 handleNotificationsClose();
                 if(notif.link) navigate(notif.link);
               }}
-              sx={{ whiteSpace: 'normal', fontWeight: !notif.isRead ? 'bold' : 'normal' }}
+              // --- MODIFIED: Added display: flex to align items ---
+              sx={{ 
+                whiteSpace: 'normal', 
+                fontWeight: !notif.isRead ? 'bold' : 'normal',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                py: 1.5,
+              }}
             >
+              {/* --- NEW: Add Avatar if image exists --- */}
+              {notif.image && (
+                <Avatar 
+                  variant="rounded"
+                  src={notif.image} 
+                  alt="Product"
+                  sx={{ width: 48, height: 48, flexShrink: 0 }}
+                />
+              )}
+              {/* --- END NEW --- */}
+
               <Box>
                 <Typography variant="body2">{notif.message}</Typography>
                 <Typography variant="caption" color="text.secondary">

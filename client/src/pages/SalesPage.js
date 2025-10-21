@@ -27,6 +27,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import DesignServicesIcon from '@mui/icons-material/DesignServices';
+// --- NEW: Import Clear Cart Icon ---
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { FaUserTag } from 'react-icons/fa';
 
 const getInitialCartState = () => {
@@ -298,6 +300,39 @@ const SalesPage = () => {
     }, 0);
   }, [cartItems]);
 
+  // --- NEW: Function to clear the entire cart ---
+  const handleClearCart = async () => {
+    if (cartItems.length === 0) return;
+
+    const isConfirmed = await confirm("Are you sure you want to clear the entire cart? This action cannot be undone.");
+    
+    if (isConfirmed) {
+      // Restore quantities to the main product list
+      setProducts(prevProducts => {
+        const productsToRestore = cartItems.filter(item => item.type === 'product');
+        if (productsToRestore.length === 0) return prevProducts;
+
+        return prevProducts.map(p => {
+          const itemInCart = productsToRestore.find(item => item._id === p._id);
+          if (itemInCart) {
+            return { ...p, quantity: p.quantity + itemInCart.cartQuantity };
+          }
+          return p;
+        });
+      });
+
+      // Clear all cart-related state
+      setCartItems([]);
+      setSelectedCustomer(null);
+      setSelectedMotorcycle(null);
+      setCustomerMotorcycles([]);
+      
+      // Clear localStorage
+      localStorage.removeItem('salesCart');
+    }
+  };
+  // --- END NEW ---
+
   const handleCompleteSale = async () => {
     if (cartItems.length === 0) return;
 
@@ -408,7 +443,36 @@ const SalesPage = () => {
             )}
           </Box>
           <Divider sx={{ mb: 1 }} />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale</Typography><Button variant="outlined" size="small" startIcon={<DesignServicesIcon />} onClick={() => setIsServiceModalOpen(true)}>Add Service</Button></Box>
+          {/* --- MODIFIED: Wrapped buttons in a Stack for alignment --- */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+              <ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale
+            </Typography>
+            
+            <Stack direction="row" spacing={1}>
+              {/* --- NEW: Clear Cart Button --- */}
+              <Button 
+                variant="outlined" 
+                color="error" 
+                size="small" 
+                startIcon={<DeleteSweepIcon />} 
+                onClick={handleClearCart}
+                disabled={cartItems.length === 0}
+              >
+                Clear
+              </Button>
+              {/* --- END NEW --- */}
+              <Button 
+                variant="outlined" 
+                size="small" 
+                startIcon={<DesignServicesIcon />} 
+                onClick={() => setIsServiceModalOpen(true)}
+              >
+                Add Service
+              </Button>
+            </Stack>
+          </Box>
+          {/* --- END MODIFICATION --- */}
           <Divider sx={{ mb: 1 }} />
           <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
             {cartItems.length === 0 ? (<Typography color="text.secondary" align="center" sx={{ mt: 4 }}>Cart is empty</Typography>) : (

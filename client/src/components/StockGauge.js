@@ -5,8 +5,9 @@ import { Box, Typography, LinearProgress, Tooltip } from '@mui/material';
 // Function to determine the color of the progress bar
 const getStatusColor = (status) => {
   switch (status) {
+    // --- MODIFIED: Changed to 'inherit' (grey) ---
     case 'Out of Stock':
-      return 'error';
+      return 'inherit';
     case 'Critical':
       return 'error';
     case 'Low':
@@ -20,18 +21,20 @@ const getStatusColor = (status) => {
 const StockGauge = ({ quantity, maxStock, stockStatus }) => {
   // Ensure maxStock is a valid number > 0 for calculation
   const safeMaxStock = Math.max(1, maxStock || 1);
-  let percentage = Math.floor((quantity / safeMaxStock) * 100);
   
-  // Handle edge cases
+  // --- NEW: Logic to prevent 0% if stock exists ---
+  const rawPercentage = (quantity / safeMaxStock) * 100;
+  let percentage = Math.round(rawPercentage);
+  
+  // If quantity is > 0 but rounding made it 0, force it to 1%
   if (quantity > 0 && percentage === 0) {
-    percentage = 1; // Show a sliver of progress if not actually 0
-  }
-  if (quantity > maxStock) {
-    percentage = 100; // Cap at 100%
+    percentage = 1;
   }
 
   const color = getStatusColor(stockStatus);
   const statusText = stockStatus || 'N/A'; // Fallback text
+  
+  const progressBarValue = Math.min(percentage, 100);
 
   return (
     <Tooltip title={`${quantity} / ${safeMaxStock} units`} arrow>
@@ -40,7 +43,11 @@ const StockGauge = ({ quantity, maxStock, stockStatus }) => {
           <Typography 
             variant="body2" 
             component="span" 
-            sx={{ fontWeight: 'bold', color: `${color}.main` }}
+            // --- MODIFIED: Use 'text.secondary' (grey) if color is 'inherit' ---
+            sx={{ 
+              fontWeight: 'bold', 
+              color: color === 'inherit' ? 'text.secondary' : `${color}.main` 
+            }}
           >
             {statusText}
           </Typography>
@@ -50,8 +57,8 @@ const StockGauge = ({ quantity, maxStock, stockStatus }) => {
         </Box>
         <LinearProgress
           variant="determinate"
-          value={percentage}
-          color={color}
+          value={progressBarValue} // The bar itself stops at 100
+          color={color} // 'inherit' will result in a grey bar
           sx={{ height: 6, borderRadius: 5 }}
         />
       </Box>

@@ -20,8 +20,9 @@ const productSchema = new mongoose.Schema({
   stockStatus: {
     type: String,
     enum: ['Healthy', 'Low', 'Critical', 'Out of Stock'],
-    default: 'Out of Stock' // Defaulting to this as quantity defaults to 0
+    default: 'Out of Stock' 
   },
+  
   // --- NEW FIELDS END ---
 
   unit: { type: String, default: 'pc' }, 
