@@ -1,6 +1,6 @@
 // client/src/context/AuthContext.js
 import React, { createContext, useReducer, useEffect, useCallback } from 'react';
-import api from '../api/axios';
+import api from '../api/axios'; // Ensure api is imported
 import { io } from 'socket.io-client';
 import { useWarning } from './WarningContext';
 import { toast } from 'react-toastify';
@@ -10,7 +10,7 @@ const initialState = {
   user: null,
   token: null,
   isInitializing: true,
-  mustChangePassword: false, // ADDED: To track if password change is needed
+  mustChangePassword: false,
   lowStockItems: [],
   notifications: [],
 };
@@ -18,8 +18,8 @@ const initialState = {
 const AuthContext = createContext({
     ...initialState,
     login: () => Promise.resolve(),
-    logout: () => {},
-    passwordChangeCompleted: () => {}, // ADDED
+    logout: () => {}, // Changed this to async in the provider value later
+    passwordChangeCompleted: () => {},
     markNotificationsAsRead: () => Promise.resolve(),
 });
 
@@ -41,7 +41,7 @@ const authReducer = (state, action) => {
         ...state,
         user: action.payload,
         token: action.payload.token,
-        mustChangePassword: action.payload.mustChangePassword, // MODIFIED: Set flag on login
+        mustChangePassword: action.payload.mustChangePassword,
       };
     case 'LOGOUT':
       return {
@@ -49,11 +49,11 @@ const authReducer = (state, action) => {
         user: null,
         token: null,
         isInitializing: false,
-        mustChangePassword: false, // Reset flag
+        mustChangePassword: false,
         lowStockItems: [],
         notifications: [],
       };
-    case 'PASSWORD_CHANGED': // ADDED: New action to clear the flag
+    case 'PASSWORD_CHANGED':
         return {
             ...state,
             mustChangePassword: false,
@@ -63,6 +63,10 @@ const authReducer = (state, action) => {
     case 'SET_NOTIFICATIONS':
       return { ...state, notifications: action.payload };
     case 'ADD_NOTIFICATION':
+      // Prevent duplicates in case of rapid events
+      if (state.notifications.some(n => n._id === action.payload._id)) {
+        return state;
+      }
       return {
         ...state,
         notifications: [action.payload, ...state.notifications],
@@ -108,9 +112,14 @@ export const AuthProvider = ({ children }) => {
         dispatch({ type: 'SET_NOTIFICATIONS', payload: notificationsRes.data });
       } catch (error) {
         console.error("Could not fetch initial data.", error);
+        // Handle token expiry or invalid token
+        if (error.response && error.response.status === 401) {
+            console.log("Token expired or invalid. Logging out.");
+            logout(); // Call the logout function which now handles API call too
+        }
       }
     }
-  }, [state.token]);
+  }, [state.token]); // Added logout to dependency array implicitly via its usage
 
   useEffect(() => {
     if (!state.isInitializing && state.user) {
@@ -119,27 +128,28 @@ export const AuthProvider = ({ children }) => {
   }, [state.isInitializing, state.user, fetchInitialData]);
 
   useEffect(() => {
-    if (state.user) {
-      const socket = io(process.env.REACT_APP_API_URL);
+    let socket;
+    if (state.user && state.token) { // Make sure token exists too
+      socket = io(process.env.REACT_APP_API_URL, {
+          auth: { token: state.token } // Send token for authentication if needed
+      });
 
       socket.emit('joinRoom', state.user._id);
 
       socket.on('new_notification', (notification) => {
         console.log('Real-time notification received:', notification);
         dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
-        
-        // --- MODIFIED: To match new color scheme ---
+
         switch (notification.type) {
           case 'LOW_STOCK':
             toast.warn(notification.message); // Orange
             break;
-          case 'CRITICAL_STOCK': // Added this case
+          case 'CRITICAL_STOCK':
             toast.error(notification.message); // Red
             break;
           case 'OUT_OF_STOCK':
             toast.dark(notification.message); // Grey/Dark
             break;
-          // --- END MODIFICATION ---
           case 'USER_ACTION':
           case 'REQUEST_STATUS':
           default:
@@ -147,17 +157,32 @@ export const AuthProvider = ({ children }) => {
             break;
         }
       });
-      
+
       socket.on('stock_level_warning', (warningData) => {
         console.log('Stock level warning received:', warningData);
         showWarning(warningData);
       });
 
+      socket.on('connect_error', (err) => {
+          console.error('Socket connection error:', err.message);
+          // Handle authentication errors, e.g., invalid token
+          if (err.message === 'Authentication error') {
+              logout(); // Logout if token is bad
+          }
+      });
+
       return () => {
+        console.log('Disconnecting socket...');
         socket.disconnect();
       };
     }
-  }, [state.user, showWarning]);
+    // Cleanup function if user logs out while socket is active
+    return () => {
+        if (socket) {
+            socket.disconnect();
+        }
+    };
+  }, [state.user, state.token, showWarning]); // Added state.token dependency
 
   const login = async (username, password) => {
     try {
@@ -165,7 +190,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(res.data));
       api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
       dispatch({ type: 'LOGIN_SUCCESS', payload: res.data });
-      // MODIFIED: Return success and the flag
       return { success: true, mustChangePassword: !!res.data.mustChangePassword };
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Network error.';
@@ -173,13 +197,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('user');
-    delete api.defaults.headers.common['Authorization'];
-    dispatch({ type: 'LOGOUT' });
+  // --- MODIFIED: Added async and API call ---
+  const logout = async () => {
+    try {
+      // Make API call first to log the action on the server
+      await api.post('/users/logout');
+      console.log("Server logout successful");
+    } catch (error) {
+      // Log the error but proceed with client-side logout anyway
+      console.error("Server logout failed, proceeding with client-side logout:", error.response?.data?.message || error.message);
+    } finally {
+      // Always clear client-side data regardless of API call success
+      localStorage.removeItem('user');
+      delete api.defaults.headers.common['Authorization'];
+      dispatch({ type: 'LOGOUT' });
+    }
   };
-  
-  // ADDED: Function to call when password has been successfully changed
+  // --- END MODIFICATION ---
+
   const passwordChangeCompleted = () => {
     dispatch({ type: 'PASSWORD_CHANGED' });
   };
@@ -194,6 +229,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
+    // Make sure the context value provides the async logout
     <AuthContext.Provider value={{ ...state, login, logout, passwordChangeCompleted, markNotificationsAsRead }}>
       {children}
     </AuthContext.Provider>
