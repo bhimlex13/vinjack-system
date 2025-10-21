@@ -3,6 +3,8 @@ const Motorcycle = require('../models/motorcycleModel');
 const Customer = require('../models/customerModel');
 const Sale = require('../models/saleModel');
 const mongoose = require('mongoose');
+// --- NEW: Import logger ---
+const logAction = require('../utils/logger');
 
 const getDuplicateKeyErrorMessage = (err) => {
     let message = 'A motorcycle with this value already exists.';
@@ -70,6 +72,14 @@ const createMotorcycle = async (req, res) => {
 
     await session.commitTransaction();
 
+    // --- NEW: Log action ---
+    logAction(
+      req.user, 
+      'CREATE_MOTORCYCLE', 
+      `Created motorcycle: ${savedMotorcycle.make} ${savedMotorcycle.model} (${savedMotorcycle.plateNumber || 'No Plate'}) for customer ${customer.name}.`, 
+      { entityType: 'Motorcycle', entityId: savedMotorcycle._id }
+    );
+
     // --- ADDED: Emit a real-time event to all clients ---
     const io = req.app.get('socketio');
     io.emit('motorcycle_added', savedMotorcycle);
@@ -122,6 +132,15 @@ const updateMotorcycle = async (req, res) => {
     if (!motorcycle) {
       return res.status(404).json({ message: 'Motorcycle not found' });
     }
+
+    // --- NEW: Log action ---
+    logAction(
+      req.user, 
+      'UPDATE_MOTORCYCLE', 
+      `Updated motorcycle: ${motorcycle.make} ${motorcycle.model} (${motorcycle.plateNumber || 'No Plate'}).`, 
+      { entityType: 'Motorcycle', entityId: motorcycle._id }
+    );
+
     res.json(motorcycle);
   } catch (error) {
     let errorMessage = 'Error updating motorcycle';
@@ -152,10 +171,18 @@ const deleteMotorcycle = async (req, res) => {
     await Customer.findByIdAndUpdate(motorcycle.owner, {
       $pull: { motorcycles: motorcycle._id }
     }).session(session);
+    
+    // --- NEW: Store details before deleting ---
+    const details = `Deleted motorcycle: ${motorcycle.make} ${motorcycle.model} (${motorcycle.plateNumber || 'No Plate'}).`;
+    const entityId = motorcycle._id;
 
     await motorcycle.deleteOne({ session });
 
     await session.commitTransaction();
+    
+    // --- NEW: Log action after successful transaction ---
+    logAction(req.user, 'DELETE_MOTORCYCLE', details, { entityType: 'Motorcycle', entityId });
+
     res.json({ message: 'Motorcycle removed successfully.' });
 
   } catch (error) {
