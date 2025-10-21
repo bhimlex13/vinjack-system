@@ -11,6 +11,7 @@ const auditLogSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: [
+      // --- EXISTING ---
       'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT',
       'PROCESS_SALE',
       'PROCESS_RETURN',
@@ -18,13 +19,25 @@ const auditLogSchema = new mongoose.Schema({
       'CREATE_CUSTOMER', 'UPDATE_CUSTOMER', 'DELETE_CUSTOMER',
       'RECORD_DELIVERY',
       'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
-      'CREATE_USER',
-      'DELETE_USER',
+      'CREATE_USER', 'DELETE_USER',
       'FORCE_PASSWORD_CHANGE',
       'REJECT_PROFILE_UPDATE',
-      'CREATE_PO', 'UPDATE_PO', 'RECEIVE_PO', 'CANCEL_PO',
+      'CREATE_PO', 'UPDATE_PO', 'CANCEL_PO',
       'STOCK_ADJUSTMENT',
-      'ADMIN_RESET_PASSWORD'
+      'ADMIN_RESET_PASSWORD',
+      'SYNC_STOCK_STATUS', // From productController
+      
+      // --- NEWLY ADDED ---
+      'APPROVE_PO', // From purchaseOrderController
+      'RECEIVE_PO_STOCK', // From purchaseOrderController
+      'LOGIN', 'LOGOUT', 'LOGIN_FAILED',
+      'UPDATE_USER',
+      'USER_PASSWORD_CHANGE',
+      'CREATE_CATEGORY', 'UPDATE_CATEGORY', 'DELETE_CATEGORY',
+      'CREATE_BRAND', 'UPDATE_BRAND', 'DELETE_BRAND',
+      'CREATE_MOTORCYCLE', 'UPDATE_MOTORCYCLE', 'DELETE_MOTORCYCLE',
+      'UPDATE_APP_SETTINGS',
+      'DATA_EXPORT', 'DATA_CLEANUP'
     ]
   },
   details: {

@@ -6,6 +6,8 @@ import api from '../api/axios';
 import ReceiptModal from '../components/ReceiptModal';
 import ReturnDetailsModal from '../components/ReturnDetailsModal';
 import UserDetailsModal from '../components/UserDetailsModal';
+// --- NEW: Import the Purchase Order modal ---
+import PurchaseOrderDetailModal from '../components/PurchaseOrderDetailModal';
 
 // MUI Imports
 import {
@@ -32,11 +34,35 @@ const AuditLogPage = () => {
   // Data for filter dropdowns
   const [users, setUsers] = useState([]);
   const actionTypes = [
-    'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT', 'PROCESS_SALE', 'PROCESS_RETURN',
-    'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER', 'CREATE_CUSTOMER', 'UPDATE_CUSTOMER',
-    'DELETE_CUSTOMER', 'RECORD_DELIVERY', 'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
-    'CREATE_USER', 'DELETE_USER', 'FORCE_PASSWORD_CHANGE', 'REJECT_PROFILE_UPDATE',
-    'CREATE_PO', 'UPDATE_PO', 'RECEIVE_PO', 'CANCEL_PO', 'STOCK_ADJUSTMENT'
+    // Product
+    'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT',
+    // Sale & Return
+    'PROCESS_SALE', 'PROCESS_RETURN',
+    // Supplier
+    'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER',
+    // Customer
+    'CREATE_CUSTOMER', 'UPDATE_CUSTOMER', 'DELETE_CUSTOMER',
+    // Delivery
+    'RECORD_DELIVERY',
+    // Service
+    'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
+    // User
+    'CREATE_USER', 'UPDATE_USER', 'DELETE_USER',
+    'LOGIN', 'LOGOUT', 'LOGIN_FAILED',
+    'ADMIN_RESET_PASSWORD', 'USER_PASSWORD_CHANGE', 'FORCE_PASSWORD_CHANGE',
+    'REJECT_PROFILE_UPDATE',
+    // PO
+    'CREATE_PO', 'UPDATE_PO', 'RECEIVE_PO_STOCK', 'CANCEL_PO', 'APPROVE_PO',
+    // Inventory
+    'STOCK_ADJUSTMENT', 'SYNC_STOCK_STATUS',
+    // Category
+    'CREATE_CATEGORY', 'UPDATE_CATEGORY', 'DELETE_CATEGORY',
+    // Brand
+    'CREATE_BRAND', 'UPDATE_BRAND', 'DELETE_BRAND',
+    // Motorcycle
+    'CREATE_MOTORCYCLE', 'UPDATE_MOTORCYCLE', 'DELETE_MOTORCYCLE',
+    // System
+    'UPDATE_APP_SETTINGS', 'DATA_EXPORT', 'DATA_CLEANUP'
   ];
 
   // State for viewing details modal
@@ -90,30 +116,27 @@ const AuditLogPage = () => {
   useEffect(() => {
     if (!selectedLog) return;
 
-    if (!selectedLog.entityType || !selectedLog.entityId) {
+    // Define endpoints for *special* modals
+    const entityEndpoints = {
+      'Sale': `/sales/${selectedLog.entityId}`,
+      'Return': `/returns/${selectedLog.entityId}`,
+      'User': `/users/details/${selectedLog.entityId}`,
+      'PurchaseOrder': `/purchase-orders/${selectedLog.entityId}`,
+    };
+
+    const endpoint = entityEndpoints[selectedLog.entityType];
+
+    // If no entityId OR it's not a type with a special modal, just show generic details.
+    if (!selectedLog.entityType || !selectedLog.entityId || !endpoint) {
       setDetailData({ genericDetails: selectedLog.details });
       return;
     }
     
+    // It IS a special type, so fetch its details
     const fetchDetails = async () => {
       setIsDetailLoading(true);
       setDetailError('');
       setDetailData(null);
-
-      const entityEndpoints = {
-        'Sale': `/sales/${selectedLog.entityId}`,
-        'Return': `/returns/${selectedLog.entityId}`,
-        'User': `/users/details/${selectedLog.entityId}`,
-        'PurchaseOrder': `/purchase-orders/${selectedLog.entityId}`,
-      };
-
-      const endpoint = entityEndpoints[selectedLog.entityType];
-
-      if (!endpoint) {
-        setDetailError(`No detailed view is configured for type: ${selectedLog.entityType}`);
-        setIsDetailLoading(false);
-        return;
-      }
 
       try {
         const response = await api.get(endpoint);
@@ -164,7 +187,7 @@ const AuditLogPage = () => {
     if (action.includes('DELETE') || action.includes('CANCEL') || action.includes('REJECT')) {
       return { ...baseStyles, backgroundColor: '#ffebee', color: '#c62828' }; // Light Red
     }
-    if (action.includes('CREATE')) {
+    if (action.includes('CREATE') || action.includes('LOGIN')) { 
       return { ...baseStyles, backgroundColor: '#e3f2fd', color: '#1565c0' }; // Light Blue
     }
     if (action.includes('SALE') || action.includes('RECEIVE')) {
@@ -173,8 +196,11 @@ const AuditLogPage = () => {
     if (action.includes('RETURN') || action.includes('ADJUSTMENT')) {
       return { ...baseStyles, backgroundColor: '#fff8e1', color: '#ff8f00' }; // Light Amber
     }
-    if (action.includes('UPDATE') || action.includes('CHANGE')) {
+    if (action.includes('UPDATE') || action.includes('CHANGE') || action.includes('APPROVE') || action.includes('SYNC')) {
       return { ...baseStyles, backgroundColor: '#e0f7fa', color: '#00838f' }; // Light Cyan
+    }
+    if (action.includes('FAILED') || action.includes('LOGOUT')) { 
+      return { ...baseStyles, backgroundColor: '#fbe9e7', color: '#d84315' }; // Light Deep Orange
     }
     return { ...baseStyles, backgroundColor: '#f5f5f5', color: '#424242' }; // Light Grey
   };
@@ -210,13 +236,27 @@ const AuditLogPage = () => {
         return <ReturnDetailsModal returnData={detailData} open={true} onClose={handleCloseModal} />;
       case 'User':
         return <UserDetailsModal userData={detailData} open={true} onClose={handleCloseModal} />;
+      
+      // --- NEW: Added case for PurchaseOrder ---
+      case 'PurchaseOrder':
+        return <PurchaseOrderDetailModal poData={detailData} open={true} onClose={handleCloseModal} />;
+      // --- END NEW ---
+      
       default:
+        let detailsToShow = 'No specific details to display.';
+        if (detailData?.genericDetails) {
+          detailsToShow = detailData.genericDetails;
+        }
+
         return (
           <Dialog open={true} onClose={handleCloseModal} maxWidth="sm" fullWidth>
             <DialogTitle>Log Details</DialogTitle>
             <DialogContent>
-              <Typography variant="body1" style={{ whiteSpace: 'pre-wrap' }}>
-                {detailData.genericDetails || 'No specific details to display.'}
+              <Typography 
+                component="pre" 
+                style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '0.875rem' }}
+              >
+                {detailsToShow}
               </Typography>
             </DialogContent>
           </Dialog>
@@ -236,7 +276,6 @@ const AuditLogPage = () => {
       
       {/* --- Filter Bar --- */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        {/* --- Grid format updated to match your project's standard --- */}
         <Grid container spacing={2} alignItems="center">
           <Grid item size={{ xs: 12, md: 6 }}>
             <TextField
@@ -309,7 +348,7 @@ const AuditLogPage = () => {
                         <IconButton 
                           onClick={() => handleViewDetails(log)} 
                           size="small"
-                          disabled={!log.entityId} // Disable if there's no entity to view
+                          disabled={!log.entityId && !log.details}
                         >
                           <VisibilityIcon />
                         </IconButton>
