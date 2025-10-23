@@ -39,6 +39,14 @@ const returnSchema = new mongoose.Schema({
     required: [true, 'A reason for the return is required.'],
     trim: true
   },
+  // --- NEW FIELD ADDED ---
+  outcome: {
+    type: String,
+    required: true,
+    enum: ['Restocked', 'Refunded', 'Replaced', 'Discarded'],
+    default: 'Restocked' // Defaulting to Restocked as that's the current behavior
+  },
+  // --- END NEW FIELD ---
   totalRefundAmount: {
     type: Number,
     required: true

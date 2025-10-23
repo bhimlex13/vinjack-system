@@ -4,13 +4,32 @@ import React from 'react';
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Button,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Divider, Grid
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Divider, Grid,
+  // --- NEW: Import Chip ---
+  Chip
 } from '@mui/material';
 
 const ReturnDetailsModal = ({ open, onClose, returnData }) => {
   if (!returnData) return null;
 
   const formatCurrency = (amount) => `₱${(amount || 0).toFixed(2)}`;
+
+  // --- NEW: Function to get chip style based on outcome ---
+  const getOutcomeChipProps = (outcome) => {
+    switch (outcome) {
+      case 'Restocked':
+        return { label: 'Restocked', color: 'success' };
+      case 'Replaced':
+        return { label: 'Replaced', color: 'info' };
+      case 'Refunded':
+        return { label: 'Refunded Only', color: 'warning' };
+      case 'Discarded':
+        return { label: 'Discarded', color: 'error' };
+      default:
+        return { label: outcome || 'N/A', color: 'default' };
+    }
+  };
+  // --- END NEW ---
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -27,8 +46,15 @@ const ReturnDetailsModal = ({ open, onClose, returnData }) => {
               <Typography variant="body2"><strong>Processed By:</strong> {returnData.recordedBy?.fullName || 'N/A'}</Typography>
             </Grid>
           </Grid>
-          
+
           <Divider sx={{ my: 2 }} />
+
+          {/* --- MODIFIED: Display Outcome using Chip --- */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body1" component="span" sx={{ fontWeight: 'bold', mr: 1 }}>Return Outcome:</Typography>
+            <Chip size="small" {...getOutcomeChipProps(returnData.outcome)} />
+          </Box>
+          {/* --- END MODIFICATION --- */}
 
           <Typography variant="body1" gutterBottom><strong>Reason for Return:</strong></Typography>
           <Typography variant="body2" sx={{ mb: 2, p: 1, border: '1px solid #eee', borderRadius: 1 }}>{returnData.reason}</Typography>
@@ -49,6 +75,14 @@ const ReturnDetailsModal = ({ open, onClose, returnData }) => {
                     <TableCell>{item.product?.name || 'N/A'}</TableCell>
                     <TableCell align="right">{item.quantity}</TableCell>
                     <TableCell align="right">{formatCurrency(item.priceAtTime * item.quantity)}</TableCell>
+                  </TableRow>
+                ))}
+                {/* --- Display returned services if any --- */}
+                {returnData.servicesReturned?.map(serviceItem => (
+                  <TableRow key={serviceItem.service?._id || serviceItem._id}>
+                    <TableCell>{serviceItem.service?.name || 'N/A'} (Service)</TableCell>
+                    <TableCell align="right">1</TableCell> {/* Services are usually quantity 1 */}
+                    <TableCell align="right">{formatCurrency(serviceItem.priceAtTime)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
