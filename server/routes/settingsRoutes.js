@@ -8,9 +8,12 @@ const {
   updateGlobalSetting,  // Update specific global setting (e.g., PUT /api/settings/global)
   createBackup,         // Manual backup download
   getBackupSettings,    // Get backup schedule config
-  updateBackupSettings  // Update backup schedule config
+  updateBackupSettings, // Update backup schedule config
+  restoreBackup         // --- IMPORT NEW CONTROLLER ---
 } = require('../controllers/settingsController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+// --- IMPORT NEW BACKUP UPLOAD MIDDLEWARE ---
+const { handleBackupUpload } = require('../middleware/backupUploadMiddleware');
 
 // --- Routes for personal user notification settings ---
 // GET /api/settings/ - Get current user's notification settings
@@ -30,6 +33,12 @@ router.route('/backup/config')
 // GET /api/settings/backup/create - Trigger and download a manual backup
 router.route('/backup/create')
   .get(protect, authorize('Owner'), createBackup);
+
+// --- NEW: Route for restoring a backup from upload (Owner only) ---
+// POST /api/settings/backup/restore - Upload a .gz file to restore the database
+router.route('/backup/restore')
+  .post(protect, authorize('Owner'), handleBackupUpload, restoreBackup);
+// --- END NEW ---
 
 // --- Routes for individual global app settings (Owner only - Legacy/Specific Use) ---
 // GET /api/settings/global/:key - Get a specific global setting by its key

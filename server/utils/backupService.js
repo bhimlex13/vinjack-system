@@ -94,4 +94,62 @@ const backupDatabaseToGCS = async () => {
   });
 };
 
-module.exports = { backupDatabaseToGCS };
+// --- NEW FUNCTION: Restore Database from File ---
+const restoreDatabase = (filePath) => {
+  return new Promise((resolve, reject) => {
+    const dbUri = process.env.MONGODB_URI;
+
+    if (!dbUri) {
+      console.error('Restore Error: Missing MONGODB_URI environment variable.');
+      return reject(new Error('Server configuration error: Missing MONGODB_URI.'));
+    }
+
+    // ** Adjust this path if your installation location is different **
+    const mongorestorePath = '"C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongorestore.exe"'; // Enclose in quotes
+
+    // Command to restore from a gzipped archive
+    // --uri: Specifies the database to connect to and restore
+    // --archive: Specifies the backup file to restore from
+    // --gzip: Indicates the archive file is gzipped
+    // --drop: Drops each collection from the database before restoring the collection from the backup
+    const restoreCommand = `${mongorestorePath} --uri="${dbUri}" --archive="${filePath}" --gzip --drop`;
+
+    console.log(`[${new Date().toLocaleString()}] Starting database restore from: ${filePath}`);
+    console.log(`Executing: ${restoreCommand}`);
+
+    exec(restoreCommand, (error, stdout, stderr) => {
+      // Clean up the uploaded file *after* the command finishes, regardless of success
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`Removed temporary backup file: ${path.basename(filePath)}`);
+        }
+      } catch (unlinkError) {
+        console.error(`Error removing temporary backup file ${path.basename(filePath)}: ${unlinkError.message}`);
+        // Do not reject here, the restore error (if any) is more important
+      }
+
+      // Handle command execution errors
+      if (error) {
+        console.error(`mongorestore Error: ${error.message}`);
+        console.error(`mongorestore Stderr: ${stderr}`);
+        return reject(new Error(`Restore failed: ${stderr || error.message}`));
+      }
+
+      // Handle potential warnings or info in stderr even if no error object
+      if (stderr) {
+        console.warn(`mongorestore Stderr (Warning/Info): ${stderr}`);
+      }
+      
+      console.log(`mongorestore Stdout: ${stdout}`);
+      console.log(`[${new Date().toLocaleString()}] Database restore successful.`);
+      resolve(stdout);
+    });
+  });
+};
+// --- END NEW FUNCTION ---
+
+module.exports = { 
+  backupDatabaseToGCS,
+  restoreDatabase // --- EXPORT THE NEW FUNCTION ---
+};

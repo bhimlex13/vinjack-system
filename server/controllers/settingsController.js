@@ -6,7 +6,7 @@ const Category = require('../models/categoryModel');
 const Brand = require('../models/brandModel');
 const Supplier = require('../models/supplierModel');
 const Sale = require('../models/saleModel');
-const Service = require('../models/serviceModel');
+const Service =require('../models/serviceModel');
 const Motorcycle = require('../models/motorcycleModel');
 const Customer = require('../models/customerModel');
 const Delivery = require('../models/deliveryModel');
@@ -15,10 +15,11 @@ const Return = require('../models/returnModel');
 const Movement = require('../models/movementModel');
 const AuditLog = require('../models/auditLogModel');
 const Notification = require('../models/notificationModel');
-// Add any other models you want to back up if necessary
+const { restoreDatabase } = require('../utils/backupService');
 const logAction = require('../utils/logger'); // Import logger
 
-// --- User-Specific Notification Settings ---
+// --- getSettings, updateSettings ---
+// (Keep these functions as they are)
 const getSettings = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).lean(); // Use lean for read-only
@@ -66,8 +67,8 @@ const updateSettings = async (req, res) => {
   }
 };
 
-
-// --- Individual Global App Settings (Legacy/Specific Use) ---
+// --- getGlobalSetting, updateGlobalSetting ---
+// (Keep these functions as they are)
 const getGlobalSetting = async (req, res) => {
   try {
     const setting = await Setting.findOne({ key: req.params.key }).lean();
@@ -101,14 +102,13 @@ const updateGlobalSetting = async (req, res) => {
   }
 };
 
-
-// --- Manual Backup Download Function ---
+// --- createBackup ---
+// (Keep this function as it is)
 const createBackup = async (req, res) => {
   try {
     console.log(`[${new Date().toLocaleString()}] User ${req.user.username} initiated manual backup process...`);
 
     // Define collections to back up
-    // Ensure all relevant models are imported at the top
     const collectionsToBackup = {
       users: User,
       products: Product,
@@ -125,16 +125,16 @@ const createBackup = async (req, res) => {
       movements: Movement,
       auditlogs: AuditLog,
       notifications: Notification,
-      settings: Setting, // Include global settings in backup
+      settings: Setting,
     };
 
     const backupData = {};
 
     // Fetch data for each collection
     for (const [key, model] of Object.entries(collectionsToBackup)) {
-      if (model && typeof model.find === 'function') { // Check if it's a valid Mongoose model
+      if (model && typeof model.find === 'function') {
         console.log(`Backing up collection: ${key}`);
-        backupData[key] = await model.find({}).lean(); // Use .lean() for plain JS objects
+        backupData[key] = await model.find({}).lean();
       } else {
         console.warn(`Model not found or invalid for collection key: '${key}'. Skipping.`);
       }
@@ -145,10 +145,10 @@ const createBackup = async (req, res) => {
     // Set headers for file download
     const dateStamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
     const fileName = `vinjack-manual-backup-${dateStamp}.json`;
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`); // Ensure filename is quoted
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.setHeader('Content-Type', 'application/json');
 
-    // Send the data as JSON stream for potentially large backups
+    // Send the data as JSON
     res.status(200).json(backupData);
     console.log(`Manual backup file ${fileName} sent successfully.`);
 
@@ -161,8 +161,8 @@ const createBackup = async (req, res) => {
   }
 };
 
-
-// --- NEW: Backup Schedule Configuration Functions ---
+// --- getBackupSettings, updateBackupSettings ---
+// (Keep these functions as they are)
 const getBackupSettings = async (req, res) => {
   try {
     // Fetch settings concurrently
@@ -198,8 +198,8 @@ const updateBackupSettings = async (req, res) => {
     await Promise.all([
       Setting.findOneAndUpdate(
         { key: 'backup_schedule_enabled' },
-        { value: String(enabled) }, // Store boolean as string "true" or "false"
-        { upsert: true, new: true, runValidators: true } // Added new: true for consistency
+        { value: String(enabled) },
+        { upsert: true, new: true, runValidators: true }
       ),
       Setting.findOneAndUpdate(
         { key: 'backup_schedule_time' },
@@ -216,16 +216,56 @@ const updateBackupSettings = async (req, res) => {
     res.status(400).json({ message: 'Error updating backup settings', error: error.message });
   }
 };
-// --- END NEW ---
 
+// --- Restore Backup from Upload ---
+const restoreBackup = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No backup file found.' });
+  }
+
+  const filePath = req.file.path;
+  const originalFilename = req.file.originalname; // Store original name for logging
+  console.log(`Restore request initiated by ${req.user.username} for file: ${originalFilename}`);
+
+  try {
+    // --- ADDED: Log initiation BEFORE restore starts ---
+    logAction(
+      req.user,
+      'DATA_RESTORE_INITIATED',
+      `Initiated database restore from file: ${originalFilename}. Current data will be overwritten.`,
+      { entityType: 'System' }
+    );
+    // --- END ADDITION ---
+
+    await restoreDatabase(filePath); // This function now handles execution and file cleanup
+
+    // Successful restore log is removed here as it gets wiped
+
+    console.log(`[${new Date().toLocaleString()}] User ${req.user.username} successfully completed database restore from ${originalFilename}.`); // Log to console
+
+    res.status(200).json({ message: 'Database restore successful. All data has been overwritten with the backup.' });
+
+  } catch (error) {
+    console.error(`Restore failed: ${error.message}`);
+    // Log the *failed* attempt (This should still work)
+    logAction(
+      req.user,
+      'DATA_RESTORE_FAILED',
+      `Failed to restore database from file: ${originalFilename}. Error: ${error.message}`,
+      { entityType: 'System' }
+    );
+
+    res.status(500).json({ message: error.message || 'An error occurred during the database restore process.' });
+  }
+};
 
 module.exports = {
-  getSettings,          // User notification settings
-  updateSettings,       // User notification settings
-  getGlobalSetting,     // Individual global setting (legacy)
-  updateGlobalSetting,  // Individual global setting (legacy)
-  createBackup,         // Manual backup download
-  // --- NEW: Export backup config functions ---
+  getSettings,
+  updateSettings,
+  getGlobalSetting,
+  updateGlobalSetting,
+  createBackup,
   getBackupSettings,
-  updateBackupSettings
+  updateBackupSettings,
+  restoreBackup
 };

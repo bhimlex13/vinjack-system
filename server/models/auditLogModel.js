@@ -36,10 +36,13 @@ const auditLogSchema = new mongoose.Schema({
       'CREATE_MOTORCYCLE', 'UPDATE_MOTORCYCLE', 'DELETE_MOTORCYCLE',
       'UPDATE_APP_SETTINGS',
       'DATA_EXPORT', 'DATA_CLEANUP',
+      'UPLOAD_SALE_RECEIPT',
+      'DATA_RESTORE', // Keep this, might be useful if --drop isn't always used? Or remove if confusing.
+      'DATA_RESTORE_FAILED',
 
-      // --- NEWLY ADDED ---
-      'UPLOAD_SALE_RECEIPT' // For customer receipt uploads
-
+      // --- ADD THIS ---
+      'DATA_RESTORE_INITIATED'
+      // --- END ADDITION ---
     ]
   },
   details: {

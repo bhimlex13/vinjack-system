@@ -1,7 +1,7 @@
 // client/src/App.js
-import React, { useContext } from 'react';
+import React, { useEffect, useContext } from 'react'; // Added useEffect
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify'; // Added toast
 import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider, default as AuthContext } from './context/AuthContext';
@@ -27,17 +27,32 @@ import DataManagementPage from './pages/DataManagementPage';
 import TransactionsPage from './pages/TransactionsPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import CreatePurchaseOrderPage from './pages/CreatePurchaseOrderPage';
-import PurchaseOrderDetailPage from './pages/PurchaseOrderDetailPage'; 
+import PurchaseOrderDetailPage from './pages/PurchaseOrderDetailPage';
 import DeliveriesPage from './pages/DeliveriesPage';
-import CustomersPage from './pages/CustomersPage'; 
-import ReturnsPage from './pages/ReturnsPage'; 
-
-// --- ADDED: Import the new page for supplier reviews ---
+import CustomersPage from './pages/CustomersPage';
+import ReturnsPage from './pages/ReturnsPage';
 import SupplierPOReviewPage from './pages/SupplierPOReviewPage';
 
 
 const InnerApp = () => {
   const { user, mustChangePassword, isInitializing } = useContext(AuthContext);
+
+  // --- ADDED: useEffect to check for restore flag ---
+  useEffect(() => {
+    // Check only after initialization and if user is logged in
+    if (!isInitializing && user) {
+      const restoreFlag = localStorage.getItem('restoreCompleted');
+      if (restoreFlag === 'true') {
+        // Use a slightly more prominent toast for this important message
+        toast.success('System successfully restored from backup.', {
+          position: "top-center",
+          autoClose: 6000, // Keep visible a bit longer
+        });
+        localStorage.removeItem('restoreCompleted'); // Clear the flag so it only shows once
+      }
+    }
+  }, [user, isInitializing]); // Run when user or initialization state changes
+  // --- END ADDITION ---
 
   if (isInitializing) {
     return <div>Loading Application...</div>;
@@ -49,7 +64,7 @@ const InnerApp = () => {
 
       <WarningModal />
       <ToastContainer
-        position="top-right"
+        position="top-right" // Default position for regular toasts
         autoClose={3500}
         hideProgressBar={false}
         newestOnTop={false}
@@ -62,10 +77,7 @@ const InnerApp = () => {
       />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        
-        {/* --- ADDED: New public route for suppliers to access their PO --- */}
         <Route path="/supplier/po/:token" element={<SupplierPOReviewPage />} />
-
 
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
@@ -83,7 +95,7 @@ const InnerApp = () => {
             <Route path="/audit-log" element={<AuditLogPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/user-management" element={<UserManagementPage />} />
-            <Route path="/data-management" element={<DataManagementPage />} /> 
+            <Route path="/data-management" element={<DataManagementPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/returns" element={<ReturnsPage />} />
             <Route path="/" element={<Navigate to="/dashboard" />} />
