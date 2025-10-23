@@ -21,7 +21,6 @@ const userSchema = new mongoose.Schema({
   },
   status: { type: String, default: 'pending' },
   
-  // ADDED: Flag to force password change on first login
   mustChangePassword: {
     type: Boolean,
     default: false,
@@ -32,6 +31,15 @@ const userSchema = new mongoose.Schema({
     notificationTime: { type: String, default: '08:00' }
   },
   
+  // --- NEW: For Dashboard Preferences ---
+  dashboardPreferences: {
+    timeRange: { type: String, default: 'all' },
+    selectedCategory: { type: String, default: '' },
+    selectedSupplier: { type: String, default: '' },
+    // You could add chart types here in the future
+  },
+  // --- END NEW ---
+
   hasPendingChanges: {
     type: Boolean,
     default: false,
