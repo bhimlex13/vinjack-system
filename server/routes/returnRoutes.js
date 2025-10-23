@@ -1,7 +1,8 @@
 // server/routes/returnRoutes.js
 const express = require('express');
 const router = express.Router();
-const { createReturn, getAllReturns, getReturnById } = require('../controllers/returnController'); // <-- 1. IMPORT THE NEW FUNCTION
+// --- MODIFIED: Import getReturnsBySale ---
+const { createReturn, getAllReturns, getReturnById, getReturnsBySale } = require('../controllers/returnController');
 const { protect } = require('../middleware/authMiddleware');
 
 // Protect all routes
@@ -11,8 +12,13 @@ router.route('/')
   .post(createReturn)
   .get(getAllReturns);
 
-// --- 2. ADD THE NEW ROUTE FOR FETCHING A SINGLE RETURN ---
+// Existing route for getting a specific return by its own ID
 router.route('/:id')
   .get(getReturnById);
+
+// --- NEW ROUTE: Get returns by original Sale ID ---
+router.route('/by-sale/:saleId')
+  .get(getReturnsBySale);
+// --- END NEW ROUTE ---
 
 module.exports = router;
