@@ -2,18 +2,19 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+const path = require('path'); // Ensure path is imported
 const connectDB = require('./config/db');
-const startLowStockCheck = require('./jobs/cronJobs');
+// --- MODIFIED: Import the correct named export ---
+const { startScheduledJobs } = require('./jobs/cronJobs'); // Changed from startLowStockCheck
+const mongoose = require('mongoose'); // Import mongoose for graceful shutdown
 
 const http = require('http');
 const { Server } = require("socket.io");
 
+// Import Routes
 const customerRoutes = require('./routes/customerRoutes');
 const returnRoutes = require('./routes/returnRoutes');
-const motorcycleRoutes = require('./routes/motorcycleRoutes'); // --- ADDED ---
-
-// Import Existing Routes
+const motorcycleRoutes = require('./routes/motorcycleRoutes');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
@@ -44,19 +45,26 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    // It's better to use the specific client URL from .env in production
+    origin: process.env.CLIENT_URL || "*", // Use "*" for development if needed, but restrict in prod
     methods: ["GET", "POST"]
   }
 });
 
+// Make io accessible in controllers via req.app.get('socketio')
 app.set('socketio', io);
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
   socket.on('joinRoom', (userId) => {
-    socket.join(userId);
-    console.log(`User with ID: ${userId} joined room.`);
+    // Add validation/check if userId is provided and valid
+    if (userId) {
+      socket.join(userId);
+      console.log(`Socket ${socket.id} joined room ${userId}.`);
+    } else {
+      console.log(`Socket ${socket.id} attempted to join room with invalid userId.`);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -64,12 +72,10 @@ io.on('connection', (socket) => {
   });
 });
 
-// Use new API routes
+// API Routes
 app.use('/api/customers', customerRoutes);
 app.use('/api/returns', returnRoutes);
-app.use('/api/motorcycles', motorcycleRoutes); // --- ADDED ---
-
-// Existing API Routes
+app.use('/api/motorcycles', motorcycleRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -86,20 +92,72 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/adjustments', adjustmentRoutes);
+
+// Serve static upload files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // =================== PRODUCTION DEPLOYMENT CODE ===================
+// Serve frontend static files if in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '..', 'client', 'build')));
+  const clientBuildPath = path.join(__dirname, '..', 'client', 'build');
+  console.log(`Serving static files from: ${clientBuildPath}`); // Log path for debugging
+  app.use(express.static(clientBuildPath));
+
+  // Serve index.html for any other requests that don't match API or static files
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'client', 'build', 'index.html'));
+    const indexPath = path.resolve(__dirname, '..', 'client', 'build', 'index.html');
+    console.log(`Serving index.html from: ${indexPath}`); // Log path for debugging
+    res.sendFile(indexPath);
   });
 }
 // =================================================================
 
-// Start the scheduled jobs
-startLowStockCheck();
-
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
+// Start server listening
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+
+  // --- MODIFIED: Call the correct function name AFTER server starts listening ---
+  try {
+    startScheduledJobs();
+  } catch (error) {
+      console.error("Failed to start scheduled jobs:", error);
+  }
+  // --- END MODIFICATION ---
+
+});
+
+
+// --- Added Graceful Shutdown Logic ---
+const shutdown = (signal) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  server.close(() => {
+    console.log('HTTP server closed.');
+    mongoose.connection.close(false).then(() => { // false doesn't force close immediately
+        console.log('MongoDB connection closed.');
+        process.exit(0); // Exit cleanly
+    }).catch(err => { // Catch potential errors during DB close
+        console.error('Error closing MongoDB connection:', err);
+        process.exit(1); // Exit with error code
+    });
+  });
+
+  // Force shutdown if graceful shutdown takes too long
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000); // 10 seconds timeout
+};
+
+// Listen for termination signals
+process.on('SIGTERM', () => shutdown('SIGTERM')); // e.g., kill command
+process.on('SIGINT', () => shutdown('SIGINT')); // e.g., Ctrl+C
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err, promise) => {
+  console.error(`Unhandled Rejection Error: ${err.message}`, err);
+  // Consider shutting down on critical errors
+  // server.close(() => process.exit(1));
+});
+// --- End Graceful Shutdown Logic ---

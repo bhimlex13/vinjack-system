@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "gen-lang-client-0866222620",
+  "private_key_id": "bb13cf2fa838f5f9cb0232e601cab2c4c1fa34e6",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC6ZDWkjK/tA8AZ\nNOVb7zO4jiYuKuBnGL1wUsErJPGwqNc4Cyoz2/USaM1DSR5VzIIsz7iYtAIhjjOn\n3Iysq9zYDpy9nH+j/Ge+0e9FBmaJ501ed5WOztA4twN6yI8WHQROQKe4vmRVKmNx\nSa6kOagBIZbODgx4UX4Ue2RjMc4e0hRenf00QOqJ7azQJS4IJucRpdC8mySkbMIR\nE4dSUhIoYP0pZ1uUo2LQTCcRaw93O1NmbvSeLqMTxTq3vYkX9MpYBwF1RCRnIlaW\n5rHjE006wNX5OSM26Zb9IgVpLAdXPFx+18ERd0mkLt3eLVXVsvH++nqnema94IwK\nGjm1zvxZAgMBAAECggEAORCSDclW2TEjQHRd3horUw8OKGdPIbFE2l0zr8JVTpk6\nnvloF815SAQXB8kchPciSZbk9LdzyZMwRG21Ee5iJDHBEhoWR/3wQ08hupe9j+3l\nVY02GC1AOYTqh05c5E/I8C5CS0DbFenu3RHKapQOWB5Q/c/2SGXmvF2Uu/vVF8EC\nz8Qr4vsO+MJHmUC54E3Va7hZAsqHOG3YY9ZwQD5O/P3jCEWLmMwAxSMSLDb3vVbh\nDpfSXlOpWpCBkc+RV6i2gdoG+yvD4hXygqqqsVD9+kR4G8fPE8eFdRK1Y1quZoQK\ndeAqBNU+7bWHVW1HTeB/pQ4wsVdVczTgUuM+0cTm8wKBgQDh6EEIZD6aQwtWx2W7\nD1ezs046EClByy1WCkuTlJew7DCbWxe+gtDd4qXGot+KhSIsRzmc+xq535gk/VUb\ntoh8b8XmNHXO7J5ceDFZAinXrDlGnnGwDhyt86ohC0g0LbjfZzM1Zh+P3sdW4SKh\nlqyTmS3culpKgMRQ3khALz6bcwKBgQDTOGmn4Y89+gWG3KSJ/rBDklMdF71svY9o\n10AJjND0Iv+MF9U4NN6gZXbE+w5zhQIwLlkpzin+hV5tkz/OuKk4Jw8wiEprX+pd\nl8gAnpHneixn65FPORK2AbpcG5gUI/bav/F1ESlMm2CV//ML1W9kmQc3E6aDxRiq\nJpNQNymuAwKBgQC0zZHfCXwhMq+MkKIXCLyEkml1hyG+CsMKLcs3HqIZc6+jZ1Cl\npUVNkOxlAk4vK0aicY7m2QIW6aF3WVoYiArMrRiSmkH/jtlf4MJ+HoEmoCxnHMCY\ny3KgtnffYowzVrSz+IC/qDBykTaxjhaNhW4x41MVagCByHVW09C3rhhJiQKBgD4t\nMQz2XRBFdTMJ6HWmv4RkoorB3kUQWBLoqjUleq0jUE6RBXcSOSbGN3ws20guM0Kz\nohOoWLxPzkg7PGFCAq5A8Tu8IwwQpBEBCSMFirW1RTUiJxhHGLbzM0TB6rajD5u9\nPPrVHm8qnfgJ7CXjonLeiT0xT6cicexEhsDqPB65AoGBAL5npqwwPGJ7Vmu7vjPE\nbX/UyawJILwcWUzcl7LRb8loQ54eX024a4T9hSftoHHu5bD65Nx6vQmcAg98CZLE\naox+4PGMlutX+ObmjxClZJgomiqNvDqY2lC/LWsljdDANtDAEiWA9DJmkGR+qdmS\nPwzJ+KLCQqaHY7Xt0IaimhG1\n-----END PRIVATE KEY-----\n",
+  "client_email": "vinjack-backup-uploader@gen-lang-client-0866222620.iam.gserviceaccount.com",
+  "client_id": "113223374630934426327",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/vinjack-backup-uploader%40gen-lang-client-0866222620.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
