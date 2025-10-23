@@ -7,7 +7,10 @@ const { sendVerificationEmail } = require('../utils/emailService');
 const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
 
-// ... (createUserByAdmin, loginUser, forceChangePassword, getMe, requestProfileUpdate, verifyOwnerUpdate, approveUserUpdate, rejectUserUpdate, getAllUsers, updateUser, deleteUser, generateToken, getUserDetails, adminResetPassword functions remain unchanged from the previous version you have)
+// ... (createUserByAdmin, loginUser, forceChangePassword, getMe, requestProfileUpdate, verifyOwnerUpdate, approveUserUpdate, rejectUserUpdate, getAllUsers, updateUser, deleteUser, logoutUser, generateToken, getUserDetails, adminResetPassword functions remain unchanged)
+// ... (Make sure all those functions are present in your file) ...
+
+// --- [Previous functions like createUserByAdmin, loginUser, etc. go here] ---
 
 const createUserByAdmin = async (req, res) => {
   try {
@@ -57,14 +60,12 @@ const loginUser = async (req, res) => {
       const isMatch = await bcrypt.compare(password, user.password);
       if (isMatch) {
         if (user.status !== 'active') {
-          // --- NEW: Log failed login (inactive) ---
           logAction(user, 'LOGIN_FAILED', `Login attempt failed: Account inactive for user '${username}'.`);
           return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
         }
-
-        // --- NEW: Log successful login ---
         logAction(user, 'LOGIN', `User '${username}' logged in successfully.`, { entityType: 'User', entityId: user._id });
 
+        // --- MODIFIED: Return preferences on login ---
         res.json({
           _id: user._id,
           fullName: user.fullName,
@@ -73,15 +74,13 @@ const loginUser = async (req, res) => {
           role: user.role,
           token: generateToken(user._id),
           mustChangePassword: user.mustChangePassword || false,
+          dashboardPreferences: user.dashboardPreferences // Send preferences
         });
       } else {
-        // --- NEW: Log failed login (invalid password) ---
         logAction(user, 'LOGIN_FAILED', `Login attempt failed: Invalid password for user '${username}'.`, { entityType: 'User', entityId: user._id });
         res.status(401).json({ message: 'Invalid username or password.' });
       }
     } else {
-      // --- NEW: Log failed login (user not found) ---
-      // Note: We don't have a user object here, so we log with a null user.
       logAction(null, 'LOGIN_FAILED', `Login attempt failed: User '${username}' not found.`);
       res.status(401).json({ message: 'Invalid username or password.' });
     }
@@ -115,11 +114,12 @@ const forceChangePassword = async (req, res) => {
 
 const getMe = async (req, res) => {
   try {
+    // --- MODIFIED: Populate dashboardPreferences ---
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+    res.json(user); // dashboardPreferences is now included
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -149,8 +149,6 @@ const requestProfileUpdate = async (req, res) => {
       }
       const salt = await bcrypt.genSalt(10);
       requestedChanges.password = await bcrypt.hash(newPassword, salt);
-
-      // --- NEW: Log password change request ---
       logAction(req.user, 'USER_PASSWORD_CHANGE', `User requested to change their password.`, { entityType: 'User', entityId: user._id });
     }
     if (Object.keys(requestedChanges).length === 0) {
@@ -225,10 +223,7 @@ const approveUserUpdate = async (req, res) => {
     if (!user || !user.hasPendingChanges) {
       return res.status(400).json({ message: 'No pending changes found for this user.' });
     }
-
-    // --- NEW: Log action ---
     logAction(req.user, 'UPDATE_USER', `Approved profile changes for user ${user.username}.`, { entityType: 'User', entityId: user._id });
-
     if (user.pendingChanges.fullName) user.fullName = user.pendingChanges.fullName;
     if (user.pendingChanges.username) user.username = user.pendingChanges.username;
     if (user.pendingChanges.email) user.email = user.pendingChanges.email;
@@ -295,16 +290,12 @@ const updateUser = async (req, res) => {
     const { role, status } = req.body;
     const user = await User.findById(req.params.id);
     if (user) {
-
-      // --- NEW: Log action ---
       let details = [];
       if (role && user.role !== role) details.push(`role to '${role}'`);
       if (status && user.status !== status) details.push(`status to '${status}'`);
       if (details.length > 0) {
         logAction(req.user, 'UPDATE_USER', `Updated user ${user.fullName}'s ${details.join(' and ')}.`, { entityType: 'User', entityId: user._id });
       }
-      // --- End Log ---
-
       user.role = role || user.role;
       user.status = status || user.status;
       const updatedUser = await user.save();
@@ -317,7 +308,7 @@ const updateUser = async (req, res) => {
         status: updatedUser.status,
       });
     } else {
-      res.status(404).json({ message: 'User not found' });
+      res.status(44).json({ message: 'User not found' });
     }
   } catch (error) {
     res.status(400).json({ message: 'Error updating user' });
@@ -342,29 +333,17 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// --- THIS IS THE LOGOUT FUNCTION ---
-const logoutUser = (req, res) => { // Renamed from just 'logout' to avoid conflict
+const logoutUser = (req, res) => {
   try {
-    // --- NEW: Add logAction ---
-    // Note: req.user might not always be available depending on how logout is called.
-    // If it's a protected route, req.user will exist. If not, logAction handles null.
     const userFullName = req.user ? req.user.fullName : 'Unknown User';
     const userId = req.user ? req.user._id : null;
     logAction(req.user, 'LOGOUT', `User '${userFullName}' logged out.`, { entityType: 'User', entityId: userId });
-    // --- END NEW ---
-
-    // The actual logout mechanism depends on your client-side implementation.
-    // Usually, the client just discards the token.
-    // Sending a success message is good practice.
     res.status(200).json({ message: 'Logout successful' });
-
   } catch (error) {
     console.error("Error during logout:", error);
-    // Even if logging fails, try to send a response
     res.status(500).json({ message: 'Server error during logout.' });
   }
 };
-// --- END LOGOUT FUNCTION ---
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -389,51 +368,81 @@ const adminResetPassword = async (req, res) => {
     try {
         const { adminPassword } = req.body;
         const targetUserId = req.params.id;
-
-        // Step 1: Verify the admin making the request
         const adminUser = await User.findById(req.user.id);
         if (!adminUser) {
             return res.status(404).json({ message: 'Admin user not found.' });
         }
-
         const isMatch = await bcrypt.compare(adminPassword, adminUser.password);
         if (!isMatch) {
             return res.status(401).json({ message: 'Incorrect admin password. Authorization denied.' });
         }
-
-        // Step 2: Find the target user to reset
         const targetUser = await User.findById(targetUserId);
         if (!targetUser) {
             return res.status(404).json({ message: 'Target user not found.' });
         }
-
-        // Prevent an Owner from resetting another Owner's password
         if (targetUser.role === 'Owner') {
             return res.status(403).json({ message: 'Cannot reset password for another Owner account.' });
         }
-
-        // Step 3: Generate a new temporary password and update the user
         const temporaryPassword = crypto.randomBytes(8).toString('hex').slice(0, 10);
         targetUser.password = temporaryPassword;
         targetUser.mustChangePassword = true;
         await targetUser.save();
-
-        // Step 4: Log the action
         logAction(req.user, 'ADMIN_RESET_PASSWORD', `Reset password for user ${targetUser.fullName}.`, { entityType: 'User', entityId: targetUser._id });
-
-        // Step 5: Return the new credentials to the admin
         res.json({
             message: 'User password has been reset.',
             username: targetUser.username,
             temporaryPassword: temporaryPassword,
         });
-
     } catch (error) {
         console.error("Error in adminResetPassword:", error);
         res.status(500).json({ message: 'Server error during password reset.' });
     }
 };
 
+// --- NEW: Controller for getting preferences ---
+const getDashboardPreferences = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('dashboardPreferences');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json(user.dashboardPreferences || {});
+  } catch (error) {
+    console.error('Error getting dashboard preferences:', error);
+    res.status(500).json({ message: 'Server error getting preferences.' });
+  }
+};
+
+// --- NEW: Controller for saving preferences ---
+const saveDashboardPreferences = async (req, res) => {
+  try {
+    const { timeRange, selectedCategory, selectedSupplier } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        $set: {
+          'dashboardPreferences.timeRange': timeRange,
+          'dashboardPreferences.selectedCategory': selectedCategory,
+          'dashboardPreferences.selectedSupplier': selectedSupplier,
+        }
+      },
+      { new: true, runValidators: true }
+    ).select('dashboardPreferences');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    logAction(req.user, 'UPDATE_PREFERENCES', 'User updated their dashboard preferences.');
+    res.json({ message: 'Preferences saved!', preferences: user.dashboardPreferences });
+  } catch (error) {
+    console.error('Error saving dashboard preferences:', error);
+    res.status(500).json({ message: 'Server error saving preferences.' });
+  }
+};
+
+
+// --- MODIFIED: Added new functions to export ---
 module.exports = {
   createUserByAdmin,
   loginUser,
@@ -448,6 +457,7 @@ module.exports = {
   rejectUserUpdate,
   getUserDetails,
   adminResetPassword,
-  // --- NEW: Export the logout function ---
-  logoutUser
+  logoutUser,
+  getDashboardPreferences, // NEW
+  saveDashboardPreferences // NEW
 };

@@ -15,8 +15,10 @@ const {
     verifyOwnerUpdate,
     getUserDetails,
     adminResetPassword,
-    // --- NEW: Import logoutUser ---
-    logoutUser
+    logoutUser,
+    // --- NEW: Import preference controllers ---
+    getDashboardPreferences,
+    saveDashboardPreferences
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -28,9 +30,12 @@ router.get('/me', protect, getMe);
 router.put('/profile', protect, requestProfileUpdate);
 router.post('/profile/verify', protect, verifyOwnerUpdate);
 router.put('/force-change-password', protect, forceChangePassword);
-
-// --- NEW: Add Logout Route ---
 router.post('/logout', protect, logoutUser);
+
+// --- NEW: Dashboard Preferences Routes (Owner Only) ---
+router.route('/dashboard-preferences')
+  .get(protect, authorize('Owner'), getDashboardPreferences)
+  .put(protect, authorize('Owner'), saveDashboardPreferences);
 // --- END NEW ---
 
 // --- Admin (Owner) routes ---
