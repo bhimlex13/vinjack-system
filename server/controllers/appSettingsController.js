@@ -18,14 +18,25 @@ const getSetting = async (req, res) => {
 const updateSetting = async (req, res) => {
   try {
     const { key, value } = req.body;
-    // Find the setting by key and update it, or create it if it doesn't exist
+
+    // --- *** THIS IS THE REAL FIX *** ---
+    // We must manually check for 'value' because findOneAndUpdate
+    // with 'upsert' does not trigger 'required' validators for
+    // fields that are 'undefined' in the update object.
+    if (value === undefined) {
+      return res.status(400).json({ message: 'Error updating setting' });
+    }
+    // --- *** END FIX *** ---
+
     const updatedSetting = await Setting.findOneAndUpdate(
       { key: key },
       { value: value },
-      { new: true, upsert: true } // upsert: true creates the doc if it doesn't exist
+      // runValidators is still good practice for other rules
+      { new: true, upsert: true, runValidators: true } 
     );
     res.json(updatedSetting);
   } catch (error) {
+    // This will now catch other errors (like a missing 'key')
     res.status(400).json({ message: 'Error updating setting' });
   }
 };

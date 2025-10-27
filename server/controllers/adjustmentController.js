@@ -10,12 +10,17 @@ exports.createStockAdjustment = async (req, res) => {
   const io = req.app.get('socketio');
   
   const { productId, adjustmentType, quantity, reason } = req.body;
-  if (!productId || !adjustmentType || !quantity || !reason) {
+  
+  // --- *** FIX 1: Updated validation logic *** ---
+  // Check for type *before* value
+  if (!productId || !adjustmentType || typeof quantity !== 'number' || !reason) {
     return res.status(400).json({ message: 'Product, adjustment type, quantity, and reason are required.' });
   }
+  // Now check for value
   if (quantity <= 0) {
     return res.status(400).json({ message: 'Quantity must be a positive number.' });
   }
+  // --- *** END FIX 1 *** ---
 
   try {
     const product = await Product.findById(productId);
@@ -63,6 +68,8 @@ exports.createStockAdjustment = async (req, res) => {
     res.status(200).json({ message: 'Stock adjusted successfully.', product: updatedProduct });
 
   } catch (error) {
-    res.status(5.00).json({ message: 'Server error while adjusting stock.', error: error.message });
+    // --- *** FIX 2: Changed 5.00 to 500 *** ---
+    res.status(500).json({ message: 'Server error while adjusting stock.', error: error.message });
+    // --- *** END FIX 2 *** ---
   }
 };
