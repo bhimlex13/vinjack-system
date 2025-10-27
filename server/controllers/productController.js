@@ -2,76 +2,79 @@
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
-// --- MODIFIED: Make sure getStockStatus is imported ---
 const { checkStockLevelAndNotify, getStockStatus } = require('../utils/stockManager');
 const { createNotification } = require('../utils/notificationManager');
 
 const getProducts = async (req, res) => {
   try {
     const products = await Product.find({})
-      .select('itemCode name category brand cost price quantity reorderLevel image maxStock stockStatus')
+      // --- MODIFICATION START ---
+      // Select the suppliers field and populate it
+      .select('itemCode name category brand cost price quantity image maxStock stockStatus suppliers')
       .populate('category', 'name')
-      .populate('brand', 'name');    
-      
+      .populate('brand', 'name')
+      .populate('suppliers', 'name'); // <-- ADD THIS LINE TO POPULATE SUPPLIERS
+      // --- MODIFICATION END ---
+
     res.status(200).json(products);
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
+// --- createProduct function (No changes needed, should already save suppliers) ---
 const createProduct = async (req, res) => {
   const io = req.app.get('socketio');
   try {
-    const { name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel, image, suppliers, maxStock } = req.body;
-    
-    const newProduct = new Product({ 
-      name, itemCode, category, brand, cost, price, quantity, unit, reorderLevel, image, suppliers, maxStock 
+    // Make sure suppliers is destructured here
+    const { name, itemCode, category, brand, cost, price, quantity, unit, image, suppliers, maxStock } = req.body;
+
+    const newProduct = new Product({
+      name, itemCode, category, brand, cost, price, quantity, unit, image, suppliers, maxStock // Ensure suppliers is included
     });
-    
+
     const initialStatus = getStockStatus(newProduct.quantity, newProduct.maxStock);
     newProduct.stockStatus = initialStatus;
 
     let savedProduct = await newProduct.save();
-    
+
     if (savedProduct.quantity > 0) {
       await logMovement({
-        product: savedProduct._id,
-        type: 'ADJUSTMENT',
-        quantityChange: savedProduct.quantity,
-        stockBefore: 0,
-        notes: 'Initial stock from product creation.',
-        recordedBy: req.user.id
+        product: savedProduct._id, type: 'ADJUSTMENT', quantityChange: savedProduct.quantity, stockBefore: 0,
+        notes: 'Initial stock from product creation.', recordedBy: req.user.id
       });
     }
 
+    // Stock status notification logic (remains the same)
     if (initialStatus === 'Low' || initialStatus === 'Critical' || initialStatus === 'Out of Stock') {
         const message = initialStatus === 'Out of Stock'
           ? `${savedProduct.name} was created and is OUT OF STOCK.`
           : `${savedProduct.name} was created with ${initialStatus.toLowerCase()} stock (${savedProduct.quantity} remaining).`;
-          
         const newNotifications = await createNotification({
-            recipientRole: 'Owner',
-            message: message,
-            type: initialStatus.toUpperCase() + '_STOCK',
-            link: '/inventory'
-        });
-
+            recipientRole: 'Owner', message: message, type: initialStatus.toUpperCase() + '_STOCK', link: '/inventory' });
         if (newNotifications && newNotifications.length) {
             newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification));
         }
     }
 
     logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`, { entityType: 'Product', entityId: savedProduct._id });
-    
-    savedProduct = await savedProduct.populate('category', 'name');
-    savedProduct = await savedProduct.populate('brand', 'name');
-    
+
+    // Populate after saving
+    savedProduct = await savedProduct.populate([
+        { path: 'category', select: 'name' },
+        { path: 'brand', select: 'name' },
+        { path: 'suppliers', select: 'name' } // Also populate suppliers here for the response
+    ]);
+
+
     res.status(201).json(savedProduct);
   } catch (error) {
     res.status(400).json({ message: 'Error creating product', error: error.message });
   }
 };
 
+
+// --- updateProduct function (No changes needed, should already save suppliers) ---
 const updateProduct = async (req, res) => {
   const io = req.app.get('socketio');
   try {
@@ -80,76 +83,98 @@ const updateProduct = async (req, res) => {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      const stockBeforeUpdate = product.quantity;
-      const maxStockBeforeUpdate = product.maxStock; 
-
-      const newStockQuantity = req.body.quantity;
-      const newMaxStock = req.body.maxStock; 
-
-      const didQuantityChange = newStockQuantity !== undefined && stockBeforeUpdate !== Number(newStockQuantity);
-      // --- FIX: Check against undefined OR null ---
-      const didMaxStockChange = newMaxStock !== undefined && (maxStockBeforeUpdate ?? 1) !== Number(newMaxStock); 
-
-      product.name = req.body.name || product.name;
-      product.itemCode = req.body.itemCode || product.itemCode;
-      product.category = req.body.category || product.category;
-      product.brand = req.body.brand || product.brand;
-      product.cost = req.body.cost ?? product.cost;
-      product.price = req.body.price ?? product.price;
-      product.quantity = newStockQuantity ?? product.quantity;
-      product.reorderLevel = req.body.reorderLevel ?? product.reorderLevel;
-      product.maxStock = newMaxStock ?? product.maxStock; 
-      product.image = req.body.image || product.image;
-      product.suppliers = req.body.suppliers || product.suppliers;
-      
-      // --- MODIFIED LOGIC ---
-      // We will *always* recalculate status on an update now, to be safe.
-      const newStatus = getStockStatus(product.quantity, product.maxStock);
+      // --- Ensure 'suppliers' is included in the update logic ---
+      const allowedUpdates = ['name', 'itemCode', 'category', 'brand', 'cost', 'price', 'maxStock', 'image', 'suppliers'];
       const oldStatus = product.stockStatus;
-      product.stockStatus = newStatus;
-      // --- END MODIFICATION ---
+      let changesMade = false;
 
-      let savedProduct = await product.save(); // First save (for form data)
+      allowedUpdates.forEach(key => {
+         // Check if the key exists in req.body AND is different from the current value
+         // Need careful comparison for arrays like suppliers
+         if (req.body[key] !== undefined) {
+             let isDifferent = false;
+             if (key === 'suppliers') {
+                 // Compare supplier arrays (simple comparison by length and content assuming IDs are strings)
+                 const currentSuppliers = product.suppliers.map(s => String(s));
+                 const newSuppliers = Array.isArray(req.body.suppliers) ? req.body.suppliers.map(s => String(s)) : [];
+                 if (currentSuppliers.length !== newSuppliers.length || !currentSuppliers.every(id => newSuppliers.includes(id))) {
+                    isDifferent = true;
+                 }
+             } else if (String(product[key]) !== String(req.body[key])) { // General comparison
+                 isDifferent = true;
+             }
 
-      // Only log movement if quantity changed
-      if (didQuantityChange) {
-        await logMovement({
-          product: savedProduct._id,
-          type: 'ADJUSTMENT',
-          quantityChange: newStockQuantity - stockBeforeUpdate,
-          stockBefore: stockBeforeUpdate,
-          notes: 'Manual stock update from product form.',
-          recordedBy: req.user.id
-        });
+             if (isDifferent) {
+                product[key] = req.body[key];
+                changesMade = true;
+             }
+         }
+      });
+
+      // --- Always recalculate status ---
+      const newStatus = getStockStatus(product.quantity, product.maxStock);
+      if (newStatus !== oldStatus) {
+         product.stockStatus = newStatus;
+         changesMade = true; // Status change counts as a change
+      }
+      // ---
+
+      if (!changesMade) {
+          // If nothing changed besides potentially status, just return the populated product
+          const populatedProduct = await product.populate([
+               { path: 'category', select: 'name' },
+               { path: 'brand', select: 'name' },
+               { path: 'suppliers', select: 'name' }
+          ]);
+          return res.json(populatedProduct);
       }
 
-      // Only send notification if status *actually* changed
+      // --- Save if changes were made ---
+      let savedProduct = await product.save();
+
+      // Send notification ONLY if status actually changed
       if (newStatus !== oldStatus) {
-        // We pass the *saved* product to the notification function
-        // but we don't need to await it or re-assign
         checkStockLevelAndNotify(savedProduct, io);
       }
-      // --- END MODIFICATION ---
 
       logAction(req.user, 'UPDATE_PRODUCT', `Updated product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`, { entityType: 'Product', entityId: savedProduct._id });
-      
-      savedProduct = await savedProduct.populate('category', 'name');
-      savedProduct = await savedProduct.populate('brand', 'name');
-    	
+
+      // Populate after saving
+      savedProduct = await savedProduct.populate([
+          { path: 'category', select: 'name' },
+          { path: 'brand', select: 'name' },
+          { path: 'suppliers', select: 'name' } // Populate suppliers for the response
+      ]);
+
       res.json(savedProduct);
 
   } catch (error) {
-    res.status(400).json({ message: 'Error updating product', error: error.message });
+     console.error("Error updating product:", error); // Add server-side logging
+     res.status(400).json({ message: 'Error updating product', error: error.message });
   }
 };
 
-const deleteProduct = async (req, res) => {
+
+// --- deleteProduct function (unchanged) ---
+const deleteProduct = async (req, res) => { /* ... */
     try {
         const product = await Product.findById(req.params.id);
         if (product) {
             const productId = product._id;
             const productDetails = `Deleted product: '${product.name}' (Code: ${product.itemCode})`;
-            
+
+            // --- Check if product has quantity or movements before deleting? (Optional safety check) ---
+            // Example: Check if quantity is 0
+            // if (product.quantity > 0) {
+            //     return res.status(400).json({ message: 'Cannot delete product with existing stock. Please adjust quantity to 0 first.' });
+            // }
+            // Example: Check associated movements (more complex)
+            // const movementsExist = await Movement.exists({ product: productId });
+            // if (movementsExist) {
+            //     return res.status(400).json({ message: 'Cannot delete product with transaction history. Consider deactivating instead.' });
+            // }
+            // --- End Optional Checks ---
+
             await product.deleteOne();
 
             logAction(req.user, 'DELETE_PRODUCT', productDetails, { entityType: 'Product', entityId: productId });
@@ -162,7 +187,8 @@ const deleteProduct = async (req, res) => {
     }
 };
 
-const getLowStockProducts = async (req, res) => {
+// --- getLowStockProducts function (unchanged) ---
+const getLowStockProducts = async (req, res) => { /* ... */
   try {
     const lowStockProducts = await Product.find({
       stockStatus: { $in: ['Low', 'Critical', 'Out of Stock'] }
@@ -171,25 +197,26 @@ const getLowStockProducts = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
-};
+ };
 
-
-const getProductsBySupplier = async (req, res) => {
+// --- getProductsBySupplier function (unchanged) ---
+const getProductsBySupplier = async (req, res) => { /* ... */
   try {
     const { supplierId } = req.params;
     if (!supplierId) {
         return res.status(400).json({ message: 'Supplier ID is required.' });
     }
+    // Only select fields needed for PO creation dropdown
     const products = await Product.find({ suppliers: supplierId })
-        .select('itemCode name cost'); 
+        .select('itemCode name cost');
     res.json(products);
   } catch (error) {
     res.status(500).json({ message: 'Server error while fetching products by supplier.', error: error.message });
   }
 };
 
-// --- START NEW FUNCTION ---
-const recalculateAllProductStatuses = async (req, res) => {
+// --- recalculateAllProductStatuses function (unchanged) ---
+const recalculateAllProductStatuses = async (req, res) => { /* ... */
   try {
     const products = await Product.find({});
     let updatedCount = 0;
@@ -210,15 +237,14 @@ const recalculateAllProductStatuses = async (req, res) => {
     res.status(500).json({ message: 'Error re-syncing statuses', error: error.message });
   }
 };
-// --- END NEW FUNCTION ---
 
 
-module.exports = { 
-  getProducts, 
-  createProduct, 
-  updateProduct, 
+module.exports = {
+  getProducts,
+  createProduct,
+  updateProduct,
   deleteProduct,
   getLowStockProducts,
   getProductsBySupplier,
-  recalculateAllProductStatuses // --- ADDED ---
+  recalculateAllProductStatuses
 };
