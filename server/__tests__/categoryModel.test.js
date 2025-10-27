@@ -8,6 +8,9 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri);
+  // --- FIX: Add createIndexes ---
+  await Category.createIndexes();
+  // --- END FIX ---
 });
 
 afterAll(async () => {
@@ -30,7 +33,6 @@ describe('Category Model Unit Tests', () => {
     const category = new Category(validCategoryData);
     const savedCategory = await category.save();
 
-    // Assertions
     expect(savedCategory._id).toBeDefined();
     expect(savedCategory.name).toBe('Engine Parts');
     expect(savedCategory.description).toBe('Parts related to the engine');
@@ -42,42 +44,23 @@ describe('Category Model Unit Tests', () => {
       description: 'A category without a name',
     };
     const category = new Category(invalidData);
-    
     let err;
-    try {
-      await category.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
+    try { await category.save(); } catch (error) { err = error; }
     expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
     expect(err.errors.name).toBeDefined();
   });
 
   // Test Case 3: Failing to save with a duplicate 'name'
   test('Should fail to save with a duplicate name', async () => {
-    // Create the first category
-    const category1 = new Category({
-      name: 'Duplicate Category',
-    });
+    const category1 = new Category({ name: 'Duplicate Category' });
     await category1.save();
 
-    // Try to create the second category with the same name
-    const category2 = new Category({
-      name: 'Duplicate Category',
-    });
+    const category2 = new Category({ name: 'Duplicate Category' });
 
     let err;
-    try {
-      await category2.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
-    expect(err).toBeDefined();
-    expect(err.code).toBe(11000); // MongoDB duplicate key error code
+    try { await category2.save(); } catch (error) { err = error; }
+    expect(err).toBeDefined(); // Should pass now
+    expect(err.code).toBe(11000);
   });
 
 });

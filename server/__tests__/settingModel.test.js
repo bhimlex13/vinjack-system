@@ -8,6 +8,10 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri);
+  
+  // ADDED THIS LINE:
+  // This forces Mongoose to wait until the 'unique' index is built
+  await Setting.createIndexes(); 
 });
 
 afterAll(async () => {

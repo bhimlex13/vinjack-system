@@ -8,6 +8,9 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri);
+  // --- FIX: Add createIndexes ---
+  await PurchaseOrder.createIndexes();
+  // --- END FIX ---
 });
 
 afterAll(async () => {
@@ -37,10 +40,9 @@ describe('Purchase Order Model Unit Tests', () => {
     const po = new PurchaseOrder(validPOData);
     const savedPO = await po.save();
 
-    // Assertions
     expect(savedPO._id).toBeDefined();
     expect(savedPO.poNumber).toBe('PO-2025-001');
-    expect(savedPO.status).toBe('Pending'); // Check default value
+    expect(savedPO.status).toBe('Pending');
     expect(savedPO.items.length).toBe(1);
   });
 
@@ -52,15 +54,8 @@ describe('Purchase Order Model Unit Tests', () => {
       totalAmount: 10,
     };
     const po = new PurchaseOrder(invalidData);
-    
     let err;
-    try {
-      await po.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
+    try { await po.save(); } catch (error) { err = error; }
     expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
     expect(err.errors.poNumber).toBeDefined();
   });
@@ -73,15 +68,8 @@ describe('Purchase Order Model Unit Tests', () => {
       totalAmount: 10,
     };
     const po = new PurchaseOrder(invalidData);
-
     let err;
-    try {
-      await po.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
+    try { await po.save(); } catch (error) { err = error; }
     expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
     expect(err.errors.supplier).toBeDefined();
   });
@@ -95,15 +83,8 @@ describe('Purchase Order Model Unit Tests', () => {
       totalAmount: -100,
     };
     const po = new PurchaseOrder(invalidData);
-    
     let err;
-    try {
-      await po.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
+    try { await po.save(); } catch (error) { err = error; }
     expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
     expect(err.errors.totalAmount).toBeDefined();
     expect(err.errors.totalAmount.message).toContain('is less than minimum allowed value (0)');
@@ -111,7 +92,6 @@ describe('Purchase Order Model Unit Tests', () => {
 
   // Test Case 5: Duplicate 'poNumber' error
   test('Should fail to save with a duplicate poNumber', async () => {
-    // Create the first PO
     const po1 = new PurchaseOrder({
       poNumber: 'PO-DUPLICATE-001',
       supplier: new mongoose.Types.ObjectId(),
@@ -120,7 +100,6 @@ describe('Purchase Order Model Unit Tests', () => {
     });
     await po1.save();
 
-    // Try to create the second PO with the same poNumber
     const po2 = new PurchaseOrder({
       poNumber: 'PO-DUPLICATE-001',
       supplier: new mongoose.Types.ObjectId(),
@@ -129,14 +108,8 @@ describe('Purchase Order Model Unit Tests', () => {
     });
 
     let err;
-    try {
-      await po2.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
-    expect(err).toBeDefined();
-    expect(err.code).toBe(11000); // MongoDB duplicate key error code
+    try { await po2.save(); } catch (error) { err = error; }
+    expect(err).toBeDefined(); // Should pass now
+    expect(err.code).toBe(11000);
   });
 });

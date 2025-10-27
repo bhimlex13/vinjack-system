@@ -8,6 +8,9 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri);
+  // --- FIX: Add createIndexes ---
+  await Service.createIndexes();
+  // --- END FIX ---
 });
 
 afterAll(async () => {
@@ -31,11 +34,10 @@ describe('Service Model Unit Tests', () => {
     const service = new Service(validServiceData);
     const savedService = await service.save();
 
-    // Assertions
     expect(savedService._id).toBeDefined();
     expect(savedService.name).toBe('Oil Change');
     expect(savedService.charge).toBe(500);
-    expect(savedService.status).toBe('active'); // Check default value
+    expect(savedService.status).toBe('active');
   });
 
   // Test Case 2: Failing to save without a 'name'
@@ -45,15 +47,8 @@ describe('Service Model Unit Tests', () => {
       charge: 100,
     };
     const service = new Service(invalidData);
-    
     let err;
-    try {
-      await service.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
+    try { await service.save(); } catch (error) { err = error; }
     expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
     expect(err.errors.name).toBeDefined();
     expect(err.errors.name.message).toBe('Please provide a service name');
@@ -66,15 +61,8 @@ describe('Service Model Unit Tests', () => {
       description: 'A service without a charge',
     };
     const service = new Service(invalidData);
-
     let err;
-    try {
-      await service.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
+    try { await service.save(); } catch (error) { err = error; }
     expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
     expect(err.errors.charge).toBeDefined();
     expect(err.errors.charge.message).toBe('Please provide a fixed charge for the service');
@@ -87,15 +75,8 @@ describe('Service Model Unit Tests', () => {
       charge: -100,
     };
     const service = new Service(invalidData);
-    
     let err;
-    try {
-      await service.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
+    try { await service.save(); } catch (error) { err = error; }
     expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
     expect(err.errors.charge).toBeDefined();
     expect(err.errors.charge.message).toContain('Charge cannot be negative');
@@ -103,29 +84,21 @@ describe('Service Model Unit Tests', () => {
 
   // Test Case 5: Duplicate 'name' error
   test('Should fail to save with a duplicate name', async () => {
-    // Create the first service
     const service1 = new Service({
       name: 'Duplicate Service',
       charge: 100,
     });
     await service1.save();
 
-    // Try to create the second service with the same name
     const service2 = new Service({
       name: 'Duplicate Service',
       charge: 200,
     });
 
     let err;
-    try {
-      await service2.save();
-    } catch (error) {
-      err = error;
-    }
-
-    // Assertions
-    expect(err).toBeDefined();
-    expect(err.code).toBe(11000); // MongoDB duplicate key error code
+    try { await service2.save(); } catch (error) { err = error; }
+    expect(err).toBeDefined(); // Should pass now
+    expect(err.code).toBe(11000);
   });
 
 });
