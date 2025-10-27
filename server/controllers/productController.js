@@ -1,17 +1,20 @@
 // server/controllers/productController.js
+const mongoose = require('mongoose'); // <-- Import mongoose
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
 const { checkStockLevelAndNotify, getStockStatus } = require('../utils/stockManager');
 const { createNotification } = require('../utils/notificationManager');
 
+// getProducts - Populate supplier from supplierCosts
 const getProducts = async (req, res) => {
   try {
     const products = await Product.find({})
-      .select('itemCode name category brand cost price quantity image maxStock stockStatus suppliers')
+      .select('itemCode name category brand price quantity image maxStock stockStatus supplierCosts defaultCost') // Adjusted fields
       .populate('category', 'name')
       .populate('brand', 'name')
-      .populate('suppliers', 'name');
+      // --- Populate supplier *within* supplierCosts ---
+      .populate('supplierCosts.supplier', 'name'); // <-- Populate nested field
 
     res.status(200).json(products);
   } catch (error) {
@@ -19,95 +22,151 @@ const getProducts = async (req, res) => {
   }
 };
 
+// createProduct - Save supplierCosts
 const createProduct = async (req, res) => {
-  // ... (createProduct logic remains the same - already logs creation) ...
-   const io = req.app.get('socketio');
+  const io = req.app.get('socketio');
   try {
-    const { name, itemCode, category, brand, cost, price, quantity, unit, image, suppliers, maxStock } = req.body;
-    const newProduct = new Product({ name, itemCode, category, brand, cost, price, quantity, unit, image, suppliers, maxStock });
+    // --- Destructure supplierCosts, removed cost and suppliers ---
+    const { name, itemCode, category, brand, price, quantity, unit, image, supplierCosts, maxStock } = req.body;
+
+    // --- Create with supplierCosts ---
+    const newProduct = new Product({
+      name, itemCode, category, brand, price, quantity, unit, image, supplierCosts, maxStock // Use supplierCosts
+    });
+
+    // --- Status and movement logic remains the same ---
     const initialStatus = getStockStatus(newProduct.quantity, newProduct.maxStock);
     newProduct.stockStatus = initialStatus;
-    let savedProduct = await newProduct.save();
-
+    let savedProduct = await newProduct.save(); // defaultCost is set by pre-save middleware
     if (savedProduct.quantity > 0) {
-      await logMovement({
+      await logMovement({ // Simplified movement log data
         product: savedProduct._id, type: 'ADJUSTMENT', quantityChange: savedProduct.quantity, stockBefore: 0,
         notes: 'Initial stock from product creation.', recordedBy: req.user.id
       });
     }
+    // Notification logic
     if (initialStatus === 'Low' || initialStatus === 'Critical' || initialStatus === 'Out of Stock') {
         const message = initialStatus === 'Out of Stock' ? `${savedProduct.name} was created and is OUT OF STOCK.`
           : `${savedProduct.name} was created with ${initialStatus.toLowerCase()} stock (${savedProduct.quantity} remaining).`;
         const newNotifications = await createNotification({ recipientRole: 'Owner', message: message, type: initialStatus.toUpperCase() + '_STOCK', link: '/inventory' });
-        if (newNotifications && newNotifications.length) {
-            newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification));
-        }
+        if (newNotifications && newNotifications.length) { newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification)); }
     }
+    // Log action
     logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`, { entityType: 'Product', entityId: savedProduct._id });
-    savedProduct = await savedProduct.populate([ { path: 'category', select: 'name' }, { path: 'brand', select: 'name' }, { path: 'suppliers', select: 'name' } ]);
+
+    // --- Populate for response ---
+    savedProduct = await savedProduct.populate([
+        { path: 'category', select: 'name' },
+        { path: 'brand', select: 'name' },
+        { path: 'supplierCosts.supplier', select: 'name' } // Populate nested supplier
+    ]);
     res.status(201).json(savedProduct);
   } catch (error) {
+    console.error("Create Product Error:", error); // More detailed logging
     res.status(400).json({ message: 'Error creating product', error: error.message });
   }
 };
 
 
-// --- MODIFICATION START ---
+// updateProduct - Save supplierCosts and log changes (Corrected variable name)
 const updateProduct = async (req, res) => {
   const io = req.app.get('socketio');
   try {
-      const product = await Product.findById(req.params.id);
+      const product = await Product.findById(req.params.id).populate('supplierCosts.supplier', 'name'); // Populate for original data
       if (!product) {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      // --- Store original values for comparison ---
+      // --- Store original values ---
       const originalProductData = {
           name: product.name,
-          itemCode: product.itemCode, // Although disabled in form, include for completeness
-          category: String(product.category), // Store as string ID
-          brand: String(product.brand), // Store as string ID
-          cost: product.cost,
+          itemCode: product.itemCode,
+          category: String(product.category), // Store ID
+          brand: String(product.brand), // Store ID
           price: product.price,
           maxStock: product.maxStock,
           image: product.image,
-          suppliers: product.suppliers.map(s => String(s)) // Store as array of string IDs
+          // Store supplierCosts with string IDs for easier comparison
+          supplierCosts: product.supplierCosts.map(sc => ({
+              supplier: String(sc.supplier?._id || sc.supplier), // Ensure ID is string
+              cost: sc.cost,
+              supplierName: sc.supplier?.name // Keep name for logging
+          }))
       };
-      // ---
 
-      const allowedUpdates = ['name', 'itemCode', 'category', 'brand', 'cost', 'price', 'maxStock', 'image', 'suppliers'];
+      // --- Allowed updates includes supplierCosts ---
+      const allowedUpdates = ['name', 'itemCode', 'category', 'brand', 'price', 'maxStock', 'image', 'supplierCosts'];
       const oldStatus = product.stockStatus;
       let changesMade = false;
       let changeDetails = []; // --- Array to store specific changes ---
 
       allowedUpdates.forEach(key => {
+         // Check if the key is present in the request body
          if (req.body[key] !== undefined) {
              let isDifferent = false;
              let newValue = req.body[key]; // Capture the new value
 
-             if (key === 'suppliers') {
-                 const currentSuppliers = originalProductData.suppliers; // Use original data
-                 const newSuppliers = Array.isArray(newValue) ? newValue.map(s => String(s)) : [];
-                 if (currentSuppliers.length !== newSuppliers.length || !currentSuppliers.every(id => newSuppliers.includes(id)) || !newSuppliers.every(id => currentSuppliers.includes(id))) {
-                    isDifferent = true;
-                    // For suppliers, log a generic change message as listing all IDs can be long
-                    changeDetails.push(`updated assigned suppliers`);
+             if (key === 'supplierCosts') {
+                 // More robust comparison for supplierCosts array
+                 const currentCosts = originalProductData.supplierCosts;
+                 const newCostsInput = Array.isArray(newValue) ? newValue : [];
+                 // Normalize new input to have string IDs and number costs
+                 const newCosts = newCostsInput.map(sc => ({ supplier: String(sc.supplier), cost: Number(sc.cost) }));
+
+                 // Check if lengths differ or if content differs (order doesn't matter)
+                 if (currentCosts.length !== newCosts.length ||
+                     !currentCosts.every(cc => newCosts.some(nc => nc.supplier === cc.supplier && nc.cost === cc.cost)) ||
+                     !newCosts.every(nc => currentCosts.some(cc => cc.supplier === nc.supplier && nc.cost === cc.cost))
+                    ) {
+                      isDifferent = true;
+                      // Log specific supplier/cost changes
+                      const added = newCosts.filter(nc => !currentCosts.some(cc => cc.supplier === nc.supplier));
+                      const removed = currentCosts.filter(cc => !newCosts.some(nc => nc.supplier === cc.supplier));
+                      const changed = newCosts.filter(nc => currentCosts.some(cc => cc.supplier === nc.supplier && nc.cost !== cc.cost));
+
+                      if (added.length > 0) changeDetails.push(`added suppliers: [${added.map(a => a.supplier).join(', ')}] with costs`); // Ideally fetch names later
+                      if (removed.length > 0) changeDetails.push(`removed suppliers: [${removed.map(r => r.supplierName || r.supplier).join(', ')}]`);
+                      changed.forEach(ch => {
+                          const old = currentCosts.find(cc => cc.supplier === ch.supplier);
+                          // Ideally fetch supplier name later for the log
+                          changeDetails.push(`changed cost for supplier ${ch.supplier} from ${old?.cost} to ${ch.cost}`);
+                      });
                  }
              } else if (key === 'category' || key === 'brand') {
                  // Compare string IDs for category/brand
                  if (String(originalProductData[key]) !== String(newValue)) {
                     isDifferent = true;
-                    // We need to fetch names later for the log message
+                    // Store IDs, fetch names later for log message
                     changeDetails.push({ key, from: originalProductData[key], to: newValue });
                  }
-             } else if (String(originalProductData[key]) !== String(newValue)) { // General comparison
+             }
+             // --- Prevent updating itemCode - USE 'product' NOT 'productToEdit' ---
+             else if (key === 'itemCode' && product) { // <-- CORRECTED HERE
+                 // Only log if they actually tried to send a different itemCode
+                 if (String(originalProductData[key]) !== String(newValue)) {
+                    console.log(`Attempted to change itemCode from ${originalProductData[key]} to ${newValue} - ignoring.`);
+                    // Optionally add to changeDetails to log the attempt, but don't set isDifferent=true
+                    // changeDetails.push(`attempted to change itemCode (ignored)`);
+                 }
+             }
+             // ---
+             else if (String(originalProductData[key]) !== String(newValue)) { // General comparison for other fields
                  isDifferent = true;
                  changeDetails.push(`changed ${key} from '${originalProductData[key]}' to '${newValue}'`);
              }
 
+             // Apply the change if it's different and allowed
              if (isDifferent) {
-                product[key] = newValue;
-                changesMade = true;
+                // For supplierCosts, ensure the structure is correct before assigning
+                if (key === 'supplierCosts') {
+                    product[key] = Array.isArray(newValue) ? newValue.map(sc => ({
+                        supplier: sc.supplier, // Keep as ObjectId or string ID from request
+                        cost: Number(sc.cost) // Ensure cost is a number
+                    })) : [];
+                } else {
+                    product[key] = newValue; // Apply change for other fields
+                }
+                changesMade = true; // Mark that a change occurred
              }
          }
       });
@@ -121,20 +180,20 @@ const updateProduct = async (req, res) => {
       }
       // ---
 
+      // If nothing actually changed, return early
       if (!changesMade) {
-          // If nothing changed, just return the populated product
-          const populatedProduct = await product.populate([
-               { path: 'category', select: 'name' },
-               { path: 'brand', select: 'name' },
-               { path: 'suppliers', select: 'name' }
-          ]);
+          const populatedProduct = await Product.findById(product._id) // Re-fetch to populate correctly
+              .populate('category', 'name')
+              .populate('brand', 'name')
+              .populate('supplierCosts.supplier', 'name');
+          console.log("No changes detected, returning current product data.");
           return res.json(populatedProduct);
       }
 
       // --- Save if changes were made ---
-      let savedProduct = await product.save();
+      let savedProduct = await product.save(); // defaultCost will be updated by pre-save middleware
 
-      // Send notification ONLY if status actually changed
+      // Send notification ONLY if status actually changed to a problematic level
       if (newStatus !== oldStatus && (newStatus === 'Low' || newStatus === 'Critical' || newStatus === 'Out of Stock')) {
         checkStockLevelAndNotify(savedProduct, io);
       }
@@ -142,109 +201,97 @@ const updateProduct = async (req, res) => {
       // --- Build detailed log message ---
       let logMessage = `Updated product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`;
       if (changeDetails.length > 0) {
-          // Fetch names for category/brand if they were changed
-          const populatedChanges = await Promise.all(changeDetails.map(async (change) => {
+           // Asynchronously fetch names for category/brand/supplier if needed for the log
+           const populatedChanges = await Promise.all(changeDetails.map(async (change) => {
+              // Populate category name change
               if (typeof change === 'object' && change.key === 'category') {
-                  const [oldCat, newCat] = await Promise.all([
-                      mongoose.model('Category').findById(change.from).select('name'),
-                      mongoose.model('Category').findById(change.to).select('name')
-                  ]);
+                  const [oldCat, newCat] = await Promise.all([ mongoose.model('Category').findById(change.from).select('name'), mongoose.model('Category').findById(change.to).select('name') ]);
                   return `changed category from '${oldCat?.name || change.from}' to '${newCat?.name || change.to}'`;
               }
+              // Populate brand name change
               if (typeof change === 'object' && change.key === 'brand') {
-                  const [oldBrand, newBrand] = await Promise.all([
-                      mongoose.model('Brand').findById(change.from).select('name'),
-                      mongoose.model('Brand').findById(change.to).select('name')
-                  ]);
+                   const [oldBrand, newBrand] = await Promise.all([ mongoose.model('Brand').findById(change.from).select('name'), mongoose.model('Brand').findById(change.to).select('name') ]);
                   return `changed brand from '${oldBrand?.name || change.from}' to '${newBrand?.name || change.to}'`;
               }
-              return change; // Return strings or supplier message directly
+              // --- TODO: Add logic here to fetch supplier names for log messages about added/changed costs if desired ---
+              // Example: if (change.startsWith('added suppliers:')) { ... fetch names ... }
+              return change; // Return strings or supplier messages directly for now
           }));
           logMessage += ` - ${populatedChanges.join(', ')}.`;
       } else {
-          logMessage += "."; // Add period if no specific details (shouldn't happen if changesMade is true)
+          logMessage += "."; // Add period if somehow changesMade was true but changeDetails is empty
       }
-      // ---
+      // --- End building log message ---
 
       logAction(req.user, 'UPDATE_PRODUCT', logMessage, { entityType: 'Product', entityId: savedProduct._id });
 
-      // Populate after saving for the response
-      savedProduct = await savedProduct.populate([
-          { path: 'category', select: 'name' },
-          { path: 'brand', select: 'name' },
-          { path: 'suppliers', select: 'name' } // Populate suppliers for the response
-      ]);
+      // Populate response after saving
+      savedProduct = await Product.findById(savedProduct._id) // Re-fetch to populate correctly
+         .populate('category', 'name')
+         .populate('brand', 'name')
+         .populate('supplierCosts.supplier', 'name');
 
       res.json(savedProduct);
 
   } catch (error) {
-     console.error("Error updating product:", error); // Add server-side logging
+     console.error("Error updating product:", error); // Log the full error on the server
      res.status(400).json({ message: 'Error updating product', error: error.message });
   }
 };
-// --- MODIFICATION END ---
 
 
 const deleteProduct = async (req, res) => {
-    // ... (deleteProduct logic remains the same) ...
-     try {
+    try {
         const product = await Product.findById(req.params.id);
         if (product) {
-            const productId = product._id;
-            const productDetails = `Deleted product: '${product.name}' (Code: ${product.itemCode})`;
-            await product.deleteOne();
-            logAction(req.user, 'DELETE_PRODUCT', productDetails, { entityType: 'Product', entityId: productId });
+            const productId = product._id; const productDetails = `Deleted product: '${product.name}' (Code: ${product.itemCode})`;
+            await product.deleteOne(); logAction(req.user, 'DELETE_PRODUCT', productDetails, { entityType: 'Product', entityId: productId });
             res.json({ message: 'Product removed' });
-        } else {
-            res.status(404).json({ message: 'Product not found' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: 'Server Error', error: error.message });
-    }
+        } else { res.status(404).json({ message: 'Product not found' }); }
+    } catch (error) { res.status(500).json({ message: 'Server Error', error: error.message }); }
 };
 
 const getLowStockProducts = async (req, res) => {
-    // ... (getLowStockProducts logic remains the same) ...
-    try {
-    const lowStockProducts = await Product.find({ stockStatus: { $in: ['Low', 'Critical', 'Out of Stock'] } });
-    res.json(lowStockProducts);
-  } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
-  }
- };
+    try { const lowStockProducts = await Product.find({ stockStatus: { $in: ['Low', 'Critical', 'Out of Stock'] } }); res.json(lowStockProducts); }
+    catch (error) { res.status(500).json({ message: 'Server Error', error: error.message }); }
+};
 
 const getProductsBySupplier = async (req, res) => {
-    // ... (getProductsBySupplier logic remains the same) ...
-     try {
+  try {
     const { supplierId } = req.params;
-    if (!supplierId) {
-        return res.status(400).json({ message: 'Supplier ID is required.' });
-    }
-    const products = await Product.find({ suppliers: supplierId }).select('itemCode name cost');
-    res.json(products);
+    if (!supplierId) { return res.status(400).json({ message: 'Supplier ID is required.' }); }
+    // --- Find products where supplierCosts array contains the supplierId ---
+    const products = await Product.find({ 'supplierCosts.supplier': supplierId })
+        // --- Select relevant fields, including the matching supplierCost entry ---
+        .select('itemCode name supplierCosts.$') // '$' projection gets only the matching array element
+        .populate('supplierCosts.supplier', 'name'); // Populate the supplier name (might not be needed if just getting cost)
+
+     // --- Extract the specific cost for the requested supplier ---
+     const productsWithCost = products.map(p => {
+         // The '$' projection means supplierCosts will only have ONE element: the matching one.
+         const relevantCostEntry = p.supplierCosts && p.supplierCosts.length > 0 ? p.supplierCosts[0] : null;
+         return {
+             _id: p._id,
+             itemCode: p.itemCode,
+             name: p.name,
+             cost: relevantCostEntry ? relevantCostEntry.cost : 0 // Fallback cost
+         };
+     });
+
+    res.json(productsWithCost);
   } catch (error) {
+    console.error("Error getting products by supplier:", error);
     res.status(500).json({ message: 'Server error while fetching products by supplier.', error: error.message });
   }
 };
 
 const recalculateAllProductStatuses = async (req, res) => {
-    // ... (recalculateAllProductStatuses logic remains the same) ...
-    try {
-    const products = await Product.find({});
-    let updatedCount = 0;
-    for (const product of products) {
-      const newStatus = getStockStatus(product.quantity, product.maxStock);
-      if (product.stockStatus !== newStatus) {
-        product.stockStatus = newStatus;
-        await product.save();
-        updatedCount++;
-      }
-    }
+    try { const products = await Product.find({}); let updatedCount = 0;
+    for (const product of products) { const newStatus = getStockStatus(product.quantity, product.maxStock);
+      if (product.stockStatus !== newStatus) { product.stockStatus = newStatus; await product.save(); updatedCount++; } }
     logAction(req.user, 'SYNC_STOCK_STATUS', `Manually re-synced all product stock statuses. ${updatedCount} products updated.`);
     res.status(200).json({ message: `Successfully re-synced all product statuses. ${updatedCount} products were updated.` });
-  } catch (error) {
-    res.status(500).json({ message: 'Error re-syncing statuses', error: error.message });
-  }
+  } catch (error) { res.status(500).json({ message: 'Error re-syncing statuses', error: error.message }); }
 };
 
 
