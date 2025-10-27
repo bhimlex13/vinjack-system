@@ -216,7 +216,7 @@ const InventoryPage = () => {
         
         <Stack direction="row" spacing={2}>
           {/* --- NEW SYNC BUTTON (Owner Only) --- */}
-          {user && user.role === 'Owner' && (
+          {/* {user && user.role === 'Owner' && (
             <Tooltip title="Recalculate stock status for all products">
               <Button 
                 variant="outlined" 
@@ -226,7 +226,7 @@ const InventoryPage = () => {
                 Sync Statuses
               </Button>
             </Tooltip>
-          )}
+          )} */}
           {/* --- END NEW BUTTON --- */}
           
           {user && (user.role === 'Owner' || user.role === 'Clerk') && (
