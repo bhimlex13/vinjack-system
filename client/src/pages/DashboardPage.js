@@ -3,15 +3,16 @@ import React, { useEffect, useState, useContext } from 'react';
 import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
 import { Bar, Line } from 'react-chartjs-2';
-import { Chart, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
-import { toast } from 'react-toastify'; // --- NEW: Import toast ---
+import { Chart, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
+import { toast } from 'react-toastify';
 
 // MUI Imports
 import {
   Box, Grid, Paper, Typography, ToggleButton, ToggleButtonGroup, CircularProgress, Container,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
   FormControl, InputLabel, Select, MenuItem, Stack,
-  Button // --- NEW: Import Button ---
+  Button,
+  Tooltip // <<<--- VERIFIED TOOLTIP IMPORT
 } from '@mui/material';
 import { FaMoneyBillWave, FaShoppingCart, FaWarehouse } from 'react-icons/fa';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -26,24 +27,86 @@ import CategoryIcon from '@mui/icons-material/Category';
 import ShoppingCartCheckoutIcon from '@mui/icons-material/ShoppingCartCheckout';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import SaveIcon from '@mui/icons-material/Save'; // --- NEW: Import SaveIcon ---
+import SaveIcon from '@mui/icons-material/Save';
 
 
-Chart.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend);
+Chart.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, ChartTooltip, Legend);
 
-// Helper component for Stat Cards (No change)
-const StatCard = ({ title, value, icon, color }) => (
-  <Paper
-    elevation={3}
-    sx={{ p: 2.5, display: 'flex', alignItems: 'center', borderLeft: 5, borderColor: `${color}.main`, height: '100%' }}
-  >
-    <Box sx={{ color: `${color}.main`, fontSize: '2.5rem', mr: 2 }}>{icon}</Box>
-    <Box>
-      <Typography color="textSecondary" variant="subtitle1" gutterBottom>{title}</Typography>
-      <Typography variant="h5" component="p" sx={{ fontWeight: 'bold' }}>{value}</Typography>
-    </Box>
-  </Paper>
-);
+// --- HELPER FUNCTION for number shortening ---
+const formatStatValue = (value) => {
+  let prefix = '';
+  let numberStr = String(value);
+
+  // Check for currency symbol
+  if (numberStr.startsWith('₱')) {
+    prefix = '₱';
+    numberStr = numberStr.substring(1);
+  }
+
+  // Remove commas for parsing
+  numberStr = numberStr.replace(/,/g, '');
+  const number = parseFloat(numberStr);
+
+  // If not a number, return original value
+  if (isNaN(number)) {
+    return { display: value, tooltip: value };
+  }
+
+  // Create a full-precision tooltip
+  const isCurrency = prefix === '₱';
+  const tooltip = `${prefix}${number.toLocaleString(undefined, {
+    maximumFractionDigits: isCurrency ? 2 : 0,
+    minimumFractionDigits: isCurrency ? 2 : 0
+  })}`;
+
+  let display;
+
+  if (number >= 1_000_000_000) {
+    display = `${prefix}${(number / 1_000_000_000).toFixed(1)}B+`;
+  } else if (number >= 1_000_000) {
+    display = `${prefix}${(number / 1_000_000).toFixed(1)}M+`;
+  } else if (number >= 10_000) { // Shorten numbers 10,000 and up
+    display = `${prefix}${Math.floor(number / 1000)}K+`;
+  } else {
+    display = `${prefix}${number.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  }
+
+  return { display, tooltip };
+};
+
+// --- StatCard component with Tooltip ---
+const StatCard = ({ title, value, icon, color }) => {
+
+  const { display, tooltip } = formatStatValue(value);
+
+  return (
+    <Paper
+      elevation={3}
+      sx={{ p: 2.5, display: 'flex', alignItems: 'center', borderLeft: 5, borderColor: `${color}.main`, height: '100%' }}
+    >
+      <Box sx={{ color: `${color}.main`, fontSize: '2.5rem', mr: 2, flexShrink: 0 }}>{icon}</Box>
+      
+      {/* Wrap text content in Tooltip */}
+      <Tooltip title={<Typography variant="body1">{tooltip}</Typography>} placement="top">
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography color="textSecondary" variant="subtitle1" gutterBottom>{title}</Typography>
+          <Typography
+            variant="h5"
+            component="p"
+            sx={{
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+          >
+            {display} {/* Show the shortened display value */}
+          </Typography>
+        </Box>
+      </Tooltip>
+    </Paper>
+  );
+}
 
 
 const DashboardPage = () => {
@@ -54,32 +117,27 @@ const DashboardPage = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [pendingPOs, setPendingPOs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // --- MODIFIED: These states will now be set by user preferences ---
-  const [timeRange, setTimeRange] = useState('all'); 
+
+  const [timeRange, setTimeRange] = useState('all');
   const [categories, setCategories] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [isFilterDataLoading, setIsFilterDataLoading] = useState(false);
-  const [isSavingPrefs, setIsSavingPrefs] = useState(false); // --- NEW: State for save button
-  // --- END MODIFICATION ---
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
 
-  // --- NEW: Load user preferences on mount (for Owner) ---
+  // Load user preferences on mount (for Owner)
   useEffect(() => {
     if (user?.role === 'Owner') {
       const loadPreferences = async () => {
         try {
-          // Preferences are now part of the /me route or login context
-          // Let's use the user object from context first
           if (user.dashboardPreferences) {
              const prefs = user.dashboardPreferences;
              if (prefs.timeRange) setTimeRange(prefs.timeRange);
              if (prefs.selectedCategory) setSelectedCategory(prefs.selectedCategory);
              if (prefs.selectedSupplier) setSelectedSupplier(prefs.selectedSupplier);
           } else {
-            // Fallback to fetch /me if not on user object (e.g. from older local storage)
              const { data } = await api.get('/users/me');
              if (data.dashboardPreferences) {
                 const prefs = data.dashboardPreferences;
@@ -95,9 +153,8 @@ const DashboardPage = () => {
       loadPreferences();
     }
   }, [user]); // Runs when user is available
-  // --- END NEW ---
 
-  // useEffect to load filter dropdown data (No change)
+  // useEffect to load filter dropdown data
   useEffect(() => {
     if (user?.role === 'Owner') {
       const fetchFilterData = async () => {
@@ -121,16 +178,14 @@ const DashboardPage = () => {
 
   // Main data fetching effect
   useEffect(() => {
-    // Only fetch if user is loaded
-    if (!user) return; 
+    if (!user) return;
 
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // --- MODIFIED: Add supplierId to params ---
         const summaryParams = new URLSearchParams({ range: timeRange });
         if (selectedCategory) summaryParams.append('categoryId', selectedCategory);
-        if (selectedSupplier) summaryParams.append('supplierId', selectedSupplier); // <-- UNCOMMENTED
+        if (selectedSupplier) summaryParams.append('supplierId', selectedSupplier);
 
         const [summaryResponse, lowStockResponse, salesTrendResponse, recentActivitiesResponse, pendingPOsResponse] = await Promise.all([
           api.get(`/reports/summary?${summaryParams.toString()}`),
@@ -139,7 +194,6 @@ const DashboardPage = () => {
           api.get(`/reports/recent-activities`),
           api.get('/reports/pending-pos')
         ]);
-        // --- END MODIFICATION ---
 
         setSummary(summaryResponse.data);
         setLowStockItems(lowStockResponse.data);
@@ -148,23 +202,22 @@ const DashboardPage = () => {
         setPendingPOs(pendingPOsResponse.data);
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
-        // Add toast for error
         toast.error("Failed to load dashboard data.");
       } finally {
         setIsLoading(false);
       }
     };
     fetchData();
-  }, [timeRange, selectedCategory, selectedSupplier, user]); // Add user as dependency
+  }, [timeRange, selectedCategory, selectedSupplier, user]);
 
-  // handleTimeRangeChange (No change)
+  // handleTimeRangeChange
   const handleTimeRangeChange = (event, newTimeRange) => {
     if (newTimeRange !== null) {
       setTimeRange(newTimeRange);
     }
   };
 
-  // Filter change handlers (No change)
+  // Filter change handlers
   const handleCategoryChange = (event) => {
       setSelectedCategory(event.target.value);
   };
@@ -172,8 +225,8 @@ const DashboardPage = () => {
   const handleSupplierChange = (event) => {
       setSelectedSupplier(event.target.value);
   };
-  
-  // --- NEW: Save user preferences ---
+
+  // Save user preferences
   const handleSavePreferences = async () => {
     setIsSavingPrefs(true);
     try {
@@ -190,13 +243,10 @@ const DashboardPage = () => {
       setIsSavingPrefs(false);
     }
   };
-  // --- END NEW ---
 
 
   // Chart functions (getTrendChartTitle, formatTrendChartLabels, barChartData, barChartOptions, lineChartData, lineChartOptions)
-  // ... (Keep all these functions as they are, no changes needed) ...
-  // getTrendChartTitle (Keep as is)
-  const getTrendChartTitle = () => { /* ... */
+  const getTrendChartTitle = () => {
     switch (timeRange) {
       case 'today': return 'Revenue Trend (Today)';
       case 'week': return 'Revenue Trend (This Week)';
@@ -205,8 +255,7 @@ const DashboardPage = () => {
     }
   };
 
-  // formatTrendChartLabels (Keep as is)
-  const formatTrendChartLabels = (data) => { /* ... */
+  const formatTrendChartLabels = (data) => {
     if (!data || data.length === 0) return [];
     const firstLabel = data[0]._id;
      if (firstLabel && (firstLabel.includes(':') || /\d{2}:00$/.test(firstLabel))) { // Hourly format check
@@ -230,8 +279,7 @@ const DashboardPage = () => {
     return []; // Fallback for unrecognized format
   };
 
-  // barChartData for Top Products (Keep as is)
-  const barChartData = { /* ... */
+  const barChartData = {
      labels: summary?.topSellingProducts?.map(p => p.productInfo?.name?.substring(0, 15) + (p.productInfo?.name?.length > 15 ? '...' : '') || 'N/A') || [],
     datasets: [{
       label: 'Qty Sold',
@@ -239,14 +287,13 @@ const DashboardPage = () => {
       backgroundColor: 'rgba(0, 123, 255, 0.6)',
     }],
   };
-  const barChartOptions = { /* ... */
+  const barChartOptions = {
      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
     plugins: { legend: { display: false } },
     scales: { x: { beginAtZero: true }, y: { ticks: { autoSkip: false } } }
   };
 
-  // lineChartData for Sales Trend (Keep as is)
-  const lineChartData = { /* ... */
+  const lineChartData = {
      labels: formatTrendChartLabels(salesTrend),
     datasets: [{
       label: 'Revenue',
@@ -256,7 +303,7 @@ const DashboardPage = () => {
       fill: true, tension: 0.4, pointBackgroundColor: 'rgb(75, 192, 192)'
     }]
   };
-  const lineChartOptions = { /* ... */
+  const lineChartOptions = {
      responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false }, title: { display: false } },
     scales: { y: { beginAtZero: true } }
@@ -270,8 +317,7 @@ const DashboardPage = () => {
       </Box>
     );
   }
-  
-  // --- NEW: Check if user is null after initialization ---
+
   if (!user) {
     return (
        <Container maxWidth="lx" sx={{ mt: 4, mb: 4 }}>
@@ -284,17 +330,16 @@ const DashboardPage = () => {
        </Container>
     );
   }
-  // --- END NEW ---
 
   return (
     <Container maxWidth="lx" sx={{ mt: 4, mb: 4 }}>
-      {/* Header, Time Range Toggle, AND NEW FILTERS */}
+      {/* Header, Time Range Toggle, AND FILTERS */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mr: 2 }}>
           Dashboard
         </Typography>
 
-        {/* --- MODIFIED: Filter Stack --- */}
+        {/* Filter Stack */}
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center">
             {/* Owner Only Filters */}
             {user?.role === 'Owner' && (
@@ -315,7 +360,6 @@ const DashboardPage = () => {
                   </Select>
                 </FormControl>
 
-                {/* --- MODIFIED: Supplier Filter (UNCOMMENTED) --- */}
                 <FormControl size="small" sx={{ minWidth: 180 }}>
                   <InputLabel id="supplier-filter-label">Supplier</InputLabel>
                   <Select
@@ -331,7 +375,6 @@ const DashboardPage = () => {
                     ))}
                   </Select>
                 </FormControl>
-                {/* --- END MODIFICATION --- */}
               </>
             )}
 
@@ -343,7 +386,7 @@ const DashboardPage = () => {
               <ToggleButton value="today">Today</ToggleButton>
             </ToggleButtonGroup>
 
-            {/* --- NEW: Save Preferences Button --- */}
+            {/* Save Preferences Button */}
             {user?.role === 'Owner' && (
               <Button
                 variant="outlined"
@@ -357,12 +400,11 @@ const DashboardPage = () => {
               </Button>
             )}
         </Stack>
-        {/* --- END Filter Stack --- */}
       </Box>
 
-      {/* ... (Rest of the JSX remains exactly the same) ... */}
+      {/* Row 1: Stat Cards */}
       <Grid container spacing={3}>
-        {/* Row 1: Stat Cards (Keep as is) */}
+        {/* Values are now formatted dynamically */}
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
           <StatCard title="Total Revenue" value={`₱${(summary?.totalRevenue)?.toFixed(2) || '0.00'}`} icon={<FaMoneyBillWave />} color="primary" />
         </Grid>
@@ -382,7 +424,7 @@ const DashboardPage = () => {
           <StatCard title="Product Types (SKUs)" value={summary?.totalSKUs || 0} icon={<InventoryIcon />} color="secondary" />
         </Grid>
 
-        {/* Row 2: Main Chart (Keep as is) */}
+        {/* Row 2: Main Chart */}
         <Grid item size={{ xs: 12 }}>
           <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: 350 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -401,11 +443,9 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* Other Widgets (Keep structure, content as is) */}
         {/* Top 5 Selling Products */}
         <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* ... title ... */}
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <BarChartIcon color="action" sx={{ mr: 1 }}/>
                 <Typography variant="h6" component="h3">Top 5 Selling Products</Typography>
@@ -424,13 +464,11 @@ const DashboardPage = () => {
         {/* Top 5 Selling Services */}
         <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
            <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-             {/* ... title ... */}
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <BuildIcon color="info" sx={{ mr: 1 }} />
                 <Typography variant="h6" component="h3">Top 5 Selling Services</Typography>
               </Box>
             <TableContainer sx={{ flexGrow: 1 }}>
-                {/* ... table content ... */}
                  <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow>
@@ -461,13 +499,11 @@ const DashboardPage = () => {
         {/* Slow Moving Products */}
         <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* ... title ... */}
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <TrendingDownIcon color="error" sx={{ mr: 1 }} />
                 <Typography variant="h6" component="h3">Slow Moving Products</Typography>
               </Box>
             <TableContainer sx={{ flexGrow: 1 }}>
-                {/* ... table content ... */}
                  <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow>
@@ -498,13 +534,11 @@ const DashboardPage = () => {
         {/* Inventory by Category Summary */}
         <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* ... title ... */}
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <CategoryIcon color="secondary" sx={{ mr: 1 }} />
                 <Typography variant="h6" component="h3">Inventory by Category</Typography>
               </Box>
             <TableContainer sx={{ flexGrow: 1 }}>
-                {/* ... table content ... */}
                  <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow>
@@ -539,13 +573,11 @@ const DashboardPage = () => {
         {/* Low Stock Items */}
         <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-             {/* ... title ... */}
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                   <WarningAmberIcon color="warning" sx={{ mr: 1 }}/>
                   <Typography variant="h6" component="h3">Low Stock Items</Typography>
               </Box>
             <TableContainer sx={{ flexGrow: 1 }}>
-               {/* ... table content ... */}
                 <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow><TableCell>Product</TableCell><TableCell align="right">Qty Left</TableCell></TableRow>
@@ -566,13 +598,11 @@ const DashboardPage = () => {
         {/* Recent Activities Section */}
         <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
            <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* ... title ... */}
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <ReceiptLongIcon color="primary" sx={{ mr: 1 }} />
                 <Typography variant="h6" component="h3">Recent Activity</Typography>
               </Box>
             <TableContainer sx={{ flexGrow: 1 }}>
-                {/* ... table content ... */}
                  <Table size="small">
                   <TableHead>
                     <TableRow>
@@ -618,13 +648,11 @@ const DashboardPage = () => {
         {/* Pending Purchase Orders */}
         <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* ... title ... */}
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <AssignmentIcon color="secondary" sx={{ mr: 1 }} />
                 <Typography variant="h6" component="h3">Pending Purchase Orders</Typography>
               </Box>
             <TableContainer sx={{ flexGrow: 1 }}>
-               {/* ... table content ... */}
                 <Table size="small">
                   <TableHead>
                     <TableRow><TableCell>PO Number</TableCell><TableCell>Status</TableCell></TableRow>
