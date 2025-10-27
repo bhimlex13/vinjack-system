@@ -14,16 +14,25 @@ const saleSchema = new mongoose.Schema({
       required: true,
       min: 1
     },
-    priceAtTime: { 
+    priceAtTime: { // Selling price at time of sale
       type: Number,
       required: true
     },
-    costAtTime: {
-        type: Number,
-        required: true
+    // REMOVED: costAtTime (replaced by costOfGoodsSold)
+    // costAtTime: {
+    //     type: Number,
+    //     required: true
+    // }
+    // --- NEW FIELD ---
+    costOfGoodsSold: { // Actual cost of the item when it was sold
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0 // Default to 0, should be set in controller
     }
+    // --- END NEW FIELD ---
   }],
-  
+
   services: [{
     service: {
         type: mongoose.Schema.Types.ObjectId,
@@ -47,27 +56,25 @@ const saleSchema = new mongoose.Schema({
     required: true
   },
 
-  // --- NEW FIELD ADDED HERE ---
   customer: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Customer' 
+    ref: 'Customer'
   },
-  // --------------------------
 
   motorcycle: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Motorcycle' 
+    ref: 'Motorcycle'
   },
 
-  customerReceiptImage: { 
-    type: String, 
+  customerReceiptImage: {
+    type: String,
   },
 
-  isManualEntry: { 
+  isManualEntry: {
     type: Boolean,
     default: false
   },
 
-}, { timestamps: true }); 
+}, { timestamps: true });
 
 module.exports = mongoose.model('Sale', saleSchema);
