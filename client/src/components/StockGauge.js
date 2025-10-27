@@ -2,63 +2,71 @@
 import React from 'react';
 import { Box, Typography, LinearProgress, Tooltip } from '@mui/material';
 
-// Function to determine the color of the progress bar
-const getStatusColor = (status) => {
+// Function to get status details (text and color)
+const getStatusDetails = (status) => {
   switch (status) {
-    // --- MODIFIED: Changed to 'inherit' (grey) ---
     case 'Out of Stock':
-      return 'inherit';
+      return { text: 'Out of Stock', color: 'inherit' }; // Grey
     case 'Critical':
-      return 'error';
+      return { text: 'Critical', color: 'error' };   // Red
     case 'Low':
-      return 'warning';
-    case 'Healthy':
+      return { text: 'Low', color: 'warning' }; // Orange
+    case 'Healthy': // Keep Healthy internally
     default:
-      return 'success';
+      return { text: 'In Stock', color: 'success' }; // Green
   }
 };
 
 const StockGauge = ({ quantity, maxStock, stockStatus }) => {
   // Ensure maxStock is a valid number > 0 for calculation
   const safeMaxStock = Math.max(1, maxStock || 1);
-  
-  // --- NEW: Logic to prevent 0% if stock exists ---
-  const rawPercentage = (quantity / safeMaxStock) * 100;
-  let percentage = Math.round(rawPercentage);
-  
-  // If quantity is > 0 but rounding made it 0, force it to 1%
-  if (quantity > 0 && percentage === 0) {
-    percentage = 1;
-  }
 
-  const color = getStatusColor(stockStatus);
-  const statusText = stockStatus || 'N/A'; // Fallback text
-  
-  const progressBarValue = Math.min(percentage, 100);
+  // Calculate raw percentage
+  const rawPercentage = (quantity / safeMaxStock) * 100;
+
+  // Cap percentage at 100 for display and bar
+  let displayPercentage = Math.round(rawPercentage);
+  if (quantity > 0 && displayPercentage === 0) {
+    displayPercentage = 1; // Show at least 1% if there's stock
+  }
+  const progressBarValue = Math.min(displayPercentage, 100); // Bar caps at 100%
+
+  // Get status text and color
+  const { text: statusText, color: statusColor } = getStatusDetails(stockStatus);
+
+  // --- MODIFIED: Tooltip shows status text ---
+  const tooltipTitle = statusText;
+
+  // --- MODIFIED: Main text shows "Quantity / MaxStock" ---
+  const quantityDisplay = `${quantity.toLocaleString()} / ${safeMaxStock.toLocaleString()}`;
 
   return (
-    <Tooltip title={`${quantity} / ${safeMaxStock} units`} arrow>
+    <Tooltip title={tooltipTitle} arrow>
       <Box sx={{ width: '100%', pt: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-          <Typography 
-            variant="body2" 
-            component="span" 
-            // --- MODIFIED: Use 'text.secondary' (grey) if color is 'inherit' ---
-            sx={{ 
-              fontWeight: 'bold', 
-              color: color === 'inherit' ? 'text.secondary' : `${color}.main` 
+          {/* --- MODIFIED: Display "Quantity / MaxStock" --- */}
+          <Typography
+            variant="body2"
+            component="span"
+            sx={{
+              fontWeight: 'bold',
+              // Use status color for quantity text too
+              color: statusColor === 'inherit' ? 'text.secondary' : `${statusColor}.main`,
+              // Add whiteSpace to prevent wrapping if numbers get very large
+              whiteSpace: 'nowrap'
             }}
           >
-            {statusText}
+            {quantityDisplay} {/* Display "763 / 1000", etc. */}
           </Typography>
+          {/* Display Capped Percentage */}
           <Typography variant="body2" component="span" sx={{ color: 'text.secondary' }}>
-            {percentage}%
+            {progressBarValue}% {/* Show capped percentage */}
           </Typography>
         </Box>
         <LinearProgress
           variant="determinate"
-          value={progressBarValue} // The bar itself stops at 100
-          color={color} // 'inherit' will result in a grey bar
+          value={progressBarValue} // Use the capped value for the bar
+          color={statusColor} // 'inherit' results in a grey bar
           sx={{ height: 6, borderRadius: 5 }}
         />
       </Box>
