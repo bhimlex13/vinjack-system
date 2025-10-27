@@ -8,13 +8,10 @@ const { createNotification } = require('../utils/notificationManager');
 const getProducts = async (req, res) => {
   try {
     const products = await Product.find({})
-      // --- MODIFICATION START ---
-      // Select the suppliers field and populate it
       .select('itemCode name category brand cost price quantity image maxStock stockStatus suppliers')
       .populate('category', 'name')
       .populate('brand', 'name')
-      .populate('suppliers', 'name'); // <-- ADD THIS LINE TO POPULATE SUPPLIERS
-      // --- MODIFICATION END ---
+      .populate('suppliers', 'name');
 
     res.status(200).json(products);
   } catch (error) {
@@ -22,20 +19,14 @@ const getProducts = async (req, res) => {
   }
 };
 
-// --- createProduct function (No changes needed, should already save suppliers) ---
 const createProduct = async (req, res) => {
-  const io = req.app.get('socketio');
+  // ... (createProduct logic remains the same - already logs creation) ...
+   const io = req.app.get('socketio');
   try {
-    // Make sure suppliers is destructured here
     const { name, itemCode, category, brand, cost, price, quantity, unit, image, suppliers, maxStock } = req.body;
-
-    const newProduct = new Product({
-      name, itemCode, category, brand, cost, price, quantity, unit, image, suppliers, maxStock // Ensure suppliers is included
-    });
-
+    const newProduct = new Product({ name, itemCode, category, brand, cost, price, quantity, unit, image, suppliers, maxStock });
     const initialStatus = getStockStatus(newProduct.quantity, newProduct.maxStock);
     newProduct.stockStatus = initialStatus;
-
     let savedProduct = await newProduct.save();
 
     if (savedProduct.quantity > 0) {
@@ -44,29 +35,16 @@ const createProduct = async (req, res) => {
         notes: 'Initial stock from product creation.', recordedBy: req.user.id
       });
     }
-
-    // Stock status notification logic (remains the same)
     if (initialStatus === 'Low' || initialStatus === 'Critical' || initialStatus === 'Out of Stock') {
-        const message = initialStatus === 'Out of Stock'
-          ? `${savedProduct.name} was created and is OUT OF STOCK.`
+        const message = initialStatus === 'Out of Stock' ? `${savedProduct.name} was created and is OUT OF STOCK.`
           : `${savedProduct.name} was created with ${initialStatus.toLowerCase()} stock (${savedProduct.quantity} remaining).`;
-        const newNotifications = await createNotification({
-            recipientRole: 'Owner', message: message, type: initialStatus.toUpperCase() + '_STOCK', link: '/inventory' });
+        const newNotifications = await createNotification({ recipientRole: 'Owner', message: message, type: initialStatus.toUpperCase() + '_STOCK', link: '/inventory' });
         if (newNotifications && newNotifications.length) {
             newNotifications.forEach(notification => io.to(notification.user.toString()).emit('new_notification', notification));
         }
     }
-
     logAction(req.user, 'CREATE_PRODUCT', `Created product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`, { entityType: 'Product', entityId: savedProduct._id });
-
-    // Populate after saving
-    savedProduct = await savedProduct.populate([
-        { path: 'category', select: 'name' },
-        { path: 'brand', select: 'name' },
-        { path: 'suppliers', select: 'name' } // Also populate suppliers here for the response
-    ]);
-
-
+    savedProduct = await savedProduct.populate([ { path: 'category', select: 'name' }, { path: 'brand', select: 'name' }, { path: 'suppliers', select: 'name' } ]);
     res.status(201).json(savedProduct);
   } catch (error) {
     res.status(400).json({ message: 'Error creating product', error: error.message });
@@ -74,7 +52,7 @@ const createProduct = async (req, res) => {
 };
 
 
-// --- updateProduct function (No changes needed, should already save suppliers) ---
+// --- MODIFICATION START ---
 const updateProduct = async (req, res) => {
   const io = req.app.get('socketio');
   try {
@@ -83,29 +61,52 @@ const updateProduct = async (req, res) => {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      // --- Ensure 'suppliers' is included in the update logic ---
+      // --- Store original values for comparison ---
+      const originalProductData = {
+          name: product.name,
+          itemCode: product.itemCode, // Although disabled in form, include for completeness
+          category: String(product.category), // Store as string ID
+          brand: String(product.brand), // Store as string ID
+          cost: product.cost,
+          price: product.price,
+          maxStock: product.maxStock,
+          image: product.image,
+          suppliers: product.suppliers.map(s => String(s)) // Store as array of string IDs
+      };
+      // ---
+
       const allowedUpdates = ['name', 'itemCode', 'category', 'brand', 'cost', 'price', 'maxStock', 'image', 'suppliers'];
       const oldStatus = product.stockStatus;
       let changesMade = false;
+      let changeDetails = []; // --- Array to store specific changes ---
 
       allowedUpdates.forEach(key => {
-         // Check if the key exists in req.body AND is different from the current value
-         // Need careful comparison for arrays like suppliers
          if (req.body[key] !== undefined) {
              let isDifferent = false;
+             let newValue = req.body[key]; // Capture the new value
+
              if (key === 'suppliers') {
-                 // Compare supplier arrays (simple comparison by length and content assuming IDs are strings)
-                 const currentSuppliers = product.suppliers.map(s => String(s));
-                 const newSuppliers = Array.isArray(req.body.suppliers) ? req.body.suppliers.map(s => String(s)) : [];
-                 if (currentSuppliers.length !== newSuppliers.length || !currentSuppliers.every(id => newSuppliers.includes(id))) {
+                 const currentSuppliers = originalProductData.suppliers; // Use original data
+                 const newSuppliers = Array.isArray(newValue) ? newValue.map(s => String(s)) : [];
+                 if (currentSuppliers.length !== newSuppliers.length || !currentSuppliers.every(id => newSuppliers.includes(id)) || !newSuppliers.every(id => currentSuppliers.includes(id))) {
                     isDifferent = true;
+                    // For suppliers, log a generic change message as listing all IDs can be long
+                    changeDetails.push(`updated assigned suppliers`);
                  }
-             } else if (String(product[key]) !== String(req.body[key])) { // General comparison
+             } else if (key === 'category' || key === 'brand') {
+                 // Compare string IDs for category/brand
+                 if (String(originalProductData[key]) !== String(newValue)) {
+                    isDifferent = true;
+                    // We need to fetch names later for the log message
+                    changeDetails.push({ key, from: originalProductData[key], to: newValue });
+                 }
+             } else if (String(originalProductData[key]) !== String(newValue)) { // General comparison
                  isDifferent = true;
+                 changeDetails.push(`changed ${key} from '${originalProductData[key]}' to '${newValue}'`);
              }
 
              if (isDifferent) {
-                product[key] = req.body[key];
+                product[key] = newValue;
                 changesMade = true;
              }
          }
@@ -116,11 +117,12 @@ const updateProduct = async (req, res) => {
       if (newStatus !== oldStatus) {
          product.stockStatus = newStatus;
          changesMade = true; // Status change counts as a change
+         changeDetails.push(`stock status changed from '${oldStatus}' to '${newStatus}'`);
       }
       // ---
 
       if (!changesMade) {
-          // If nothing changed besides potentially status, just return the populated product
+          // If nothing changed, just return the populated product
           const populatedProduct = await product.populate([
                { path: 'category', select: 'name' },
                { path: 'brand', select: 'name' },
@@ -133,13 +135,40 @@ const updateProduct = async (req, res) => {
       let savedProduct = await product.save();
 
       // Send notification ONLY if status actually changed
-      if (newStatus !== oldStatus) {
+      if (newStatus !== oldStatus && (newStatus === 'Low' || newStatus === 'Critical' || newStatus === 'Out of Stock')) {
         checkStockLevelAndNotify(savedProduct, io);
       }
 
-      logAction(req.user, 'UPDATE_PRODUCT', `Updated product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`, { entityType: 'Product', entityId: savedProduct._id });
+      // --- Build detailed log message ---
+      let logMessage = `Updated product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`;
+      if (changeDetails.length > 0) {
+          // Fetch names for category/brand if they were changed
+          const populatedChanges = await Promise.all(changeDetails.map(async (change) => {
+              if (typeof change === 'object' && change.key === 'category') {
+                  const [oldCat, newCat] = await Promise.all([
+                      mongoose.model('Category').findById(change.from).select('name'),
+                      mongoose.model('Category').findById(change.to).select('name')
+                  ]);
+                  return `changed category from '${oldCat?.name || change.from}' to '${newCat?.name || change.to}'`;
+              }
+              if (typeof change === 'object' && change.key === 'brand') {
+                  const [oldBrand, newBrand] = await Promise.all([
+                      mongoose.model('Brand').findById(change.from).select('name'),
+                      mongoose.model('Brand').findById(change.to).select('name')
+                  ]);
+                  return `changed brand from '${oldBrand?.name || change.from}' to '${newBrand?.name || change.to}'`;
+              }
+              return change; // Return strings or supplier message directly
+          }));
+          logMessage += ` - ${populatedChanges.join(', ')}.`;
+      } else {
+          logMessage += "."; // Add period if no specific details (shouldn't happen if changesMade is true)
+      }
+      // ---
 
-      // Populate after saving
+      logAction(req.user, 'UPDATE_PRODUCT', logMessage, { entityType: 'Product', entityId: savedProduct._id });
+
+      // Populate after saving for the response
       savedProduct = await savedProduct.populate([
           { path: 'category', select: 'name' },
           { path: 'brand', select: 'name' },
@@ -153,30 +182,17 @@ const updateProduct = async (req, res) => {
      res.status(400).json({ message: 'Error updating product', error: error.message });
   }
 };
+// --- MODIFICATION END ---
 
 
-// --- deleteProduct function (unchanged) ---
-const deleteProduct = async (req, res) => { /* ... */
-    try {
+const deleteProduct = async (req, res) => {
+    // ... (deleteProduct logic remains the same) ...
+     try {
         const product = await Product.findById(req.params.id);
         if (product) {
             const productId = product._id;
             const productDetails = `Deleted product: '${product.name}' (Code: ${product.itemCode})`;
-
-            // --- Check if product has quantity or movements before deleting? (Optional safety check) ---
-            // Example: Check if quantity is 0
-            // if (product.quantity > 0) {
-            //     return res.status(400).json({ message: 'Cannot delete product with existing stock. Please adjust quantity to 0 first.' });
-            // }
-            // Example: Check associated movements (more complex)
-            // const movementsExist = await Movement.exists({ product: productId });
-            // if (movementsExist) {
-            //     return res.status(400).json({ message: 'Cannot delete product with transaction history. Consider deactivating instead.' });
-            // }
-            // --- End Optional Checks ---
-
             await product.deleteOne();
-
             logAction(req.user, 'DELETE_PRODUCT', productDetails, { entityType: 'Product', entityId: productId });
             res.json({ message: 'Product removed' });
         } else {
@@ -187,40 +203,35 @@ const deleteProduct = async (req, res) => { /* ... */
     }
 };
 
-// --- getLowStockProducts function (unchanged) ---
-const getLowStockProducts = async (req, res) => { /* ... */
-  try {
-    const lowStockProducts = await Product.find({
-      stockStatus: { $in: ['Low', 'Critical', 'Out of Stock'] }
-    });
+const getLowStockProducts = async (req, res) => {
+    // ... (getLowStockProducts logic remains the same) ...
+    try {
+    const lowStockProducts = await Product.find({ stockStatus: { $in: ['Low', 'Critical', 'Out of Stock'] } });
     res.json(lowStockProducts);
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
  };
 
-// --- getProductsBySupplier function (unchanged) ---
-const getProductsBySupplier = async (req, res) => { /* ... */
-  try {
+const getProductsBySupplier = async (req, res) => {
+    // ... (getProductsBySupplier logic remains the same) ...
+     try {
     const { supplierId } = req.params;
     if (!supplierId) {
         return res.status(400).json({ message: 'Supplier ID is required.' });
     }
-    // Only select fields needed for PO creation dropdown
-    const products = await Product.find({ suppliers: supplierId })
-        .select('itemCode name cost');
+    const products = await Product.find({ suppliers: supplierId }).select('itemCode name cost');
     res.json(products);
   } catch (error) {
     res.status(500).json({ message: 'Server error while fetching products by supplier.', error: error.message });
   }
 };
 
-// --- recalculateAllProductStatuses function (unchanged) ---
-const recalculateAllProductStatuses = async (req, res) => { /* ... */
-  try {
+const recalculateAllProductStatuses = async (req, res) => {
+    // ... (recalculateAllProductStatuses logic remains the same) ...
+    try {
     const products = await Product.find({});
     let updatedCount = 0;
-
     for (const product of products) {
       const newStatus = getStockStatus(product.quantity, product.maxStock);
       if (product.stockStatus !== newStatus) {
@@ -229,10 +240,8 @@ const recalculateAllProductStatuses = async (req, res) => { /* ... */
         updatedCount++;
       }
     }
-
     logAction(req.user, 'SYNC_STOCK_STATUS', `Manually re-synced all product stock statuses. ${updatedCount} products updated.`);
     res.status(200).json({ message: `Successfully re-synced all product statuses. ${updatedCount} products were updated.` });
-
   } catch (error) {
     res.status(500).json({ message: 'Error re-syncing statuses', error: error.message });
   }
