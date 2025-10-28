@@ -1,17 +1,17 @@
 // server/routes/saleRoutes.js
 const express = require('express');
 const router = express.Router();
-// --- MODIFIED: Import uploadMiddleware and the new controller function ---
+// --- MODIFIED: Import new controller, remove old one ---
 const {
   createSale,
   getAllSales,
   getSaleById,
   searchSales,
-  uploadReceiptImage // <-- NEW
+  saveReceiptString // <-- NEW
 } = require('../controllers/saleController');
 const { protect, authorize } = require('../middleware/authMiddleware');
-// --- NEW: Import upload middleware ---
-const uploadMiddleware = require('../middleware/uploadMiddleware');
+// --- REMOVED: uploadMiddleware is no longer needed for sales ---
+// const uploadMiddleware = require('../middleware/uploadMiddleware');
 
 router.route('/')
     .post(protect, authorize('Owner', 'Admin', 'Clerk'), createSale)
@@ -20,14 +20,13 @@ router.route('/')
 router.route('/search')
     .get(protect, authorize('Owner', 'Admin', 'Clerk'), searchSales);
 
-// --- NEW: Route for uploading customer receipt image ---
-// Uses uploadMiddleware to handle the file named 'receiptImage'
-router.route('/:id/upload-receipt')
+// --- NEW: Route for saving the Base64 receipt string ---
+// This route expects a JSON body with { receiptImageString: "data:image/..." }
+router.route('/:id/save-receipt-string')
     .post(
         protect,
         authorize('Owner', 'Admin', 'Clerk'),
-        uploadMiddleware, // Handles single file upload named 'receiptImage'
-        uploadReceiptImage
+        saveReceiptString // Does NOT use multer middleware
     );
 // --- END NEW ---
 
