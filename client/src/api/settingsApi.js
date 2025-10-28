@@ -1,41 +1,57 @@
 // client/src/api/settingsApi.js
-import api from './axios';
+import api from './axios'; // Assuming your configured axios instance is here
 
-// --- Manual Backup ---
-
-// Triggers a download of a manual .json backup
-export const createManualBackup = () => {
-  // We don't use the api instance here because we need to handle a blob response
-  // We get the token from localStorage just like the api instance does
-  const user = JSON.parse(localStorage.getItem('user'));
-  const token = user ? user.token : null;
-
-  if (!token) {
-    return Promise.reject(new Error('No token found'));
+/**
+ * Triggers a manual backup process to Google Cloud Storage.
+ * @returns {Promise<Object>} - The response data from the server (e.g., { message: '...' }).
+ */
+export const triggerManualBackupToGCS = async () => {
+  try {
+    // Use the axios instance for POST
+    // No request body needed for this trigger
+    const response = await api.post('/settings/backup/gcs');
+    return response.data; // Return the JSON response (e.g., { message: '...' })
+  } catch (error) {
+    console.error("Error triggering manual backup to GCS:", error.response || error);
+    throw error; // Rethrow error for component's catch block
   }
+};
 
-  return fetch(`${process.env.REACT_APP_API_URL}/api/settings/backup/create`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+/**
+ * Fetches the list of available backup files from Google Cloud Storage.
+ * @returns {Promise<Array<Object>>} - An array of backup file objects (e.g., [{ name, timeCreated, size }]).
+ */
+export const listGCSBackups = async () => {
+    try {
+        const response = await api.get('/settings/backup/list');
+        return response.data; // Returns the array of backup file info
+    } catch (error) {
+        console.error("Error fetching backup list from GCS:", error.response || error);
+        throw error; // Rethrow error for component's catch block
+    }
 };
 
 
-// --- Restore from Backup ---
-
-// Uploads a .gz backup file to restore the database
-export const restoreBackup = async (formData) => {
-  // formData will contain the file
-  const response = await api.post('/settings/backup/restore', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data', // Important for file uploads
-    },
-    // Optional: Add upload progress tracking if needed
-    // onUploadProgress: (progressEvent) => {
-    //   console.log(`Upload Progress: ${Math.round((progressEvent.loaded * 100) / progressEvent.total)}%`);
-    // },
-  });
-  return response.data;
+/**
+ * Initiates restoring the database from a specified GCS backup file.
+ * @param {string} fileName - The name of the .gz file in GCS to restore from.
+ * @returns {Promise<Object>} - The response data from the server (e.g., { message: '...' }).
+ */
+export const restoreBackup = async (fileName) => {
+  try {
+    // Send the filename in the request body as JSON
+    const response = await api.post('/settings/backup/restore', { fileName }); // No FormData needed
+    return response.data; // Return the JSON response (e.g., { message: '...' })
+  } catch (error) {
+    console.error("Error initiating restore from GCS:", error.response || error);
+    // Rethrow error for component's catch block
+    throw error;
+  }
 };
+
+// Remove the old createManualBackup function (JSON download) if no longer needed
+// export const createManualBackup = async () => { ... };
+
+// Config functions remain the same if needed
+// export const getBackupConfig = async () => { ... };
+// export const updateBackupConfig = async (config) => { ... };
