@@ -6,8 +6,9 @@ const Customer = require('../models/customerModel');
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
 const { checkStockLevelAndNotify } = require('../utils/stockManager');
-const path = require('path'); // Needed for path manipulation
+// const path = require('path'); // No longer needed for this controller
 
+// --- createSale, getAllSales, getSaleById, searchSales remain unchanged ---
 const createSale = async (req, res) => {
   const io = req.app.get('socketio');
   const { items, services, customerId, motorcycleId } = req.body;
@@ -16,16 +17,10 @@ const createSale = async (req, res) => {
     return res.status(400).json({ message: 'Sale must include at least one item or service.' });
   }
 
-  // Use a session for transaction safety if needed, especially with stock updates
-  // const session = await mongoose.startSession();
-  // session.startTransaction();
-
   try {
     if (customerId) {
-        const customerExists = await Customer.findById(customerId); //.session(session);
+        const customerExists = await Customer.findById(customerId);
         if (!customerExists) {
-            // await session.abortTransaction();
-            // session.endSession();
             return res.status(404).json({ message: 'Customer not found.' });
         }
     }
@@ -34,55 +29,48 @@ const createSale = async (req, res) => {
     const processedItems = [];
     const processedServices = [];
     const movementsToLog = [];
-    const productsToUpdate = []; // Keep track of products to save later
+    const productsToUpdate = [];
 
     if (items && items.length > 0) {
         for (const item of items) {
-          // --- Select defaultCost ---
-          const product = await Product.findById(item.product).select('name quantity price defaultCost maxStock stockStatus'); //.session(session);
+          const product = await Product.findById(item.product).select('name quantity price defaultCost maxStock stockStatus');
           if (!product) throw new Error(`Product with ID ${item.product} not found.`);
           if (product.quantity < item.quantity) throw new Error(`Insufficient stock for ${product.name}. Only ${product.quantity} left.`);
 
           const stockBefore = product.quantity;
-          product.quantity -= item.quantity; // Decrease stock
-          productsToUpdate.push(product); // Add to list to save later
+          product.quantity -= item.quantity;
+          productsToUpdate.push(product);
 
           movementsToLog.push({
               product: product._id, type: 'SALE', quantityChange: -item.quantity,
               stockBefore, recordedBy: req.user.id
-              // referenceId will be added after sale save
           });
 
-          const salePrice = product.price; // Use current selling price
+          const salePrice = product.price;
           calculatedTotal += item.quantity * salePrice;
 
-          // --- Store price and COST OF GOODS SOLD ---
           processedItems.push({
             product: item.product,
             quantity: item.quantity,
             priceAtTime: salePrice,
-            costOfGoodsSold: product.defaultCost || 0 // Use defaultCost, fallback to 0
+            costOfGoodsSold: product.defaultCost || 0
           });
-          // --- END ---
         }
     }
 
     if (services && services.length > 0) {
       for (const serviceItem of services) {
-        const service = await Service.findById(serviceItem.service); //.session(session);
+        const service = await Service.findById(serviceItem.service);
         if (!service || service.status !== 'active') throw new Error(`Service with ID ${serviceItem.service} not found or is inactive.`);
         calculatedTotal += service.charge;
         processedServices.push({ service: service._id, priceAtTime: service.charge });
       }
     }
 
-    // --- Save Product stock changes ---
     for (const prod of productsToUpdate) {
-        await prod.save(); //{ session });
-        // Trigger stock check AFTER saving the product update
-        await checkStockLevelAndNotify(prod, io); // Pass the updated product
+        await prod.save();
+        await checkStockLevelAndNotify(prod, io);
     }
-    // ---
 
     const sale = new Sale({
       items: processedItems,
@@ -92,25 +80,18 @@ const createSale = async (req, res) => {
       customer: customerId || undefined,
       motorcycle: motorcycleId || undefined,
     });
-    const createdSale = await sale.save(); //{ session });
+    const createdSale = await sale.save();
 
-    // --- Log movements after sale is saved ---
     for (const movement of movementsToLog) {
-        movement.referenceId = createdSale._id; // Add reference ID now
+        movement.referenceId = createdSale._id;
         await logMovement(movement);
     }
-    // ---
 
     logAction(req.user, 'PROCESS_SALE', `Processed sale #${createdSale._id} with a total of ₱${calculatedTotal.toFixed(2)}.`, { entityType: 'Sale', entityId: createdSale._id });
 
-    // Commit transaction if using sessions
-    // await session.commitTransaction();
-    // session.endSession();
-
-    // Populate for response (no changes needed here)
     const populatedSale = await Sale.findById(createdSale._id)
       .populate('recordedBy', 'fullName')
-      .populate('items.product', 'name') // Only need name now
+      .populate('items.product', 'name')
       .populate({ path: 'services.service', select: 'name' })
       .populate('customer', 'name')
       .populate('motorcycle', 'make model plateNumber');
@@ -118,17 +99,11 @@ const createSale = async (req, res) => {
     res.status(201).json(populatedSale);
 
   } catch (error) {
-    // Abort transaction on error if using sessions
-    // await session.abortTransaction();
-    // session.endSession();
     console.error("Error creating sale:", error);
     res.status(400).json({ message: error.message || "An unexpected error occurred while processing the sale." });
   }
 };
-
-
-// --- getAllSales, getSaleById, searchSales, uploadReceiptImage remain unchanged ---
-const getAllSales = async (req, res) => { /* ... unchanged ... */
+const getAllSales = async (req, res) => {
     try {
         const sales = await Sale.find({})
             .sort({ createdAt: -1 })
@@ -143,7 +118,7 @@ const getAllSales = async (req, res) => { /* ... unchanged ... */
         res.status(500).json({ message: 'Server error fetching sales.', error: error.message });
     }
  };
-const getSaleById = async (req, res) => { /* ... unchanged ... */
+const getSaleById = async (req, res) => {
     try {
         const sale = await Sale.findById(req.params.id)
             .populate('recordedBy', 'fullName')
@@ -159,7 +134,7 @@ const getSaleById = async (req, res) => { /* ... unchanged ... */
         res.status(500).json({ message: 'Server error fetching sale details.', error: error.message });
     }
  };
-const searchSales = async (req, res) => { /* ... unchanged ... */
+const searchSales = async (req, res) => {
   try {
     const { customerId, userId, startDate, endDate } = req.query;
     let filter = {};
@@ -180,24 +155,62 @@ const searchSales = async (req, res) => { /* ... unchanged ... */
     res.status(500).json({ message: 'Server error while searching sales.', error: error.message });
   }
 };
-const uploadReceiptImage = async (req, res) => { /* ... unchanged ... */
+
+// --- NEW: Function to save Base64 receipt string ---
+const saveReceiptString = async (req, res) => {
   try {
-    const sale = await Sale.findById(req.params.id);
-    if (!sale) return res.status(404).json({ message: 'Sale not found.' });
-    if (!req.file) return res.status(400).json({ message: 'No receipt image file uploaded.' });
-    const filePath = path.join('/uploads', 'receipts', req.file.filename).replace(/\\/g, '/');
-    sale.customerReceiptImage = filePath;
-    await sale.save();
-    logAction( req.user, 'UPLOAD_SALE_RECEIPT', `Uploaded customer receipt image for Sale ID ${sale._id}. File: ${req.file.filename}`, { entityType: 'Sale', entityId: sale._id });
+    const { receiptImageString } = req.body; // Get the string from the request body
+    const saleId = req.params.id;
+
+    if (!receiptImageString || !receiptImageString.startsWith('data:image')) {
+      return res.status(400).json({ message: 'Invalid or missing image data provided.' });
+    }
+
+    // Find the sale and update the field directly
+    const sale = await Sale.findByIdAndUpdate(
+        saleId,
+        { customerReceiptImage: receiptImageString }, // Save the full Base64 string
+        { new: true, runValidators: true } // Return the updated document
+    );
+
+    if (!sale) {
+      return res.status(404).json({ message: 'Sale not found.' });
+    }
+
+    logAction(
+      req.user,
+      'UPLOAD_SALE_RECEIPT', // Action type remains the same conceptually
+      `Uploaded customer receipt image for Sale ID ${sale._id}. (Base64)`,
+      { entityType: 'Sale', entityId: sale._id }
+    );
+
+    // Populate the updated sale to send back the full data needed by the frontend
     const populatedSale = await Sale.findById(sale._id)
       .populate('recordedBy', 'fullName').populate('items.product', 'name')
       .populate({ path: 'services.service', select: 'name' })
       .populate('customer', 'name').populate('motorcycle', 'make model plateNumber');
-    res.status(200).json({ message: 'Receipt image uploaded successfully.', filePath: filePath, sale: populatedSale });
+
+    res.status(200).json({
+      message: 'Receipt image uploaded successfully.',
+      sale: populatedSale // Send back the updated and populated sale object
+    });
+
   } catch (error) {
-    console.error('Error uploading receipt image:', error);
-    res.status(500).json({ message: 'Server error during receipt upload.', error: error.message });
+    console.error('Error saving receipt string:', error);
+    // Handle potential validation errors if the Base64 string is too long for MongoDB limits
+    if (error.name === 'ValidationError') {
+        return res.status(400).json({ message: 'Validation Error: Image data might be too large.', details: error.message });
+    }
+    res.status(500).json({ message: 'Server error during receipt save.', error: error.message });
   }
 };
+// --- END NEW ---
 
-module.exports = { createSale, getAllSales, getSaleById, searchSales, uploadReceiptImage };
+
+module.exports = {
+  createSale,
+  getAllSales,
+  getSaleById,
+  searchSales,
+  saveReceiptString // --- MODIFIED: Export the new function ---
+};
