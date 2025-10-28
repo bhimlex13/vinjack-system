@@ -3,10 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "bash ./install_mongo_tools.sh && node index.js",
     "dev": "nodemon index.js",
-    "test": "jest",
-    "postinstall": "bash ./install_mongo_tools.sh || echo 'Skipping MongoDB tools install on non-Linux environment.'"
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
