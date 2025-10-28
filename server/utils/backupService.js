@@ -119,12 +119,15 @@ const backupDatabaseToGCS = () => {
     const backupFilePath = path.join(localBackupDir, backupFileName); // Save in main backup dir first
 
     // Ensure mongodump path is correct
-    const mongodumpPath = '"C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongodump.exe"'; // Adjust if needed
+    // --- MODIFIED: Remove hardcoded Windows path ---
+    // const mongodumpPath = '"C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongodump.exe"'; // Adjust if needed
+    const mongodumpPath = 'mongodump'; // Use this if mongodump is in the system PATH
+    // --- END MODIFICATION ---
 
     const dumpCommand = `${mongodumpPath} --uri="${dbUri}" --archive="${backupFilePath}" --gzip`;
 
     console.log(`[${new Date().toLocaleString()}] Starting database backup...`);
-    console.log(`Executing: ${dumpCommand}`);
+    console.log(`Executing: ${dumpCommand}`); // Check this log output after the change
 
     exec(dumpCommand, async (error, stdout, stderr) => {
       if (error) {
@@ -179,7 +182,10 @@ const restoreDatabase = (filePath) => {
     }
 
     // Ensure mongorestore path is correct
-    const mongorestorePath = '"C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongorestore.exe"'; // Adjust if needed
+    // --- MODIFIED: Remove hardcoded Windows path ---
+    // const mongorestorePath = '"C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongorestore.exe"'; // Adjust if needed
+    const mongorestorePath = 'mongorestore'; // Use this if mongorestore is in the system PATH
+    // --- END MODIFICATION ---
 
     const restoreCommand = `${mongorestorePath} --uri="${dbUri}" --archive="${filePath}" --gzip --drop`;
 
