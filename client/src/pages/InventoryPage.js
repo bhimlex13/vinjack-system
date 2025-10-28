@@ -253,13 +253,13 @@ const InventoryPage = () => {
         <Stack direction="row" spacing={2}>
           {(user?.role === 'Owner' || user?.role === 'Admin') && (
             <Tooltip title="Recalculate stock status for all products">
-              <Button 
+              {/* <Button 
                 variant="outlined" 
                 startIcon={<SyncIcon />} 
                 onClick={handleSyncStatuses}
               >
                 Sync Statuses
-              </Button>
+              </Button> */}
             </Tooltip>
           )}
           

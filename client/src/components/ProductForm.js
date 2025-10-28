@@ -274,11 +274,11 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
         <Box component="form" onSubmit={handleSubmit}>
           <Grid container spacing={2}>
             {/* Item Code, Name */}
-             <Grid item xs={12}> <TextField fullWidth required name="itemCode" label="Item Code" value={formData.itemCode} onChange={handleChange} disabled={!!productToEdit} InputProps={{ endAdornment: ( <InputAdornment position="end"> <Tooltip title="Generate Unique Item Code"><IconButton onClick={handleGenerateItemCode} edge="end" disabled={!!productToEdit}> <AutoFixHighIcon /> </IconButton></Tooltip> </InputAdornment> ) }} /> {!!productToEdit && <FormHelperText>Item Code cannot be changed after creation.</FormHelperText>} </Grid>
-             <Grid item xs={12}><TextField fullWidth required name="name" label="Product Name" value={formData.name} onChange={handleChange} /></Grid>
+             <Grid item size={{ xs: 12 }}> <TextField fullWidth required name="itemCode" label="Item Code" value={formData.itemCode} onChange={handleChange} disabled={!!productToEdit} InputProps={{ endAdornment: ( <InputAdornment position="end"> <Tooltip title="Generate Unique Item Code"><IconButton onClick={handleGenerateItemCode} edge="end" disabled={!!productToEdit}> <AutoFixHighIcon /> </IconButton></Tooltip> </InputAdornment> ) }} /> {!!productToEdit && <FormHelperText>Item Code cannot be changed after creation.</FormHelperText>} </Grid>
+             <Grid item size={{ xs: 12 }}><TextField fullWidth required name="name" label="Product Name" value={formData.name} onChange={handleChange} /></Grid>
 
             {/* Category & Brand Select */}
-            <Grid item xs={6}>
+            <Grid item size={{ xs: 6 }}>
               <FormControl fullWidth required>
                 <InputLabel>Category</InputLabel>
                 <Select
@@ -291,7 +291,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={6}>
+            <Grid item size={{ xs: 6 }}>
               <FormControl fullWidth required>
                 <InputLabel>Brand</InputLabel>
                 <Select
@@ -306,7 +306,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
             </Grid>
 
             {/* Supplier Display Area */}
-            <Grid item xs={12}>
+            <Grid item size={{ xs: 12 }}>
                 <Typography variant="subtitle2" gutterBottom>Assigned Suppliers & Costs</Typography>
                 <Paper variant="outlined" sx={{ p: 1.5 }}>
                     {getAssignedSupplierDetailsWithCost.length > 0 ? (
@@ -361,13 +361,13 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
             
 
             {/* Price, Quantity, Max Stock */}
-             <Grid item xs={6}><TextField fullWidth required type="number" name="price" label="Selling Price" value={formData.price} onChange={handleChange} inputProps={{ step: "0.01", min: 0 }} /></Grid>
-             <Grid item xs={6}> <TextField fullWidth required type="number" name="quantity" label="Current Qty" value={formData.quantity} onChange={handleChange} inputProps={{ min: 0 }} disabled={!!productToEdit} InputProps={productToEdit ? { endAdornment: ( <InputAdornment position="end"> <Tooltip title="Use 'Adjust Stock' button in the inventory list to change quantity."> <InfoOutlinedIcon color="action" /> </Tooltip> </InputAdornment> ) }: {}} /> {!!productToEdit && <FormHelperText>Quantity is managed via transactions. Use Adjust Stock for corrections.</FormHelperText>} </Grid>
-             <Grid item xs={6}> <TextField fullWidth required type="number" name="maxStock" label="Max Stock" value={formData.maxStock} onChange={handleChange} inputProps={{ min: 1 }} /> </Grid>
+             <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="price" label="Selling Price" value={formData.price} onChange={handleChange} inputProps={{ step: "0.01", min: 0 }} /></Grid>
+             <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="quantity" label="Current Qty" value={formData.quantity} onChange={handleChange} inputProps={{ min: 0 }} disabled={!!productToEdit} InputProps={productToEdit ? { endAdornment: ( <InputAdornment position="end"> <Tooltip title="Use 'Adjust Stock' button in the inventory list to change quantity."> <InfoOutlinedIcon color="action" /> </Tooltip> </InputAdornment> ) }: {}} /> {!!productToEdit && <FormHelperText>Quantity is managed via transactions. Use Adjust Stock for corrections.</FormHelperText>} </Grid>
+             <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="maxStock" label="Max Stock" value={formData.maxStock} onChange={handleChange} inputProps={{ min: 1 }} /> </Grid>
              
              {/* --- NEW: Status Dropdown (Owner only, Edit mode only) --- */}
              {productToEdit && (user?.role === 'Owner' || user?.role === 'Admin') && (
-                <Grid item xs={6}>
+                <Grid item size={{ xs: 6 }}>
                     <FormControl fullWidth required>
                         <InputLabel>Status</InputLabel>
                         <Select
@@ -389,10 +389,10 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
 
 
             {/* Helper Text for Thresholds */}
-            <Grid item xs={12} sx={{ mt: -1.5, pl: 1, pr: 1 }}> {formData.maxStock > 0 && ( <FormHelperText> Thresholds based on {formData.maxStock} units: <strong> Low</strong> status at &le; {Math.floor(formData.maxStock * 0.25)} | <strong> Critical</strong> status at &le; {Math.floor(formData.maxStock * 0.10)} </FormHelperText> )} </Grid>
+            <Grid item size={{ xs: 12 }} sx={{ mt: -1.5, pl: 1, pr: 1 }}> {formData.maxStock > 0 && ( <FormHelperText> Thresholds based on {formData.maxStock} units: <strong> Low</strong> status at &le; {Math.floor(formData.maxStock * 0.25)} | <strong> Critical</strong> status at &le; {Math.floor(formData.maxStock * 0.10)} </FormHelperText> )} </Grid>
 
             {/* Image URL/Upload */}
-            <Grid item xs={12}>
+            <Grid item size={{ xs: 12 }}>
               <FormControl fullWidth>
                 <ToggleButtonGroup value={imageSource} exclusive onChange={(e, val) => val && setImageSource(val)} size="small">
                   <ToggleButton value="url">URL</ToggleButton>

@@ -1,6 +1,7 @@
 // server/utils/emailService.js
 const nodemailer = require('nodemailer');
 
+// Ensure EMAIL_USER and EMAIL_APP_PASSWORD are set in your .env file
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -10,7 +11,6 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendVerificationEmail = async (recipientEmail, code) => {
-  // ... (sendVerificationEmail function remains the same)
   const mailOptions = {
     from: `"VinJack System" <${process.env.EMAIL_USER}>`,
     to: recipientEmail,
@@ -33,12 +33,12 @@ const sendVerificationEmail = async (recipientEmail, code) => {
 
 
 const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
-  // ... (sendLowStockEmail function remains the same)
   if (!lowStockItems || lowStockItems.length === 0) {
     console.log('No low stock items to report. Email not sent.');
     return;
   }
 
+  // Generate HTML list of low stock items
   const itemsHtml = lowStockItems
     .map(item => `<li>${item.name} (Current: ${item.quantity}, Reorder at: ${item.reorderLevel})</li>`)
     .join('');
@@ -59,14 +59,15 @@ const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
     await transporter.sendMail(mailOptions);
     console.log(`Low stock alert email sent successfully to ${recipientEmail}.`);
   } catch (error) {
-    console.error(`Error sending email to ${recipientEmail}:`, error);
+    console.error(`Error sending low stock email to ${recipientEmail}:`, error);
+    // Log error, but don't stop the calling process
   }
 };
 
 
 const sendPoLink = async (supplierEmail, supplierName, poNumber, token) => {
-  // --- THIS LINE IS FIXED ---
-  const link = `${process.env.CLIENT_URL}/supplier/po/${token}`; // Changed path
+  // Construct the link using the client URL from environment variables
+  const link = `${process.env.CLIENT_URL}/supplier/po/${token}`; // Ensure CLIENT_URL is in your .env
 
   const mailOptions = {
     from: `"Vinjack System" <${process.env.EMAIL_USER}>`,
@@ -95,9 +96,42 @@ const sendPoLink = async (supplierEmail, supplierName, poNumber, token) => {
     await transporter.sendMail(mailOptions);
     console.log(`PO email sent successfully to ${supplierEmail}`);
   } catch (error) {
-    console.error(`Error sending PO email to ${supplierEmail}:`, error);
+    console.error(`Error sending PO link email to ${supplierEmail}:`, error);
     // Log the error but don't stop PO creation
   }
 };
 
-module.exports = { sendLowStockEmail, sendVerificationEmail, sendPoLink };
+// --- NEW FUNCTION: Send PO Approval Notification ---
+const sendPOApprovalNotification = async (recipientEmail, supplierName, poNumber) => {
+    const mailOptions = {
+        from: `"VinJack System" <${process.env.EMAIL_USER}>`,
+        to: recipientEmail,
+        subject: `Purchase Order ${poNumber} Approved by VinJack Motorworks`,
+        html: `
+            <p>Hello ${supplierName},</p>
+            <p>This email confirms that your submitted review for Purchase Order <strong>${poNumber}</strong> has been <strong>approved</strong> by VinJack Motorworks.</p>
+            <p>We will proceed with the order based on the agreed quantities and costs.</p>
+            <p>Thank you for your prompt response.</p>
+            <p>Sincerely,</p>
+            <p>VinJack Motorworks</p>
+        `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`PO Approval notification sent successfully to ${recipientEmail} for PO ${poNumber}`);
+    } catch (error) {
+        console.error(`Error sending PO Approval email to ${recipientEmail} for PO ${poNumber}:`, error);
+        // Log the error but don't necessarily stop the main process
+        // Consider adding more robust error logging if needed
+    }
+};
+// --- END NEW FUNCTION ---
+
+
+module.exports = {
+    sendLowStockEmail,
+    sendVerificationEmail,
+    sendPoLink,
+    sendPOApprovalNotification // --- EXPORT NEW FUNCTION ---
+};
