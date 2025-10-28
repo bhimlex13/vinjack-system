@@ -8,8 +8,7 @@ const Delivery = require('../models/deliveryModel');
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
 const { checkStockLevelAndNotify } = require('../utils/stockManager');
-// --- Import sendPoLink AND sendPOApprovalNotification ---
-const { sendPoLink, sendPOApprovalNotification } = require('../utils/emailService'); // Ensure both are imported
+const { sendPoLink, sendPOApprovalNotification } = require('../utils/emailService');
 
 // Helper function to get the next sequence number for PO
 async function getNextSequenceValue(sequenceName) {
@@ -42,10 +41,8 @@ const createPurchaseOrder = async (req, res) => {
     const createdPurchaseOrder = await purchaseOrder.save();
     logAction(req.user, 'CREATE_PO', `Created Purchase Order #${poNumber}`, { entityType: 'PurchaseOrder', entityId: createdPurchaseOrder._id });
 
-    // Populate supplier name and email for the response and email sending
     const populatedPO = await PurchaseOrder.findById(createdPurchaseOrder._id).populate('supplier', 'name email');
 
-    // Send email to supplier with the review link
     if (populatedPO.supplier && populatedPO.supplier.email) {
         sendPoLink(
             populatedPO.supplier.email, populatedPO.supplier.name,
@@ -74,7 +71,6 @@ const getPurchaseOrderByToken = async (req, res) => {
     if (!purchaseOrder) {
       return res.status(404).json({ message: 'Purchase Order link is invalid or has expired.' });
     }
-    // Prevent review if already finalized
     if (['Approved', 'Completed', 'Cancelled'].includes(purchaseOrder.status)) {
         return res.status(400).json({ message: 'This purchase order has already been finalized.' });
     }
@@ -95,12 +91,10 @@ const updateBySupplier = async (req, res) => {
     if (!po) {
       return res.status(404).json({ message: 'Purchase Order not found.' });
     }
-     // Prevent update if not in Pending state
      if (po.status !== 'Pending') {
       return res.status(400).json({ message: 'This PO has already been reviewed or actioned.' });
     }
 
-    // Update item details based on supplier input
     po.items.forEach(originalItem => {
         const updatedItem = items.find(i => i.product === originalItem.product.toString());
         if (updatedItem) {
@@ -109,7 +103,6 @@ const updateBySupplier = async (req, res) => {
         }
     });
 
-    // Recalculate total based on available items and potentially updated costs
     let newTotalAmount = 0;
     po.items.forEach(item => {
         const costToUse = typeof item.supplierUpdatedCost === 'number' ? item.supplierUpdatedCost : item.cost;
@@ -117,9 +110,9 @@ const updateBySupplier = async (req, res) => {
         newTotalAmount += item.total;
     });
 
-    po.totalAmount = newTotalAmount; // Update total amount
+    po.totalAmount = newTotalAmount;
     po.supplierNotes = supplierNotes;
-    po.status = 'Awaiting Approval'; // Change status
+    po.status = 'Awaiting Approval';
     po.history.push({ status: 'Awaiting Approval', notes: supplierNotes || 'Reviewed by supplier.', updatedBy: 'Supplier' });
 
     await po.save();
@@ -134,12 +127,10 @@ const updateBySupplier = async (req, res) => {
 // Approve the Purchase Order after supplier review
 const approveSupplierChanges = async (req, res) => {
   try {
-    // Populate supplier email for notification
     const po = await PurchaseOrder.findById(req.params.id).populate('supplier', 'name email');
     if (!po) {
       return res.status(404).json({ message: 'Purchase Order not found.' });
     }
-    // Only allow approval if status is 'Awaiting Approval'
     if (po.status !== 'Awaiting Approval') {
       return res.status(400).json({ message: `Cannot approve a PO with status '${po.status}'.` });
     }
@@ -147,30 +138,26 @@ const approveSupplierChanges = async (req, res) => {
     let finalTotalAmount = 0;
     const availableItems = [];
 
-    // Finalize items based on supplier feedback
     po.items.forEach(item => {
       if (item.isAvailable) {
-        // Use supplier's cost if provided, otherwise original cost
         if (typeof item.supplierUpdatedCost === 'number') {
           item.cost = item.supplierUpdatedCost;
         }
-        item.total = item.quantity * item.cost; // Recalculate total for the item
-        finalTotalAmount += item.total; // Add to final PO total
-        availableItems.push(item); // Keep only available items
+        item.total = item.quantity * item.cost;
+        finalTotalAmount += item.total;
+        availableItems.push(item);
       }
     });
 
-    po.items = availableItems; // Update items list
-    po.totalAmount = finalTotalAmount; // Update final total amount
-    po.status = 'Approved'; // Set status to Approved
+    po.items = availableItems;
+    po.totalAmount = finalTotalAmount;
+    po.status = 'Approved';
     po.history.push({ status: 'Approved', notes: 'Supplier changes approved by user.', updatedBy: req.user.name });
 
     const updatedPurchaseOrder = await po.save();
 
-    // Log the approval action
     logAction(req.user, 'APPROVE_PO', `Approved supplier changes for PO #${po.poNumber}`, { entityType: 'PurchaseOrder', entityId: updatedPurchaseOrder._id });
 
-    // --- SEND APPROVAL EMAIL to Supplier ---
     if (po.supplier && po.supplier.email) {
         sendPOApprovalNotification(
             po.supplier.email,
@@ -182,11 +169,9 @@ const approveSupplierChanges = async (req, res) => {
     } else {
         console.log(`Supplier email not found for approved PO ${po.poNumber}. Approval email not sent.`);
     }
-    // --- END SEND APPROVAL EMAIL ---
 
-    // Repopulate necessary fields for the response
     const populatedPO = await PurchaseOrder.findById(updatedPurchaseOrder._id)
-      .populate('supplier', 'name') // Keep name populated
+      .populate('supplier', 'name')
       .populate('items.product', 'name itemCode unit');
 
     res.json(populatedPO);
@@ -203,7 +188,7 @@ const getAllPurchaseOrders = async (req, res) => {
         const purchaseOrders = await PurchaseOrder.find({})
             .populate('supplier', 'name')
             .populate('items.product', 'name')
-            .sort({ createdAt: -1 }); // Sort by creation date, newest first
+            .sort({ createdAt: -1 });
         res.json(purchaseOrders);
     } catch (error) {
         console.error('Error fetching all POs:', error);
@@ -215,8 +200,8 @@ const getAllPurchaseOrders = async (req, res) => {
 const getPurchaseOrderById = async (req, res) => {
     try {
         const purchaseOrder = await PurchaseOrder.findById(req.params.id)
-            .populate('supplier') // Populate full supplier details
-            .populate('items.product'); // Populate full product details
+            .populate('supplier')
+            .populate('items.product');
         if (purchaseOrder) {
             res.json(purchaseOrder);
         } else {
@@ -232,7 +217,7 @@ const getPurchaseOrderById = async (req, res) => {
 const updatePurchaseOrder = async (req, res) => {
     try {
         const { id } = req.params;
-        const { notes, status } = req.body; // Allow updating notes or status
+        const { notes, status } = req.body; 
 
         const po = await PurchaseOrder.findById(id);
         if (!po) {
@@ -244,7 +229,6 @@ const updatePurchaseOrder = async (req, res) => {
              po.notes = notes;
              updated = true;
         }
-        // Be cautious allowing direct status updates, usually handled by specific actions
         if (status && po.status !== status) {
             po.status = status;
             po.history.push({ status: status, notes: `Status manually updated by ${req.user.name}.`, updatedBy: req.user.name });
@@ -252,7 +236,7 @@ const updatePurchaseOrder = async (req, res) => {
         }
 
         if(!updated) {
-            return res.json(po); // No changes made
+            return res.json(po);
         }
 
         const updatedPO = await po.save();
@@ -274,14 +258,20 @@ const receivePurchaseOrder = async (req, res) => {
     if (!po) {
       return res.status(404).json({ message: 'Purchase Order not found.' });
     }
-    // Allow receiving only if Approved or Partially Received
     if (!['Approved', 'Partially Received'].includes(po.status)) {
       return res.status(400).json({ message: `Cannot receive stock for a PO with status '${po.status}'.` });
     }
 
-    // Expecting items as JSON string because of potential file upload
-    const receivedItems = JSON.parse(req.body.items);
+    // --- MODIFIED: Read 'items' and 'receiptImageString' from JSON body ---
+    const { items: receivedItems, receiptImageString } = req.body;
+    // --- END MODIFICATION ---
+
     let itemsActuallyReceived = false;
+    
+    // Check if receivedItems is an array
+    if (!Array.isArray(receivedItems)) {
+        return res.status(400).json({ message: 'Invalid format for received items.' });
+    }
 
     for (const receivedItem of receivedItems) {
       const poItem = po.items.find(p => p.product.toString() === receivedItem.productId);
@@ -289,63 +279,57 @@ const receivePurchaseOrder = async (req, res) => {
         const qtyToReceive = Number(receivedItem.quantityReceived);
         const maxReceivable = poItem.quantity - (poItem.quantityReceived || 0);
 
-        // Validate received quantity
         if (qtyToReceive > 0 && qtyToReceive <= maxReceivable) {
             itemsActuallyReceived = true;
             const product = await Product.findById(receivedItem.productId);
             if (!product) {
                 console.warn(`Product ID ${receivedItem.productId} not found during PO receive for ${po.poNumber}`);
-                continue; // Skip this item if product doesn't exist
+                continue; 
             }
 
             const stockBefore = product.quantity;
-            product.quantity = Number(product.quantity) + qtyToReceive; // Increase stock
+            product.quantity = Number(product.quantity) + qtyToReceive;
             await product.save();
 
-            // Check and notify for stock level changes
             await checkStockLevelAndNotify(product, io);
 
-            // Update quantity received on the PO item
             poItem.quantityReceived = (poItem.quantityReceived || 0) + qtyToReceive;
 
-            // Log the inventory movement
             await logMovement({
               product: receivedItem.productId,
               type: 'DELIVERY (PO)',
               quantityChange: qtyToReceive,
               stockBefore: stockBefore,
-              referenceId: po._id, // Link movement to this PO
+              referenceId: po._id,
               recordedBy: req.user.id
             });
         } else if (qtyToReceive > maxReceivable) {
             console.warn(`Attempted to receive ${qtyToReceive} for product ${receivedItem.productId} on PO ${po.poNumber}, but only ${maxReceivable} were remaining.`);
-            // Optionally throw an error or just ignore the excess
         }
       }
     }
 
-    // Determine the final status after receiving items
     const isCompleted = po.items.every(item => (item.quantityReceived || 0) >= item.quantity);
     po.status = isCompleted ? 'Completed' : (itemsActuallyReceived || po.status === 'Partially Received' ? 'Partially Received' : 'Approved');
 
-    // Handle uploaded receipt image
-    if (req.file) {
-      po.receiptImageUrl = `/uploads/receipts/${req.file.filename}`; // Save relative path
+    // --- MODIFIED: Save the Base64 string if provided ---
+    if (receiptImageString) {
+      po.receiptImageUrl = receiptImageString; // Save the string
     }
+    // --- END MODIFICATION ---
 
-    // Add entry to PO history
+    // --- MODIFIED: Update history note ---
     po.history.push({
       status: po.status,
-      notes: `Received stock. ${itemsActuallyReceived ? '' : 'No items received in this transaction. '}Receipt: ${req.file ? req.file.filename : 'Not uploaded.'}`,
+      notes: `Received stock. ${itemsActuallyReceived ? '' : 'No items received in this transaction. '}Receipt: ${receiptImageString ? 'Uploaded' : 'Not uploaded.'}`,
       updatedBy: req.user.name
     });
+    // --- END MODIFICATION ---
 
     const updatedPO = await po.save();
 
-    // Log the receiving action
     logAction(req.user, 'RECEIVE_PO_STOCK', `Received stock for PO #${po.poNumber}. Status: ${updatedPO.status}`, { entityType: 'PurchaseOrder', entityId: updatedPO._id });
 
-    // Populate for response
     const populatedPO = await PurchaseOrder.findById(updatedPO._id)
       .populate('supplier')
       .populate('items.product');
@@ -366,7 +350,6 @@ const cancelPurchaseOrder = async (req, res) => {
         if (!po) {
             return res.status(404).json({ message: 'Purchase Order not found' });
         }
-        // Prevent cancelling if already completed or cancelled
         if (po.status === 'Completed' || po.status === 'Cancelled') {
             return res.status(400).json({ message: `Cannot cancel a PO with status '${po.status}'.` });
         }

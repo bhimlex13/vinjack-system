@@ -25,28 +25,20 @@ export const updatePurchaseOrder = async (id, purchaseOrderData) => {
   return response.data;
 };
 
-// --- MODIFIED: This function is rewritten to handle file uploads ---
-// It now accepts the items and the receipt file, and sends them as FormData.
-export const receivePurchaseOrder = async (id, items, receiptImageFile) => {
-  const formData = new FormData();
-
-  // 'items' must be converted to a JSON string to be sent with a file.
-  formData.append('items', JSON.stringify(items));
-
-  // Append the file if it exists. The key 'receiptImage' MUST match the backend middleware.
-  if (receiptImageFile) {
-    formData.append('receiptImage', receiptImageFile);
-  }
-
-  const config = {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+// --- MODIFIED: This function is rewritten to send JSON ---
+// It now accepts the items and the Base64 receipt string.
+export const receivePurchaseOrder = async (id, items, receiptImageString) => {
+  // Create the JSON payload
+  const payload = {
+    items: items, // The array of items
+    receiptImageString: receiptImageString // The Base64 string (or null)
   };
 
-  const response = await api.post(`/purchase-orders/${id}/receive`, formData, config);
+  // Send as standard application/json
+  const response = await api.post(`/purchase-orders/${id}/receive`, payload);
   return response.data;
 };
+// --- END MODIFICATION ---
 
 // Cancel a purchase order
 export const cancelPurchaseOrder = async (id) => {

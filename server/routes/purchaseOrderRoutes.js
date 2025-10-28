@@ -1,8 +1,8 @@
 // server/routes/purchaseOrderRoutes.js
 const express = require('express');
 const router = express.Router();
-// --- MODIFIED: Import the new middleware with the error handler ---
-const uploadWithErrorHandler = require('../middleware/uploadMiddleware'); 
+// --- MODIFIED: 'uploadWithErrorHandler' is no longer needed here ---
+// const uploadWithErrorHandler = require('../middleware/uploadMiddleware'); 
 const { 
   createPurchaseOrder, 
   getAllPurchaseOrders, 
@@ -35,8 +35,9 @@ router.route('/:id')
   .get(protect, authorize('Owner', 'Admin'), getPurchaseOrderById)
   .put(protect, authorize('Owner', 'Admin'), updatePurchaseOrder);
 
-// --- MODIFIED: The 'uploadWithErrorHandler' middleware is now used here ---
-router.post('/:id/receive', protect, authorize('Owner', 'Admin'), uploadWithErrorHandler, receivePurchaseOrder);
+// --- MODIFIED: Removed 'uploadWithErrorHandler' middleware ---
+// The route now expects JSON, not FormData
+router.post('/:id/receive', protect, authorize('Owner', 'Admin'), receivePurchaseOrder);
 
 router.post('/:id/cancel', protect, authorize('Owner', 'Admin'), cancelPurchaseOrder);
 
