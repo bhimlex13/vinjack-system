@@ -19,6 +19,13 @@ const productSchema = new mongoose.Schema({
     enum: ['Healthy', 'Low', 'Critical', 'Out of Stock'],
     default: 'Out of Stock'
   },
+  // --- NEW: Add status field ---
+  status: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  },
+  // --- END NEW ---
   unit: { type: String, default: 'pc' },
   image: { type: String, trim: true, default: '' },
   supplierCosts: [{
@@ -26,20 +33,9 @@ const productSchema = new mongoose.Schema({
     supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
     cost: { type: Number, required: true, min: 0 },
   }],
-  // defaultCost is now set via the form, not automatically
   defaultCost: { type: Number, min: 0, default: 0 },
 
 }, { timestamps: true });
 
-// --- REMOVED PRE-SAVE HOOK ---
-// productSchema.pre('save', function(next) {
-//   if (this.supplierCosts && this.supplierCosts.length > 0) {
-//     this.defaultCost = this.supplierCosts[0].cost;
-//   } else {
-//     this.defaultCost = 0;
-//   }
-//   next();
-// });
-// --- END REMOVAL ---
 
 module.exports = mongoose.model('Product', productSchema);

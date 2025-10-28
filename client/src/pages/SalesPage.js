@@ -27,8 +27,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import DesignServicesIcon from '@mui/icons-material/DesignServices';
-// --- NEW: Import Clear Cart Icon ---
-import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'; // Keep existing icon
 import { FaUserTag } from 'react-icons/fa';
 
 const getInitialCartState = () => {
@@ -83,7 +82,6 @@ const SalesPage = () => {
 
     socket.on('customer_added', (newCustomer) => {
       setCustomers(prevCustomers => {
-        // Prevent adding duplicates
         if (prevCustomers.some(c => c._id === newCustomer._id)) {
           return prevCustomers;
         }
@@ -91,9 +89,7 @@ const SalesPage = () => {
       });
     });
 
-    // --- THIS IS THE FIX for real-time Motorcycle updates ---
     socket.on('motorcycle_added', (newMotorcycle) => {
-      // If the new motorcycle belongs to the currently selected customer, re-fetch the list
       if (selectedCustomer && selectedCustomer._id === newMotorcycle.owner) {
         fetchMotorcycles(selectedCustomer._id);
       }
@@ -154,17 +150,26 @@ const SalesPage = () => {
           getServices('active'), getCustomers(),
         ]);
         
-        let productsData = productsRes.data;
+        // --- MODIFICATION: Filter out inactive products ---
+        let activeProductsData = productsRes.data.filter(p => p.status === 'active');
+        // --- END MODIFICATION ---
+
+        // Adjust quantities based on current cart
         if (cartItems.length > 0) {
-          productsData = productsData.map(product => {
+          activeProductsData = activeProductsData.map(product => {
             const itemInCart = cartItems.find(item => item.type === 'product' && item._id === product._id);
             if (itemInCart) {
-              return { ...product, quantity: product.quantity - itemInCart.cartQuantity };
+              // Ensure we don't go below zero if cart had more than available
+              const newQuantity = Math.max(0, product.quantity - itemInCart.cartQuantity); 
+              return { ...product, quantity: newQuantity };
             }
             return product;
           });
         }
-        setProducts(productsData);
+        
+        // --- Use the filtered data ---
+        setProducts(activeProductsData);
+        // --- ---
         
         setCategories(categoriesRes.data);
         setBrands(brandsRes.data);
@@ -186,12 +191,11 @@ const SalesPage = () => {
     };
     fetchInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Only run on mount
 
   const handleNewCustomerSubmit = async (newCustomerData) => {
     try {
       const createdCustomer = await createCustomer(newCustomerData);
-      // The socket event will update other tabs, but we update the current tab immediately.
       setCustomers(prev => [...prev, createdCustomer]);
       setSelectedCustomer(createdCustomer);
       setIsCustomerModalOpen(false);
@@ -200,11 +204,9 @@ const SalesPage = () => {
     }
   };
   
-  // --- THIS IS THE FIX to make the current tab update robustly ---
   const handleNewMotorcycleSubmit = async (newMotorcycleData) => {
     try {
         const createdMotorcycle = await createMotorcycle(newMotorcycleData);
-        // Re-fetch the list for the current user for an immediate and guaranteed update
         const updatedMotorcyclesList = await fetchMotorcycles(selectedCustomer._id);
         const newMotorcycleInList = updatedMotorcyclesList.find(m => m._id === createdMotorcycle._id);
         setSelectedMotorcycle(newMotorcycleInList);
@@ -215,23 +217,28 @@ const SalesPage = () => {
   };
 
   const addProductToCart = (product) => {
+    // Double-check status just in case, though it should be filtered out already
+    if(product.status !== 'active') return; 
+
     const productInState = products.find(p => p._id === product._id);
     if (!productInState || productInState.quantity <= 0) return;
 
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item.type === 'product' && item._id === product._id);
       if (existingItem) {
-        if (existingItem.cartQuantity < existingItem.stock) {
+        if (existingItem.cartQuantity < existingItem.stock) { // Use original stock from item added to cart
           return prevCart.map(item =>
             item._id === product._id ? { ...item, cartQuantity: item.cartQuantity + 1 } : item
           );
         }
-        return prevCart;
+        return prevCart; // Don't add if cart quantity >= original stock
       } else {
-        return [...prevCart, { ...product, cartQuantity: 1, stock: product.quantity, type: 'product' }];
+        // When adding for the first time, store the CURRENT available quantity as 'stock'
+        return [...prevCart, { ...product, cartQuantity: 1, stock: productInState.quantity, type: 'product' }];
       }
     });
 
+    // Decrease quantity in the displayed product list
     setProducts(prevProducts =>
       prevProducts.map(p =>
         p._id === product._id ? { ...p, quantity: p.quantity - 1 } : p
@@ -251,39 +258,50 @@ const SalesPage = () => {
   };
 
   const removeServiceFromCart = (serviceId) => {
-    setCartItems(prevCart => prevCart.filter(item => item._id !== serviceId));
+    setCartItems(prevCart => prevCart.filter(item => item._id !== serviceId && item.type === 'service'));
   };
 
 
   const updateQuantity = (product, amount) => {
     setCartItems(prevCart => {
-      const existingItem = prevCart.find(item => item.type === 'product' && item._id === product._id);
-      if (!existingItem) return prevCart;
+      const existingItemIndex = prevCart.findIndex(item => item.type === 'product' && item._id === product._id);
+      if (existingItemIndex === -1) return prevCart;
 
+      const existingItem = prevCart[existingItemIndex];
       const newQuantity = existingItem.cartQuantity + amount;
 
-      if (newQuantity <= 0) {
-        const productInList = products.find(p => p._id === product._id);
-        if (productInList) {
-          setProducts(prevProducts =>
-            prevProducts.map(p =>
-              p._id === product._id ? { ...p, quantity: p.quantity + existingItem.cartQuantity } : p
-            )
-          );
-        }
-        return prevCart.filter(item => item._id !== product._id);
-      }
+      // Find the product in the main list to get its current display quantity
+      const productInList = products.find(p => p._id === product._id);
+      const currentAvailableInList = productInList ? productInList.quantity : 0;
 
-      if (newQuantity <= existingItem.stock) {
+      if (newQuantity <= 0) {
+        // Remove item from cart, restore full quantity to list
         setProducts(prevProducts =>
           prevProducts.map(p =>
-            p._id === product._id ? { ...p, quantity: p.quantity - amount } : p
+            p._id === product._id ? { ...p, quantity: p.quantity + existingItem.cartQuantity } : p
           )
         );
-        return prevCart.map(item =>
-          item._id === product._id ? { ...item, cartQuantity: newQuantity } : item
-        );
+        const newCart = [...prevCart];
+        newCart.splice(existingItemIndex, 1);
+        return newCart;
       }
+      
+      // Check if adding more is allowed (new cart quantity <= original stock in cart item)
+      // AND check if reducing quantity in the list is allowed (amount < 0 requires quantity in list > 0)
+      if (newQuantity <= existingItem.stock && (amount > 0 ? currentAvailableInList > 0 : true)) {
+        // Update quantity in list
+         setProducts(prevProducts =>
+           prevProducts.map(p =>
+             p._id === product._id ? { ...p, quantity: p.quantity - amount } : p
+           )
+         );
+         // Update quantity in cart
+        const newCart = [...prevCart];
+        newCart[existingItemIndex] = { ...existingItem, cartQuantity: newQuantity };
+        return newCart;
+      }
+      
+      // If checks fail, return original cart
       return prevCart;
     });
   };
@@ -300,14 +318,12 @@ const SalesPage = () => {
     }, 0);
   }, [cartItems]);
 
-  // --- NEW: Function to clear the entire cart ---
   const handleClearCart = async () => {
     if (cartItems.length === 0) return;
 
     const isConfirmed = await confirm("Are you sure you want to clear the entire cart? This action cannot be undone.");
     
     if (isConfirmed) {
-      // Restore quantities to the main product list
       setProducts(prevProducts => {
         const productsToRestore = cartItems.filter(item => item.type === 'product');
         if (productsToRestore.length === 0) return prevProducts;
@@ -315,23 +331,21 @@ const SalesPage = () => {
         return prevProducts.map(p => {
           const itemInCart = productsToRestore.find(item => item._id === p._id);
           if (itemInCart) {
-            return { ...p, quantity: p.quantity + itemInCart.cartQuantity };
+            // Restore quantity based on original stock stored in cart item
+            return { ...p, quantity: itemInCart.stock }; 
           }
           return p;
         });
       });
 
-      // Clear all cart-related state
       setCartItems([]);
       setSelectedCustomer(null);
       setSelectedMotorcycle(null);
       setCustomerMotorcycles([]);
       
-      // Clear localStorage
       localStorage.removeItem('salesCart');
     }
   };
-  // --- END NEW ---
 
   const handleCompleteSale = async () => {
     if (cartItems.length === 0) return;
@@ -354,18 +368,29 @@ const SalesPage = () => {
         setSelectedCustomer(null); 
         setSelectedMotorcycle(null);
         setCustomerMotorcycles([]);
+        
+        // --- RE-FETCH active products after sale ---
         const productsResponse = await api.get('/products');
-        setProducts(productsResponse.data);
+        setProducts(productsResponse.data.filter(p => p.status === 'active'));
+        // --- END RE-FETCH ---
+
       } catch (error) {
         alert(`Sale failed: ${error.response?.data?.message || error.message}`);
+        
+        // --- RE-FETCH active products on failure (to ensure consistency) ---
         const productsResponse = await api.get('/products');
-        setProducts(productsResponse.data);
+        setProducts(productsResponse.data.filter(p => p.status === 'active'));
+        // --- END RE-FETCH ---
       }
     }
   };
 
   const filteredProducts = useMemo(() => {
+    // Note: 'products' state should already be pre-filtered for 'active' status
     return products.filter(product => {
+        // We can optionally add an extra check here, but it might be redundant
+        // if (product.status !== 'active') return false; 
+        
         const searchMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
         const brandMatch = selectedBrand ? product.brand._id === selectedBrand : true;
         const categoryMatch = selectedCategory ? product.category._id === selectedCategory : true;
@@ -398,7 +423,8 @@ const SalesPage = () => {
           <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
             <Grid container spacing={2}>
               {filteredProducts.map(product => (
-                <Grid item key={product._id} size={{ xs: 12, sm: 4, md: 3, lg: 2 }}>
+                // --- Using the 'size' prop as requested ---
+                <Grid item key={product._id} size={{ xs: 12, sm: 4, md: 3, lg: 2 }}> 
                   <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', ...(product.quantity === 0 && { backgroundColor: grey[300], cursor: 'not-allowed' }) }}>
                     <CardActionArea 
                       onClick={() => addProductToCart(product)} disabled={product.quantity === 0}
@@ -443,14 +469,12 @@ const SalesPage = () => {
             )}
           </Box>
           <Divider sx={{ mb: 1 }} />
-          {/* --- MODIFIED: Wrapped buttons in a Stack for alignment --- */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
               <ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale
             </Typography>
             
             <Stack direction="row" spacing={1}>
-              {/* --- NEW: Clear Cart Button --- */}
               <Button 
                 variant="outlined" 
                 color="error" 
@@ -461,7 +485,6 @@ const SalesPage = () => {
               >
                 Clear
               </Button>
-              {/* --- END NEW --- */}
               <Button 
                 variant="outlined" 
                 size="small" 
@@ -472,14 +495,50 @@ const SalesPage = () => {
               </Button>
             </Stack>
           </Box>
-          {/* --- END MODIFICATION --- */}
           <Divider sx={{ mb: 1 }} />
           <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
             {cartItems.length === 0 ? (<Typography color="text.secondary" align="center" sx={{ mt: 4 }}>Cart is empty</Typography>) : (
               <List>
                 {cartItems.map(item => (
                   <ListItem key={item._id} disablePadding>
-                    {item.type === 'product' ? (<><ListItemText primary={item.name} secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`}/><Box sx={{ display: 'flex', alignItems: 'center' }}><IconButton size="small" onClick={() => updateQuantity(item, -1)}><RemoveIcon fontSize="small"/></IconButton><Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography><IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton></Box></>) : (<><ListItemText primary={item.name} secondary={`₱${(item.charge).toFixed(2)}`}/><Tooltip title="Remove Service"><IconButton size="small" edge="end" aria-label="delete" onClick={() => removeServiceFromCart(item._id)}><DeleteIcon /></IconButton></Tooltip></>)}
+                    {item.type === 'product' ? (
+                        <>
+                            <ListItemText 
+                                primary={item.name} 
+                                secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`}
+                            />
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <IconButton size="small" onClick={() => updateQuantity(item, -1)}>
+                                    <RemoveIcon fontSize="small"/>
+                                </IconButton>
+                                <Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography>
+                                <IconButton 
+                                    size="small" 
+                                    onClick={() => updateQuantity(item, 1)} 
+                                    disabled={item.cartQuantity >= item.stock} // Disable based on original stock
+                                >
+                                    <AddIcon fontSize="small"/>
+                                </IconButton>
+                            </Box>
+                        </>
+                    ) : (
+                        <>
+                            <ListItemText 
+                                primary={item.name} 
+                                secondary={`₱${(item.charge).toFixed(2)}`}
+                            />
+                            <Tooltip title="Remove Service">
+                                <IconButton 
+                                    size="small" 
+                                    edge="end" 
+                                    aria-label="delete" 
+                                    onClick={() => removeServiceFromCart(item._id)}
+                                >
+                                    <DeleteIcon />
+                                </IconButton>
+                            </Tooltip>
+                        </>
+                    )}
                   </ListItem>
                 ))}
               </List>
@@ -487,15 +546,53 @@ const SalesPage = () => {
           </Box>
           <Divider sx={{ my: 1 }} />
           <Box sx={{ mt: 'auto' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}><Typography variant="h5" sx={{ fontWeight: 'bold' }}>Total</Typography><Typography variant="h5" sx={{ fontWeight: 'bold' }}>₱{calculateTotal.toFixed(2)}</Typography></Box>
-            <Button variant="contained" color="success" fullWidth size="large" startIcon={<PointOfSaleIcon />} onClick={handleCompleteSale} disabled={cartItems.length === 0}>Complete Sale</Button>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Total</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>₱{calculateTotal.toFixed(2)}</Typography>
+            </Box>
+            <Button 
+                variant="contained" 
+                color="success" 
+                fullWidth size="large" 
+                startIcon={<PointOfSaleIcon />} 
+                onClick={handleCompleteSale} 
+                disabled={cartItems.length === 0}
+            >
+                Complete Sale
+            </Button>
           </Box>
         </Paper>
       </Box>
-      {selectedCustomer && (<Dialog open={isMotorcycleModalOpen} onClose={() => setIsMotorcycleModalOpen(false)} maxWidth="sm" fullWidth><DialogTitle>Add New Motorcycle for {selectedCustomer.name}</DialogTitle><MotorcycleForm customer={selectedCustomer} onFormSubmit={handleNewMotorcycleSubmit} onClose={() => setIsMotorcycleModalOpen(false)}/></Dialog>)}
-      <Dialog open={isCustomerModalOpen} onClose={() => setIsCustomerModalOpen(false)} maxWidth="sm" fullWidth><DialogTitle>Add New Customer</DialogTitle><CustomerForm onClose={() => setIsCustomerModalOpen(false)} onFormSubmit={handleNewCustomerSubmit}/></Dialog>
-      {showReceiptModal && lastSaleData && (<ReceiptModal saleData={lastSaleData} onClose={() => setShowReceiptModal(false)} />)}
-      <AddServiceModal open={isServiceModalOpen} onClose={() => setIsServiceModalOpen(false)} services={services} onAddService={addServiceToCart} cartItems={cartItems}/>
+      {selectedCustomer && (
+        <Dialog open={isMotorcycleModalOpen} onClose={() => setIsMotorcycleModalOpen(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>Add New Motorcycle for {selectedCustomer.name}</DialogTitle>
+            <MotorcycleForm 
+                customer={selectedCustomer} 
+                onFormSubmit={handleNewMotorcycleSubmit} 
+                onClose={() => setIsMotorcycleModalOpen(false)}
+            />
+        </Dialog>
+      )}
+      <Dialog open={isCustomerModalOpen} onClose={() => setIsCustomerModalOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Add New Customer</DialogTitle>
+          <CustomerForm 
+              onClose={() => setIsCustomerModalOpen(false)} 
+              onFormSubmit={handleNewCustomerSubmit}
+          />
+      </Dialog>
+      {showReceiptModal && lastSaleData && (
+          <ReceiptModal 
+              saleData={lastSaleData} 
+              onClose={() => setShowReceiptModal(false)} 
+          />
+      )}
+      <AddServiceModal 
+          open={isServiceModalOpen} 
+          onClose={() => setIsServiceModalOpen(false)} 
+          services={services} 
+          onAddService={addServiceToCart} 
+          cartItems={cartItems}
+      />
     </Box>
   );
 };

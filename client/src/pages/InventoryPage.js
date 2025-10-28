@@ -11,7 +11,7 @@ import StockGauge from '../components/StockGauge';
 import {
   Box, Button, Typography, TextField, Select, MenuItem, FormControl, InputLabel,
   Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent,
-  Container, Tooltip, IconButton, Stack
+  Container, Tooltip, IconButton, Stack, Chip // --- NEW: Import Chip ---
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
@@ -19,7 +19,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import TuneIcon from '@mui/icons-material/Tune';
 import HistoryIcon from '@mui/icons-material/History';
-// --- NEW: Import Sync Icon ---
 import SyncIcon from '@mui/icons-material/Sync';
 
 const InventoryPage = () => {
@@ -37,6 +36,8 @@ const InventoryPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
+  // --- NEW: Filter for product status ---
+  const [filterStatus, setFilterStatus] = useState('active');
 
   const fetchInitialData = async () => {
     try {
@@ -60,7 +61,6 @@ const InventoryPage = () => {
     fetchInitialData();
   }, []);
 
-  // --- NEW: Function to run the status recalculation ---
   const handleSyncStatuses = async () => {
     const isConfirmed = window.confirm(
       "Are you sure you want to recalculate all product stock statuses? This will fix any out-of-sync items based on their current quantity and max stock."
@@ -70,14 +70,13 @@ const InventoryPage = () => {
       try {
         const response = await api.post('/products/recalculate-statuses');
         alert(response.data.message || "Statuses re-synced successfully!");
-        await fetchInitialData(); // This will re-fetch and set loading to false
+        await fetchInitialData(); 
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to sync statuses.');
-        setIsLoading(false); // Make sure to stop loading on error
+        setIsLoading(false); 
       }
     }
   };
-  // --- END NEW FUNCTION ---
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
@@ -88,9 +87,12 @@ const InventoryPage = () => {
       const brandId = typeof product.brand === 'object' ? product.brand?._id : product.brand;
       const categoryMatch = filterCategory ? categoryId === filterCategory : true;
       const brandMatch = filterBrand ? brandId === filterBrand : true;
-      return searchMatch && categoryMatch && brandMatch;
+      // --- NEW: Filter by status ---
+      const statusMatch = filterStatus ? product.status === filterStatus : true;
+
+      return searchMatch && categoryMatch && brandMatch && statusMatch;
     });
-  }, [products, searchTerm, filterCategory, filterBrand]);
+  }, [products, searchTerm, filterCategory, filterBrand, filterStatus]); // --- Added filterStatus
 
   const handleProductFormSubmit = (productData) => {
     const existingProductIndex = products.findIndex(p => p._id === productData._id);
@@ -120,16 +122,27 @@ const InventoryPage = () => {
     setIsProductModalOpen(true);
   };
 
-  const handleDelete = async (productId) => {
+  // --- RENAMED: from handleDelete to handleArchive ---
+  const handleArchive = async (productId) => {
     try {
-      await api.delete(`/products/${productId}`);
-      setProducts(products.filter(p => p._id !== productId));
+      // The backend 'DELETE' route now archives, not deletes
+      const response = await api.delete(`/products/${productId}`);
+      
+      // Update the product in the local state with the returned (archived) product
+      handleProductFormSubmit(response.data.product); 
+      
+      return Promise.resolve(); // Indicate success
     } catch (err) {
-      setError('Failed to delete product.');
+      setError('Failed to archive product.');
+      return Promise.reject(err); // Indicate failure
     }
   };
 
   const getRowClassName = (params) => {
+    // --- MODIFIED: Add class for inactive products ---
+    if (params.row.status === 'inactive') {
+      return 'inactive-row';
+    }
     return params.row.stockStatus === 'Out of Stock' ? 'out-of-stock-row' : '';
   };
 
@@ -141,7 +154,7 @@ const InventoryPage = () => {
     { field: 'brand', headerName: 'Brand', width: 150, renderCell: (params) => params.row.brand?.name || 'N/A' },
     { field: 'price', headerName: 'Price', width: 120, renderCell: (params) => `₱${(params.row?.price || 0).toFixed(2)}` },
     { 
-      field: 'status', 
+      field: 'stockStatus', // Renamed from 'status' to avoid confusion
       headerName: 'Stock Level', 
       width: 200, 
       renderCell: (params) => (
@@ -152,6 +165,23 @@ const InventoryPage = () => {
         />
       ) 
     },
+    // --- NEW: Status Column ---
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 100,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <Chip
+          label={params.value === 'active' ? 'Active' : 'Archived'}
+          color={params.value === 'active' ? 'success' : 'default'}
+          size="small"
+          variant="outlined"
+        />
+      )
+    },
+    // --- END NEW ---
     {
       field: 'actions', headerName: 'Actions', width: 180, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => (
@@ -168,7 +198,12 @@ const InventoryPage = () => {
               </IconButton>
             </Tooltip>
             <Tooltip title="Adjust Stock">
-              <IconButton size="small" color="secondary" onClick={() => setAdjustmentProduct(params.row)}>
+              <IconButton 
+                size="small" 
+                color="secondary" 
+                onClick={() => setAdjustmentProduct(params.row)}
+                disabled={params.row.status === 'inactive'} // --- Disable adjustment for inactive items ---
+              >
                 <TuneIcon />
               </IconButton>
             </Tooltip>
@@ -189,7 +224,8 @@ const InventoryPage = () => {
             onFormSubmit={handleProductFormSubmit}
             productToEdit={editingProduct}
             onClose={() => setIsProductModalOpen(false)}
-            onProductDelete={handleDelete}
+            // --- MODIFIED: Pass the archive handler ---
+            onProductArchive={handleArchive}
           />
         </DialogContent>
       </Dialog>
@@ -215,8 +251,7 @@ const InventoryPage = () => {
         </Typography>
         
         <Stack direction="row" spacing={2}>
-          {/* --- NEW SYNC BUTTON (Owner Only) --- */}
-          {/* {user && user.role === 'Owner' && (
+          {(user?.role === 'Owner' || user?.role === 'Admin') && (
             <Tooltip title="Recalculate stock status for all products">
               <Button 
                 variant="outlined" 
@@ -226,8 +261,7 @@ const InventoryPage = () => {
                 Sync Statuses
               </Button>
             </Tooltip>
-          )} */}
-          {/* --- END NEW BUTTON --- */}
+          )}
           
           {user && (user.role === 'Owner' || user.role === 'Clerk') && (
             <Button variant="contained" startIcon={<AddIcon />} onClick={openProductModalForAdd}>
@@ -237,44 +271,63 @@ const InventoryPage = () => {
         </Stack>
       </Box>
 
-      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
         <TextField label="Search" variant="outlined" size="small" value={searchTerm} 
-          onChange={(e) => setSearchTerm(e.target.value)} // <-- FIX HERE
-          sx={{ flexGrow: 1 }} InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
+          onChange={(e) => setSearchTerm(e.target.value)} 
+          sx={{ flexGrow: 1, minWidth: '200px' }} 
+          InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
         />
-        <FormControl size="small" sx={{ minWidth: 200 }}>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
           <InputLabel>Category</InputLabel>
           <Select value={filterCategory} label="Category" onChange={(e) => setFilterCategory(e.target.value)}>
             <MenuItem value=""><em>All Categories</em></MenuItem>
             {categories.map(cat => <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
           <InputLabel>Brand</InputLabel>
           <Select value={filterBrand} label="Brand" onChange={(e) => setFilterBrand(e.target.value)}>
             <MenuItem value=""><em>All Brands</em></MenuItem>
             {brands.map(brand => <MenuItem key={brand._id} value={brand._id}>{brand.name}</MenuItem>)}
           </Select>
         </FormControl>
+        {/* --- NEW: Status Filter --- */}
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Status</InputLabel>
+          <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)}>
+            <MenuItem value=""><em>All Statuses</em></MenuItem>
+            <MenuItem value="active">Active Only</MenuItem>
+            <MenuItem value="inactive">Archived Only</MenuItem>
+          </Select>
+        </FormControl>
+        {/* --- END NEW --- */}
       </Paper>
       
       <Paper sx={{
           height: '70vh',
           width: '100%',
+          // --- STYLING for new row classes ---
           '& .out-of-stock-row': {
             backgroundColor: '#fafafa',
             color: '#9e9e9e',
+            '&:hover': { backgroundColor: '#f0f0f0', }
           },
-          '& .out-of-stock-row:hover': {
-            backgroundColor: '#f0f0f0',
+          '& .inactive-row': {
+            backgroundColor: '#f5f5f5',
+            color: '#bdbdbd',
+            textDecoration: 'line-through',
+            '&:hover': { backgroundColor: '#eeeeee', }
           },
+          // --- END STYLING ---
       }}>
         <DataGrid
           rows={filteredProducts}
           columns={columns}
           loading={isLoading}
           getRowId={(row) => row._id}
-          initialState={{ sorting: { sortModel: [{ field: 'status', sort: 'desc' }] }, }}
+          initialState={{ 
+            sorting: { sortModel: [{ field: 'status', sort: 'asc' }] }, // --- Sort by status first ---
+          }}
           getRowClassName={getRowClassName}
         />
       </Paper>
