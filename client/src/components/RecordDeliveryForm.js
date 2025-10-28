@@ -1,9 +1,9 @@
 // client/src/components/RecordDeliveryForm.js
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react'; // Added useMemo
 import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
 import ConfirmationContext from '../context/ConfirmationContext';
-import { toast } from 'react-toastify'; // Import toast
+import { toast } from 'react-toastify';
 
 // MUI Imports
 import {
@@ -16,13 +16,19 @@ import {
   Grid,
   TextField,
   Typography,
-  List,
-  ListItem,
-  ListItemText,
   IconButton,
   Divider,
   Alert,
   Tooltip,
+  Autocomplete, // <-- NEW: Import Autocomplete
+  TableContainer, // <-- NEW: Import Table components
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Paper, // <-- NEW: Import Paper
+  CircularProgress // <-- NEW: Import CircularProgress
 } from '@mui/material';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -41,22 +47,26 @@ const RecordDeliveryForm = ({ onClose }) => {
   const { confirm } = useContext(ConfirmationContext);
 
   const [suppliers, setSuppliers] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState([]); // List of available products for Autocomplete
   const [selectedSupplier, setSelectedSupplier] = useState('');
-  // --- NEW: deliveryDate state ---
-  const [deliveryDate, setDeliveryDate] = useState(formatDateForInput(new Date())); // Default to today
-  // --- END NEW ---
-  const [productsReceived, setProductsReceived] = useState([]);
-  const [currentItem, setCurrentItem] = useState({
-    product: '',
-    quantity: '',
-    costAtTime: '',
-  });
-  const [error, setError] = useState('');
-  const [totalCostDisplay, setTotalCostDisplay] = useState(0); // State to display total cost
+  const [deliveryDate, setDeliveryDate] = useState(formatDateForInput(new Date()));
+  const [productsReceived, setProductsReceived] = useState([]); // Items added to the delivery list
 
+  // --- MODIFIED: State for the current item being added ---
+  const [selectedProduct, setSelectedProduct] = useState(null); // Holds the selected product object from Autocomplete
+  const [quantity, setQuantity] = useState(''); // Current quantity input
+  const [costAtTime, setCostAtTime] = useState(''); // Current cost input
+  // --- END MODIFICATION ---
+
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false); // General loading state
+  const [isProductLoading, setIsProductLoading] = useState(false); // Product list loading state
+
+  // Fetch initial suppliers and products
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true); // Start general loading
+      setIsProductLoading(true);
       try {
         const [suppliersRes, productsRes] = await Promise.all([
           api.get('/suppliers'),
@@ -64,51 +74,71 @@ const RecordDeliveryForm = ({ onClose }) => {
         ]);
         setSuppliers(suppliersRes.data);
         setProducts(productsRes.data);
+        setError(''); // Clear error on success
       } catch (error) {
         setError('Failed to load initial data.');
         console.error("Error fetching form data:", error);
+      } finally {
+        setIsLoading(false); // Stop general loading
+        setIsProductLoading(false);
       }
     };
     fetchData();
   }, []);
 
-  // --- NEW: useEffect to calculate total cost display ---
-  useEffect(() => {
-      const calculateTotal = () => {
-          const total = productsReceived.reduce((sum, item) => {
-              const qty = Number(item.quantity) || 0;
-              const cost = Number(item.costAtTime) || 0;
-              return sum + (qty * cost);
-          }, 0);
-          setTotalCostDisplay(total);
-      };
-      calculateTotal();
-  }, [productsReceived]); // Recalculate whenever items change
+  // Calculate total cost using useMemo for efficiency
+  const totalCost = useMemo(() => {
+      return productsReceived.reduce((sum, item) => {
+          const qty = Number(item.quantity) || 0;
+          const cost = Number(item.costAtTime) || 0;
+          return sum + (qty * cost);
+      }, 0);
+  }, [productsReceived]);
+
+  // --- NEW: Handle Autocomplete product selection ---
+  const handleProductSelection = (event, newValue) => {
+    setSelectedProduct(newValue);
+    // Optionally pre-fill cost if available (e.g., defaultCost)
+    setCostAtTime(newValue?.defaultCost?.toString() || ''); // Use default cost if available
+    setQuantity('1'); // Reset quantity to 1 when selecting a new product
+  };
   // --- END NEW ---
 
-  const handleItemChange = (e) => {
-    const { name, value } = e.target;
-    // Basic validation for quantity and cost inputs
-    if ((name === 'quantity' || name === 'costAtTime') && value && parseFloat(value) < 0) {
-        toast.warn(`${name === 'quantity' ? 'Quantity' : 'Cost'} cannot be negative.`);
-        setCurrentItem({ ...currentItem, [name]: '0' }); // Reset to 0 or keep previous valid value
-    } else {
-        setCurrentItem({ ...currentItem, [name]: value });
+  // Handle quantity input change
+  const handleQuantityChange = (e) => {
+    const value = e.target.value;
+    if (value === '' || (Number(value) >= 1 && Number.isInteger(Number(value)))) {
+       setQuantity(value);
+    } else if (Number(value) < 1) {
+       setQuantity('1'); // Reset to 1 if below 1
     }
   };
 
+  // Handle cost input change
+  const handleCostChange = (e) => {
+    const value = e.target.value;
+    // Allow empty, numbers, and one decimal point
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      // Basic check for non-negative
+      if (parseFloat(value) < 0) {
+        setCostAtTime('0');
+      } else {
+        setCostAtTime(value);
+      }
+    }
+  };
 
+  // Add the selected item to the delivery list table
   const handleAddItem = () => {
-    setError(''); // Clear previous error
-    const { product, quantity, costAtTime } = currentItem;
-    if (!product || !quantity || !costAtTime) {
+    setError('');
+    if (!selectedProduct || !quantity || !costAtTime) {
       setError('Please select a product and enter quantity & cost.');
       return;
     }
     const numQuantity = Number(quantity);
     const numCost = Number(costAtTime);
     if (isNaN(numQuantity) || numQuantity <= 0) {
-        setError('Quantity must be a positive number.');
+        setError('Quantity must be a positive whole number.');
         return;
     }
     if (isNaN(numCost) || numCost < 0) {
@@ -116,89 +146,103 @@ const RecordDeliveryForm = ({ onClose }) => {
         return;
     }
 
-    if (productsReceived.some(p => p.product === product)) {
-      setError('This product has already been added. Remove it first to change quantity/cost.');
+    // Check if product already exists in the list
+    if (productsReceived.some(p => p.product._id === selectedProduct._id)) {
+      setError(`${selectedProduct.name} is already in the list. Remove it first to change quantity/cost.`);
       return;
-    }
-
-    const productDetails = products.find((p) => p._id === product);
-    if (!productDetails) {
-        setError('Selected product details not found.'); // Should not happen if products loaded correctly
-        return;
     }
 
     setProductsReceived([
       ...productsReceived,
       {
-          product: product, // Store ID
-          quantity: numQuantity, // Store as number
-          costAtTime: numCost, // Store as number
-          name: productDetails.name // Keep name for display
+          product: selectedProduct, // Store the whole product object temporarily for display
+          quantity: numQuantity,
+          costAtTime: numCost,
        },
     ]);
-    setCurrentItem({ product: '', quantity: '', costAtTime: '' }); // Reset form
+
+    // Reset inputs
+    setSelectedProduct(null); // Clear Autocomplete
+    setQuantity('');
+    setCostAtTime('');
   };
 
+  // Remove item from the delivery list table
   const handleRemoveItem = (productId) => {
-    setProductsReceived(productsReceived.filter((p) => p.product !== productId));
+    setProductsReceived(productsReceived.filter((p) => p.product._id !== productId));
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(''); // Clear previous error
+    setError('');
 
-    // --- MODIFIED: Added deliveryDate validation ---
     if (!selectedSupplier || productsReceived.length === 0 || !deliveryDate) {
       setError('Please select a supplier, delivery date, and add at least one product.');
       return;
     }
-    // Check if date is valid (basic check)
     if (isNaN(new Date(deliveryDate).getTime())) {
         setError('Invalid delivery date selected.');
         return;
     }
-    // --- END MODIFICATION ---
 
-    // Total cost is now calculated in useEffect, use totalCostDisplay
+    // Prepare data for API: only send necessary fields
     const deliveryData = {
       supplier: selectedSupplier,
-      deliveryDate: deliveryDate, // Add date
-      productsReceived: productsReceived.map(({ name, ...rest }) => rest), // Remove name before sending
-      totalCost: totalCostDisplay, // Send calculated total cost
-      // recordedBy is added automatically by the backend via middleware
+      deliveryDate: deliveryDate,
+      // Map productsReceived to send only product ID and numeric quantity/cost
+      productsReceived: productsReceived.map(item => ({
+        product: item.product._id, // Send only the ID
+        quantity: Number(item.quantity),
+        costAtTime: Number(item.costAtTime)
+      })),
+      totalCost: totalCost, // Send calculated total cost
     };
 
+    const supplierName = suppliers.find(s => s._id === selectedSupplier)?.name || 'Unknown Supplier';
+    const formattedDate = new Date(deliveryDate).toLocaleDateString();
+    const formattedTotal = totalCost.toFixed(2);
+
     const isConfirmed = await confirm(
-        'Confirm Delivery Record', // Title
-        `Save delivery from ${suppliers.find(s => s._id === selectedSupplier)?.name || 'Unknown'} on ${new Date(deliveryDate).toLocaleDateString()} with a total cost of ₱${totalCostDisplay.toFixed(2)}? Stock levels will be updated.` // Message
+        'Confirm Delivery Record',
+        `Save delivery from ${supplierName} on ${formattedDate} with ${productsReceived.length} item(s) and a total cost of ₱${formattedTotal}? Stock levels will be updated.`
     );
 
     if (isConfirmed) {
+      setIsLoading(true); // Indicate submission processing
       try {
         await api.post('/deliveries', deliveryData);
-        toast.success('Delivery recorded successfully!'); // Add success toast
+        toast.success('Direct delivery recorded successfully and stock updated!');
         onClose(); // Close modal on success
       } catch (err) {
         const errMsg = err.response?.data?.message || err.message || 'Failed to record delivery.';
         setError(`Failed to record delivery: ${errMsg}`);
-        console.error("Delivery save error:", err); // Log detailed error
-        toast.error(`Error: ${errMsg}`); // Show error toast
+        toast.error(`Error: ${errMsg}`);
+      } finally {
+        setIsLoading(false); // Stop loading indicator
       }
     }
   };
 
+  // Filter products for Autocomplete - exclude those already added
+  const productOptions = useMemo(() => {
+    const addedIds = new Set(productsReceived.map(item => item.product._id));
+    return products.filter(p => !addedIds.has(p._id));
+  }, [products, productsReceived]);
+
   return (
-    <Box component="form" onSubmit={handleSubmit}>
+    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}> {/* Added margin top */}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Grid container spacing={2}>
           {/* Supplier */}
           <Grid item size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth required margin="normal">
+              <FormControl fullWidth required margin="dense"> {/* Changed margin */}
                 <InputLabel>Supplier</InputLabel>
                 <Select
                   value={selectedSupplier}
                   label="Supplier"
                   onChange={(e) => setSelectedSupplier(e.target.value)}
+                  disabled={isLoading} // Disable while loading
                 >
                   <MenuItem value=""><em>Select Supplier...</em></MenuItem>
                   {suppliers.map((s) => (
@@ -211,7 +255,6 @@ const RecordDeliveryForm = ({ onClose }) => {
           </Grid>
           {/* Delivery Date */}
           <Grid item size={{ xs: 12, sm: 6 }}>
-              {/* --- NEW: Delivery Date Field --- */}
               <TextField
                 label="Delivery Date"
                 type="date"
@@ -220,9 +263,9 @@ const RecordDeliveryForm = ({ onClose }) => {
                 InputLabelProps={{ shrink: true }}
                 required
                 fullWidth
-                margin="normal"
+                margin="dense" // Changed margin
+                disabled={isLoading} // Disable while loading
               />
-              {/* --- END NEW --- */}
           </Grid>
       </Grid>
 
@@ -230,116 +273,152 @@ const RecordDeliveryForm = ({ onClose }) => {
         <Typography variant="overline">Add Products Received</Typography>
       </Divider>
 
-      {/* Product Input Row */}
-      <Grid container spacing={2} alignItems="center">
-        <Grid item size={{ xs: 12, sm: 5 }}> {/* Adjusted size */}
-          <FormControl fullWidth size="small">
-            <InputLabel>Product</InputLabel>
-            <Select
-              name="product"
-              value={currentItem.product}
-              label="Product"
-              onChange={handleItemChange}
-              displayEmpty // Allows showing placeholder
-            >
-              <MenuItem value="" disabled><em>Select Product...</em></MenuItem>
-              {products.map((p) => (
-                <MenuItem key={p._id} value={p._id}>
-                  {p.name} (Current Stock: {p.quantity})
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+      {/* --- MODIFIED: Product Input Row using Autocomplete --- */}
+      <Grid container spacing={1} alignItems="center" sx={{ mb: 2 }}> {/* Reduced spacing */}
+        {/* Product Autocomplete */}
+        <Grid item size={{ xs: 12, md: 5 }}>
+          <Autocomplete
+            options={productOptions} // Use filtered options
+            getOptionLabel={(option) => `${option.name} (${option.itemCode})`}
+            isOptionEqualToValue={(option, value) => option._id === value._id}
+            value={selectedProduct}
+            onChange={handleProductSelection}
+            loading={isProductLoading}
+            disabled={isLoading || isProductLoading} // Disable while loading
+            size="small" // Make Autocomplete smaller
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Select Product"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {isProductLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+          />
         </Grid>
-        <Grid item size={{ xs: 6, sm: 2 }}>
+        {/* Quantity */}
+        <Grid item size={{ xs: 4, md: 2 }}>
           <TextField
-            name="quantity"
             label="Quantity"
-            type="number"
-            value={currentItem.quantity}
-            onChange={handleItemChange}
-            inputProps={{ min: "1" }} // Ensure positive
+            type="number" // Keep as number type
+            value={quantity}
+            onChange={handleQuantityChange}
+            inputProps={{ min: 1 }} // Min 1
             fullWidth
-            size="small"
+            size="small" // Make smaller
+            disabled={isLoading || !selectedProduct} // Disable if no product selected or loading
           />
         </Grid>
-        <Grid item size={{ xs: 6, sm: 3 }}>
+        {/* Cost */}
+        <Grid item size={{ xs: 5, md: 3 }}>
           <TextField
-            name="costAtTime"
             label="Cost per Item (₱)"
-            type="number"
-            value={currentItem.costAtTime}
-            onChange={handleItemChange}
-            inputProps={{ step: "0.01", min: "0" }} // Ensure non-negative
+            type="number" // Keep as number type
+            value={costAtTime}
+            onChange={handleCostChange}
+            inputProps={{ step: "0.01", min: 0 }} // Min 0
             fullWidth
-            size="small"
+            size="small" // Make smaller
+            disabled={isLoading || !selectedProduct} // Disable if no product selected or loading
           />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 2 }}> {/* Adjusted size */}
-          <Tooltip title="Add Product to List">
-            {/* Disable button slightly differently if fields missing */}
-            <Box sx={{ display: 'flex', justifyContent: 'center'}}>
-                <IconButton
-                  color="primary"
-                  onClick={handleAddItem}
-                  disabled={!currentItem.product || !currentItem.quantity || !currentItem.costAtTime}
-                >
-                  <AddCircleIcon fontSize="large"/>
-                </IconButton>
-            </Box>
+        {/* Add Button */}
+        <Grid item size={{ xs: 3, md: 2 }} sx={{ textAlign: 'center' }}>
+          <Tooltip title="Add Product to Delivery List">
+            {/* Wrap IconButton in Box for centering/sizing if needed */}
+            <span> {/* Span needed for Tooltip when button is disabled */}
+              <IconButton
+                color="primary"
+                onClick={handleAddItem}
+                disabled={!selectedProduct || !quantity || !costAtTime || isLoading || isProductLoading} // Disable if fields missing or loading
+                size="large" // Keep button prominent
+              >
+                <AddCircleIcon fontSize="inherit"/>
+              </IconButton>
+            </span>
           </Tooltip>
         </Grid>
       </Grid>
+      {/* --- END MODIFICATION --- */}
 
-      <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
-        Items in Delivery List
+      <Typography variant="h6" sx={{ mt: 2, mb: 1 }}> {/* Reduced margin */}
+        Items in this Delivery
       </Typography>
 
-      {/* Items List */}
-      <Box sx={{ maxHeight: 200, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1, mb: 2 }}>
-        {productsReceived.length === 0 ? (
-          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
-            No products added yet.
-          </Typography>
-        ) : (
-          <List dense>
-            {productsReceived.map((item) => (
-              <ListItem
-                key={item.product}
-                secondaryAction={
-                  <Tooltip title="Remove Item">
-                    <IconButton edge="end" onClick={() => handleRemoveItem(item.product)} color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
-                }
-              >
-                <ListItemText
-                  primary={`${item.name}`}
-                  secondary={`${item.quantity} x ₱${Number(item.costAtTime).toFixed(2)} each = ₱${(item.quantity * item.costAtTime).toFixed(2)}`}
-                />
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </Box>
-
-       {/* --- NEW: Total Cost Display --- */}
-       <Typography variant="subtitle1" sx={{ fontWeight: 'bold', textAlign: 'right', mb: 2 }}>
-            Estimated Total Cost: ₱{totalCostDisplay.toFixed(2)}
-       </Typography>
-       {/* --- END NEW --- */}
+      {/* --- MODIFIED: Items Table (similar to CreatePurchaseOrderPage) --- */}
+      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 250, mb: 2 }}> {/* Added max height and margin */}
+        <Table stickyHeader size="small"> {/* Make table smaller */}
+          <TableHead>
+            <TableRow>
+              <TableCell>Product</TableCell>
+              <TableCell align="right">Quantity</TableCell>
+              <TableCell align="right">Unit Cost</TableCell>
+              <TableCell align="right">Subtotal</TableCell>
+              <TableCell align="center">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {productsReceived.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  <Typography color="text.secondary">No products added yet.</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              productsReceived.map((item) => (
+                <TableRow key={item.product._id} hover>
+                  <TableCell>{item.product.name} ({item.product.itemCode})</TableCell>
+                  <TableCell align="right">{item.quantity}</TableCell>
+                  <TableCell align="right">₱{Number(item.costAtTime).toFixed(2)}</TableCell>
+                  <TableCell align="right">₱{(item.quantity * item.costAtTime).toFixed(2)}</TableCell>
+                  <TableCell align="center">
+                    <Tooltip title="Remove Item">
+                      {/* Disable remove button while submitting */}
+                      <span>
+                        <IconButton
+                          onClick={() => handleRemoveItem(item.product._id)}
+                          color="error"
+                          size="small"
+                          disabled={isLoading}
+                        >
+                          <DeleteIcon fontSize="small"/>
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+            {/* Show Total Row only if items exist */}
+            {productsReceived.length > 0 && (
+                 <TableRow sx={{ '& td': { borderTop: '2px solid black', fontWeight: 'bold' } }}>
+                     <TableCell colSpan={3} align="right">Total Cost:</TableCell>
+                     <TableCell align="right">₱{totalCost.toFixed(2)}</TableCell>
+                     <TableCell /> {/* Empty cell for actions column */}
+                 </TableRow>
+             )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {/* --- END MODIFICATION --- */}
 
 
       {/* Action Buttons */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, gap: 1 }}>
-          <Button onClick={onClose} color="inherit">Cancel</Button>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, gap: 1 }}> {/* Reduced margin */}
+          <Button onClick={onClose} color="inherit" disabled={isLoading}>Cancel</Button>
           <Button
             type="submit"
             variant="contained"
-            disabled={productsReceived.length === 0 || !selectedSupplier || !deliveryDate} // Disable if no items/supplier/date
+            disabled={productsReceived.length === 0 || !selectedSupplier || !deliveryDate || isLoading}
           >
-            Save Delivery
+            {isLoading ? <CircularProgress size={24} /> : 'Save Delivery & Update Stock'} {/* Updated text */}
           </Button>
       </Box>
     </Box>
