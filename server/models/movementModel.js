@@ -5,7 +5,9 @@ const movementSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
   type: {
     type: String,
-    enum: ['SALE', 'DELIVERY', 'ADJUSTMENT', 'RETURN'],
+    // --- MODIFIED: Added 'DELIVERY (PO)' to the enum list ---
+    enum: ['SALE', 'DELIVERY', 'ADJUSTMENT', 'RETURN', 'DELIVERY (PO)'],
+    // --- END MODIFICATION ---
     required: true
   },
   quantityChange: { type: Number, required: true }, // e.g., -5 for a sale, +50 for delivery
