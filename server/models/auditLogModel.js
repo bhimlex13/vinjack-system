@@ -11,35 +11,49 @@ const auditLogSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: [
-      'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT', 
-      'PROCESS_SALE',
-      'PROCESS_RETURN',
-      'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER',
-      'CREATE_CUSTOMER', 'UPDATE_CUSTOMER', 'DELETE_CUSTOMER',
-      'RECORD_DELIVERY',
-      'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
-      'CREATE_USER', 'DELETE_USER',
-      'FORCE_PASSWORD_CHANGE',
-      'REJECT_PROFILE_UPDATE',
-      'CREATE_PO', 'UPDATE_PO', 'CANCEL_PO',
-      'STOCK_ADJUSTMENT',
-      'ADMIN_RESET_PASSWORD',
+      // Product Actions
+      'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT', // Note: DELETE_PRODUCT might become unused
+      'ARCHIVE_PRODUCT', // Added previously
       'SYNC_STOCK_STATUS',
-      'APPROVE_PO',
-      'RECEIVE_PO_STOCK',
+
+      // Sale & Return Actions
+      'PROCESS_SALE', 'UPLOAD_SALE_RECEIPT',
+      'PROCESS_RETURN',
+
+      // Supplier & PO Actions
+      'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER',
+      'RECORD_DELIVERY', // Maybe rename? This is Direct Delivery
+      'CREATE_PO', 'UPDATE_PO', 'CANCEL_PO', 'APPROVE_PO', 'RECEIVE_PO_STOCK',
+
+      // Customer & Motorcycle Actions
+      'CREATE_CUSTOMER', 'UPDATE_CUSTOMER', 'DELETE_CUSTOMER',
+      'CREATE_MOTORCYCLE', 'UPDATE_MOTORCYCLE', 'DELETE_MOTORCYCLE',
+
+      // Service Actions
+      'CREATE_SERVICE', 'UPDATE_SERVICE', 'DELETE_SERVICE',
+
+      // User & Auth Actions
+      'CREATE_USER', 'UPDATE_USER', 'DELETE_USER',
       'LOGIN', 'LOGOUT', 'LOGIN_FAILED',
-      'UPDATE_USER',
-      'USER_PASSWORD_CHANGE',
+      'USER_PASSWORD_CHANGE', // User changes own password
+      'ADMIN_RESET_PASSWORD', // Admin resets user password
+      'FORCE_PASSWORD_CHANGE', // For profile updates needing verification
+      'REJECT_PROFILE_UPDATE', // Owner rejects pending update
+
+      // Category & Brand Actions
       'CREATE_CATEGORY', 'UPDATE_CATEGORY', 'DELETE_CATEGORY',
       'CREATE_BRAND', 'UPDATE_BRAND', 'DELETE_BRAND',
-      'CREATE_MOTORCYCLE', 'UPDATE_MOTORCYCLE', 'DELETE_MOTORCYCLE',
-      'UPDATE_APP_SETTINGS',
-      'DATA_EXPORT', 'DATA_CLEANUP',
-      'UPLOAD_SALE_RECEIPT',
-      'DATA_RESTORE', 
-      'DATA_RESTORE_FAILED',
-      'DATA_RESTORE_INITIATED',
-      'ARCHIVE_PRODUCT' 
+
+      // System & Settings Actions
+      'UPDATE_APP_SETTINGS', // Includes backup schedule, global settings
+      'DATA_CLEANUP', // If you have a cleanup function
+
+      // Backup & Restore Actions
+      'DATA_EXPORT', // Manual JSON download (if still used)
+      'DATA_RESTORE_INITIATED', // Logged before restore starts
+      'DATA_RESTORE_FAILED', // Logged if restore fails
+      'DATA_BACKUP_GCS_MANUAL', // *** ADDED THIS LINE ***
+      'STOCK_ADJUSTMENT',
 
     ]
   },

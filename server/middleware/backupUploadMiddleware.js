@@ -3,7 +3,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Define the temporary upload directory for restores
+// Define the temporary upload directory relative to this file
+// server/backups/uploads/
 const uploadDir = path.join(__dirname, '..', 'backups', 'uploads');
 
 // Ensure the upload directory exists
@@ -17,8 +18,10 @@ const storage = multer.diskStorage({
     cb(null, uploadDir); // Save files to the 'server/backups/uploads' directory
   },
   filename: (req, file, cb) => {
-    // Keep the original filename, it's temporary
-    cb(null, file.originalname); 
+    // Use a timestamp and original name to avoid conflicts, keep extension
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    // Example: backupFile-1678886400000-123456789.gz
   }
 });
 
@@ -26,7 +29,7 @@ const storage = multer.diskStorage({
 const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname);
   if (ext !== '.gz') {
-    // Reject file
+    // Reject file with a specific error message
     cb(new Error('File upload failed: Only .gz (gzipped archive) files are allowed.'), false);
   } else {
     // Accept file
@@ -35,31 +38,34 @@ const fileFilter = (req, file, cb) => {
 };
 
 // Configure multer
-const upload = multer({ 
+// 'backupFile' must match the FormData key used in the frontend
+const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 1024 * 1024 * 100 // 100 MB file size limit
+    fileSize: 1024 * 1024 * 100 // 100 MB file size limit (adjust as needed)
   }
-}).single('backupFile'); // 'backupFile' must match the FormData key from the client
+}).single('backupFile');
 
-// Custom middleware to handle multer errors gracefully
+// Custom middleware wrapper to handle multer errors gracefully
 const handleBackupUpload = (req, res, next) => {
   upload(req, res, (err) => {
     if (err instanceof multer.MulterError) {
-      // A Multer error occurred (e.g., file size limit)
-      return res.status(400).json({ message: `Multer error: ${err.message}` });
+      // Handle known Multer errors (e.g., file size limit)
+      console.error('Multer Error:', err);
+      return res.status(400).json({ message: `Upload Error: ${err.message}.` });
     } else if (err) {
-      // An unknown error occurred (e.g., file type mismatch from fileFilter)
-      return res.status(400).json({ message: err.message });
+      // Handle custom errors (e.g., wrong file type from fileFilter)
+      console.error('File Filter/Unknown Upload Error:', err);
+      return res.status(400).json({ message: err.message || 'File upload failed.' });
     }
-    
-    // Check if a file was actually uploaded
+
+    // Check if a file was actually uploaded (Multer might not throw error if no file)
     if (!req.file) {
       return res.status(400).json({ message: 'No backup file was uploaded.' });
     }
 
-    // Everything went fine, proceed to the controller
+    // File uploaded successfully, proceed to the controller
     next();
   });
 };
