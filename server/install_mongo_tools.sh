@@ -9,24 +9,37 @@ fi
 
 echo "Installing MongoDB Tools (for Linux)..."
 
-# Create a bin directory in the server folder
-mkdir -p ./bin
+# --- DEFINE FILE AND FOLDER NAMES ---
+# We use a known-good version for Ubuntu 22.04 (Render's environment)
+DOWNLOAD_URL="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2204-x86_64-100.12.1.tgz"
+TAR_FILE="mongo-tools.tgz"
+EXTRACT_FOLDER="mongodb-database-tools-ubuntu2204-x86_64-100.12.1"
+BIN_DIR="./bin"
 
-# Download the official MongoDB Database Tools (a recent stable version)
-curl "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-linux-x86_64-100.9.4.tgz" -o mongo-tools.tgz
+# --- SCRIPT START ---
+echo "Creating bin directory..."
+mkdir -p $BIN_DIR
 
-# Extract the archive
-tar -xvzf mongo-tools.tgz
+echo "Downloading MongoDB tools from $DOWNLOAD_URL..."
+# Use curl with -L to follow redirects and -f to fail on server errors
+curl -f -L "$DOWNLOAD_URL" -o $TAR_FILE
 
+echo "Extracting $TAR_FILE..."
+# Extract the tarball
+tar -xvzf $TAR_FILE
+
+echo "Moving binaries to $BIN_DIR..."
 # Move only the binaries we need to our bin folder
-mv mongodb-database-tools-linux-x86_64-100.9.4/bin/mongodump ./bin/
-mv mongodb-database-tools-linux-x86_64-100.9.4/bin/mongorestore ./bin/
+mv $EXTRACT_FOLDER/bin/mongodump $BIN_DIR/
+mv $EXTRACT_FOLDER/bin/mongorestore $BIN_DIR/
 
+echo "Making binaries executable..."
 # Make the binaries executable
-chmod +x ./bin/mongodump
-chmod +x ./bin/mongorestore
+chmod +x $BIN_DIR/mongodump
+chmod +x $BIN_DIR/mongorestore
 
+echo "Cleaning up downloaded files..."
 # Clean up the downloaded file and extracted folder
-rm -rf mongo-tools.tgz mongodb-database-tools-linux-x86_64-100.9.4
+rm -rf $TAR_FILE $EXTRACT_FOLDER
 
-echo "MongoDB Tools (mongodump, mongorestore) installed in ./bin"
+echo "MongoDB Tools (mongodump, mongorestore) installed in $BIN_DIR"
