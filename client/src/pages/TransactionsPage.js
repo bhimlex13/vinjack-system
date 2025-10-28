@@ -4,6 +4,7 @@ import api from '../api/axios';
 import ReceiptModal from '../components/ReceiptModal';
 import UploadReceiptModal from '../components/UploadReceiptModal';
 import ImageViewModal from '../components/ImageViewModal';
+import { searchSales } from '../api/saleApi'; 
 
 // MUI Imports
 import {
@@ -12,9 +13,10 @@ import {
   IconButton, Tooltip
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
+// --- MODIFIED: Correct Icon Import Paths (CheckCircleIcon removed) ---
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ImageIcon from '@mui/icons-material/Image';
+// --- END MODIFICATION ---
 
 const TransactionsPage = () => {
   const today = new Date().toISOString().split('T')[0];
@@ -64,19 +66,20 @@ const TransactionsPage = () => {
     setIsLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams();
       const sDate = startDate || today;
       const eDate = endDate || today;
 
-      params.append('startDate', sDate);
-      params.append('endDate', eDate);
-      if (filterCustomer) params.append('customerId', filterCustomer);
-      if (filterUser) params.append('userId', filterUser);
+      const responseData = await searchSales({
+        startDate: sDate,
+        endDate: eDate,
+        customerId: filterCustomer,
+        userId: filterUser
+      });
 
-      const response = await api.get(`/sales/search?${params.toString()}`);
-      // Log received data for debugging
-      // console.log("Fetched Sales Data:", response.data);
-      setSales(response.data || []);
+      // --- This console log confirms data is correct ---
+      // console.log("Fetched Sales Data (raw):", responseData);
+      
+      setSales(responseData || []);
     } catch (err) {
       setError('Failed to fetch transaction data.');
       console.error(err);
@@ -117,34 +120,34 @@ const TransactionsPage = () => {
   const columns = [
     {
       field: 'createdAt', headerName: 'Date', width: 170,
-      renderCell: (params) => params?.value ? new Date(params.value).toLocaleString('en-US', { // Safer access
+      renderCell: (params) => params?.value ? new Date(params.value).toLocaleString('en-US', {
         year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
       }) : 'N/A',
     },
     { field: '_id', headerName: 'Sale ID', width: 220 },
     {
       field: 'customer', headerName: 'Customer', width: 180,
-      // --- MODIFIED: Added check for params ---
       valueGetter: (params) => params?.row?.customer?.name || 'Walk-in'
     },
     {
+      // --- MODIFICATION 1: Use renderCell instead of valueGetter ---
       field: 'recordedBy', headerName: 'Cashier', width: 180,
-      // --- MODIFIED: Added check for params ---
-      valueGetter: (params) => params?.row?.recordedBy?.fullName || 'N/A'
+      renderCell: (params) => params?.row?.recordedBy?.fullName || 'N/A'
     },
     {
+      // --- MODIFICATION 2: Removed valueGetter, simplified renderCell ---
       field: 'totalAmount', headerName: 'Total Amount', width: 150, type: 'number', align: 'right', headerAlign: 'right',
-      // --- MODIFIED: Added check for params.value ---
-      renderCell: (params) => params?.value != null ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(params.value) : 'N/A',
-      // Also add a safe valueGetter for sorting/filtering
-      valueGetter: (params) => params?.row?.totalAmount ?? 0,
+      renderCell: (params) => {
+        // Read directly from the row
+        const amount = params.row?.totalAmount ?? 0;
+        return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
+      }
     },
     {
       field: 'actions', headerName: 'Actions', width: 200, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => {
-        // --- MODIFIED: Ensure params.row exists before rendering actions ---
         if (!params?.row) {
-          return null; // Or some placeholder/loading state
+          return null;
         }
         return (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>

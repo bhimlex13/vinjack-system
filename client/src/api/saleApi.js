@@ -7,7 +7,7 @@ export const getSaleById = async (id) => {
   return response.data;
 };
 
-// --- NEW: Search for sales based on criteria ---
+// --- MODIFIED: Search for sales based on criteria ---
 export const searchSales = async (params) => {
   try {
     const queryParams = new URLSearchParams();
@@ -17,6 +17,7 @@ export const searchSales = async (params) => {
     if (params.startDate) queryParams.append('startDate', params.startDate);
     if (params.endDate) queryParams.append('endDate', params.endDate);
     
+    // --- CHANGED: Point to the correct sale controller endpoint ---
     const response = await api.get(`/sales/search?${queryParams.toString()}`);
     return response.data;
   } catch (error) {
