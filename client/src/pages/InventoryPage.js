@@ -36,8 +36,10 @@ const InventoryPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
-  // --- NEW: Filter for product status ---
+  // --- Filter for product status ---
   const [filterStatus, setFilterStatus] = useState('active');
+  // --- NEW: Filter for stock level ---
+  const [filterStockLevel, setFilterStockLevel] = useState('');
 
   const fetchInitialData = async () => {
     try {
@@ -87,12 +89,14 @@ const InventoryPage = () => {
       const brandId = typeof product.brand === 'object' ? product.brand?._id : product.brand;
       const categoryMatch = filterCategory ? categoryId === filterCategory : true;
       const brandMatch = filterBrand ? brandId === filterBrand : true;
-      // --- NEW: Filter by status ---
+      // --- Filter by status ---
       const statusMatch = filterStatus ? product.status === filterStatus : true;
+      // --- NEW: Filter by stock level ---
+      const stockLevelMatch = filterStockLevel ? product.stockStatus === filterStockLevel : true;
 
-      return searchMatch && categoryMatch && brandMatch && statusMatch;
+      return searchMatch && categoryMatch && brandMatch && statusMatch && stockLevelMatch;
     });
-  }, [products, searchTerm, filterCategory, filterBrand, filterStatus]); // --- Added filterStatus
+  }, [products, searchTerm, filterCategory, filterBrand, filterStatus, filterStockLevel]); // --- Added filterStockLevel
 
   const handleProductFormSubmit = (productData) => {
     const existingProductIndex = products.findIndex(p => p._id === productData._id);
@@ -165,7 +169,7 @@ const InventoryPage = () => {
         />
       ) 
     },
-    // --- NEW: Status Column ---
+    // --- Status Column ---
     {
       field: 'status',
       headerName: 'Status',
@@ -181,7 +185,7 @@ const InventoryPage = () => {
         />
       )
     },
-    // --- END NEW ---
+    // --- END ---
     {
       field: 'actions', headerName: 'Actions', width: 180, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => (
@@ -291,13 +295,26 @@ const InventoryPage = () => {
             {brands.map(brand => <MenuItem key={brand._id} value={brand._id}>{brand.name}</MenuItem>)}
           </Select>
         </FormControl>
-        {/* --- NEW: Status Filter --- */}
+        {/* --- Status Filter --- */}
         <FormControl size="small" sx={{ minWidth: 180 }}>
           <InputLabel>Status</InputLabel>
           <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)}>
             <MenuItem value=""><em>All Statuses</em></MenuItem>
             <MenuItem value="active">Active Only</MenuItem>
             <MenuItem value="inactive">Archived Only</MenuItem>
+          </Select>
+        </FormControl>
+        {/* --- END --- */}
+
+        {/* --- NEW: Stock Level Filter --- */}
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Stock Level</InputLabel>
+          <Select value={filterStockLevel} label="Stock Level" onChange={(e) => setFilterStockLevel(e.target.value)}>
+            <MenuItem value=""><em>All Levels</em></MenuItem>
+            <MenuItem value="Healthy">Healthy</MenuItem>
+            <MenuItem value="Low">Low</MenuItem>
+            <MenuItem value="Critical">Critical</MenuItem>
+            <MenuItem value="Out of Stock">Out of Stock</MenuItem>
           </Select>
         </FormControl>
         {/* --- END NEW --- */}
