@@ -218,5 +218,4 @@ module.exports = {
   updateBackupSettings,
   restoreBackup,           // <-- EXPORT MODIFIED function
   listGCSBackups,          // <-- EXPORT NEW function
-  // createBackup // <-- REMOVE old export (or keep if needed elsewhere, but rename if so)
 };
