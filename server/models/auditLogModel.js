@@ -11,8 +11,7 @@ const auditLogSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: [
-      // --- EXISTING ---
-      'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT',
+      'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT', 
       'PROCESS_SALE',
       'PROCESS_RETURN',
       'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER',
@@ -37,12 +36,11 @@ const auditLogSchema = new mongoose.Schema({
       'UPDATE_APP_SETTINGS',
       'DATA_EXPORT', 'DATA_CLEANUP',
       'UPLOAD_SALE_RECEIPT',
-      'DATA_RESTORE', // Keep this, might be useful if --drop isn't always used? Or remove if confusing.
+      'DATA_RESTORE', 
       'DATA_RESTORE_FAILED',
+      'DATA_RESTORE_INITIATED',
+      'ARCHIVE_PRODUCT' 
 
-      // --- ADD THIS ---
-      'DATA_RESTORE_INITIATED'
-      // --- END ADDITION ---
     ]
   },
   details: {
