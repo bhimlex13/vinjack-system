@@ -32,7 +32,22 @@ try {
   storage = null; // Ensure storage is null if init fails
 }
 
-// --- List Backups from GCS ---
+// --- NEW: Define binary paths based on environment ---
+// Render sets the RENDER variable to 'true' in its environment
+const isRender = process.env.RENDER === 'true';
+
+// If on Render, use the binaries we installed. Otherwise, use the system's global path.
+const mongodumpPath = isRender
+  ? path.join(__dirname, '..', 'bin', 'mongodump') // Path from .../server/utils to .../server/bin
+  : 'mongodump';
+
+const mongorestorePath = isRender
+  ? path.join(__dirname, '..', 'bin', 'mongorestore')
+  : 'mongorestore';
+// --- END NEW ---
+
+
+// --- List Backups from GCS (Unchanged) ---
 const listBackupsFromGCS = async () => {
   if (!storage) {
     throw new Error('Google Cloud Storage client is not initialized.');
@@ -47,16 +62,14 @@ const listBackupsFromGCS = async () => {
       prefix: 'vinjack-backup-', // Optional: Filter by prefix if needed
     });
 
-    // Filter for .gz files and sort by name (usually timestamp) descending
     const backupFiles = files
       .filter(file => file.name.endsWith('.gz'))
       .map(file => ({
         name: file.name,
-        // Parse timestamp from filename if possible, otherwise use updated time
-        timeCreated: file.metadata.timeCreated || file.metadata.updated, // GCS metadata
-        size: file.metadata.size, // File size in bytes
+        timeCreated: file.metadata.timeCreated || file.metadata.updated,
+        size: file.metadata.size,
       }))
-      .sort((a, b) => new Date(b.timeCreated) - new Date(a.timeCreated)); // Newest first
+      .sort((a, b) => new Date(b.timeCreated) - new Date(a.timeCreated));
 
     return backupFiles;
   } catch (error) {
@@ -64,9 +77,8 @@ const listBackupsFromGCS = async () => {
     throw new Error('Failed to list backups from Cloud Storage.');
   }
 };
-// --- END List Backups ---
 
-// --- Download Backup from GCS ---
+// --- Download Backup from GCS (Unchanged) ---
 const downloadBackupFromGCS = async (fileName) => {
   if (!storage) {
     throw new Error('Google Cloud Storage client is not initialized.');
@@ -76,7 +88,7 @@ const downloadBackupFromGCS = async (fileName) => {
     throw new Error('GCS_BUCKET_NAME environment variable is not set.');
   }
 
-  const destinationPath = path.join(tempDownloadDir, fileName); // Save in temp download dir
+  const destinationPath = path.join(tempDownloadDir, fileName); 
 
   try {
     console.log(`Downloading ${fileName} from GCS bucket ${bucketName} to ${destinationPath}...`);
@@ -84,22 +96,19 @@ const downloadBackupFromGCS = async (fileName) => {
       destination: destinationPath,
     });
     console.log(`Successfully downloaded ${fileName} to ${destinationPath}.`);
-    return destinationPath; // Return the path where the file was saved
+    return destinationPath; 
   } catch (error) {
     console.error(`Error downloading file ${fileName} from GCS:`, error);
-    // Clean up partial download if it exists
     if (fs.existsSync(destinationPath)) {
       try { fs.unlinkSync(destinationPath); } catch (e) { /* ignore cleanup error */ }
     }
     throw new Error(`Failed to download backup file '${fileName}' from Cloud Storage.`);
   }
 };
-// --- END Download Backup ---
 
 
-// --- Backup Database To GCS (Modified to return filename) ---
+// --- Backup Database To GCS (Modified) ---
 const backupDatabaseToGCS = () => {
-  // Use a Promise to handle the async nature of exec
   return new Promise((resolve, reject) => {
     if (!storage) {
       console.error('Backup Error: Google Cloud Storage client is not initialized.');
@@ -116,18 +125,14 @@ const backupDatabaseToGCS = () => {
 
     const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
     const backupFileName = `vinjack-backup-${timestamp}.gz`;
-    const backupFilePath = path.join(localBackupDir, backupFileName); // Save in main backup dir first
+    const backupFilePath = path.join(localBackupDir, backupFileName); 
 
-    // Ensure mongodump path is correct
-    // --- MODIFIED: Remove hardcoded Windows path ---
-    // const mongodumpPath = '"C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongodump.exe"'; // Adjust if needed
-    const mongodumpPath = 'mongodump'; // Use this if mongodump is in the system PATH
+    // --- MODIFIED: Use the dynamic mongodumpPath variable ---
+    const dumpCommand = `${mongodumpPath} --uri="${dbUri}" --archive="${backupFilePath}" --gzip`;
     // --- END MODIFICATION ---
 
-    const dumpCommand = `${mongodumpPath} --uri="${dbUri}" --archive="${backupFilePath}" --gzip`;
-
     console.log(`[${new Date().toLocaleString()}] Starting database backup...`);
-    console.log(`Executing: ${dumpCommand}`); // Check this log output after the change
+    console.log(`Executing: ${dumpCommand}`); 
 
     exec(dumpCommand, async (error, stdout, stderr) => {
       if (error) {
@@ -141,19 +146,17 @@ const backupDatabaseToGCS = () => {
 
       console.log(`Database dump successful: ${backupFileName}`);
 
-      // Upload to GCS
       try {
         console.log(`Uploading ${backupFileName} to GCS bucket ${bucketName}...`);
         await storage.bucket(bucketName).upload(backupFilePath, {
           destination: backupFileName,
         });
         console.log(`Successfully uploaded ${backupFileName} to GCS.`);
-        resolve(backupFileName); // --- Resolve with the filename on success ---
+        resolve(backupFileName); 
       } catch (gcsError) {
         console.error(`GCS Upload Error: ${gcsError.message}`);
-        reject(new Error(`GCS Upload failed: ${gcsError.message}`)); // Reject on GCS error
+        reject(new Error(`GCS Upload failed: ${gcsError.message}`)); 
       } finally {
-        // Clean up the local backup file after upload attempt
         try {
           if (fs.existsSync(backupFilePath)) {
             fs.unlinkSync(backupFilePath);
@@ -161,7 +164,6 @@ const backupDatabaseToGCS = () => {
           }
         } catch (unlinkError) {
           console.error(`Error removing local backup file ${backupFileName}: ${unlinkError.message}`);
-          // Don't reject here, upload success/failure is more important
         }
       }
     });
@@ -170,7 +172,7 @@ const backupDatabaseToGCS = () => {
 // --- END Backup Database To GCS ---
 
 
-// --- Restore Database from Local File (No changes needed here) ---
+// --- Restore Database from Local File (Modified) ---
 const restoreDatabase = (filePath) => {
   return new Promise((resolve, reject) => {
     const dbUri = process.env.MONGODB_URI;
@@ -181,19 +183,14 @@ const restoreDatabase = (filePath) => {
       return reject(new Error('Server configuration error: Missing MONGODB_URI.'));
     }
 
-    // Ensure mongorestore path is correct
-    // --- MODIFIED: Remove hardcoded Windows path ---
-    // const mongorestorePath = '"C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongorestore.exe"'; // Adjust if needed
-    const mongorestorePath = 'mongorestore'; // Use this if mongorestore is in the system PATH
-    // --- END MODIFICATION ---
-
+    // --- MODIFIED: Use the dynamic mongorestorePath variable ---
     const restoreCommand = `${mongorestorePath} --uri="${dbUri}" --archive="${filePath}" --gzip --drop`;
+    // --- END MODIFICATION ---
 
     console.log(`[${new Date().toLocaleString()}] Starting database restore from local file: ${filePath}`);
     console.log(`Executing: ${restoreCommand}`);
 
     exec(restoreCommand, (error, stdout, stderr) => {
-      // ALWAYS Clean up the downloaded/temporary file
       try {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
@@ -204,7 +201,6 @@ const restoreDatabase = (filePath) => {
         if (!error) console.warn('Restore command completed, but failed to clean up temporary file.');
       }
 
-      // Handle command execution errors
       if (error) {
         console.error(`mongorestore Error: ${error.message}`);
         console.error(`mongorestore Stderr: ${stderr}`);
@@ -223,6 +219,6 @@ const restoreDatabase = (filePath) => {
 module.exports = {
   backupDatabaseToGCS,
   restoreDatabase,
-  listBackupsFromGCS,     // --- EXPORT NEW FUNCTION ---
-  downloadBackupFromGCS,  // --- EXPORT NEW FUNCTION ---
+  listBackupsFromGCS,     
+  downloadBackupFromGCS,  
 };
