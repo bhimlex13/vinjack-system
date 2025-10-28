@@ -6,6 +6,8 @@ import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
 import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
 import ReceiveStockModal from '../components/ReceiveStockModal';
+// --- NEW: Import ImageViewModal ---
+import ImageViewModal from '../components/ImageViewModal';
 
 // MUI Imports
 import {
@@ -22,6 +24,8 @@ import ReceiptIcon from '@mui/icons-material/Receipt';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import LinkIcon from '@mui/icons-material/Link';
+// --- NEW: Import icon for the image link ---
+import ImageIcon from '@mui/icons-material/Image';
 
 
 const PurchaseOrderDetailPage = () => {
@@ -35,6 +39,11 @@ const PurchaseOrderDetailPage = () => {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const printoutRef = useRef();
+
+  // --- NEW: State for Image View Modal ---
+  const [isImageViewOpen, setIsImageViewOpen] = useState(false);
+  const [imageViewUrl, setImageViewUrl] = useState('');
+  // --- END NEW ---
 
   const fetchPo = useCallback(async () => {
     try {
@@ -95,6 +104,24 @@ const PurchaseOrderDetailPage = () => {
     }
   };
 
+  // --- NEW: Handler to open the image view modal ---
+  // Copies logic from TransactionsPage.js
+  const handleOpenImageView = (imageUrl) => {
+    if (!imageUrl) return;
+
+    // Check if it's a Base64 string or a URL path
+    if (imageUrl.startsWith('data:image')) {
+      // It's a Base64 string, use it directly
+      setImageViewUrl(imageUrl);
+    } else {
+      // It's a path (from old uploads), build the full URL
+      const imageBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      setImageViewUrl(`${imageBaseUrl}${imageUrl}`);
+    }
+    setIsImageViewOpen(true);
+  };
+  // --- END NEW ---
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!po) return <Alert severity="warning">Purchase Order not found.</Alert>;
@@ -113,9 +140,18 @@ const PurchaseOrderDetailPage = () => {
   };
 
   const supplierLink = po?.supplierResponseToken ? `${window.location.origin}/supplier/po/${po.supplierResponseToken}` : null;
+  const receiptImageUrl = po?.receiptImageUrl; // Get the image string/path
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* --- MODIFIED: Render the ImageViewModal --- */}
+      <ImageViewModal 
+        open={isImageViewOpen} 
+        onClose={() => setIsImageViewOpen(false)} 
+        imageUrl={imageViewUrl} 
+      />
+      {/* --- END MODIFICATION --- */}
+
       <ReceiveStockModal
         open={isReceiveModalOpen}
         onClose={() => setIsReceiveModalOpen(false)}
@@ -181,15 +217,22 @@ const PurchaseOrderDetailPage = () => {
             </Grid>
           )}
 
-            {po.receiptImageUrl && (
+            {/* --- MODIFIED: Attachment section to use MuiLink with onClick --- */}
+            {receiptImageUrl && (
                 <Grid item xs={12}>
                     <Typography variant="h6">Attachments</Typography>
-                    <MuiLink href={`http://localhost:5000${po.receiptImageUrl}`} target="_blank" rel="noopener noreferrer" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ReceiptIcon />
+                    <MuiLink
+                      component="button" // Make it act like a button but look like a link
+                      variant="body1"
+                      onClick={() => handleOpenImageView(receiptImageUrl)}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', textAlign: 'left' }}
+                    >
+                        <ImageIcon />
                         View Uploaded Receipt
                     </MuiLink>
                 </Grid>
             )}
+            {/* --- END MODIFICATION --- */}
         </Grid>
 
         {po.status === 'Awaiting Approval' && po.supplierNotes && (
