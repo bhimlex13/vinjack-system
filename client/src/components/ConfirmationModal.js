@@ -16,6 +16,14 @@ const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel, title = "Conf
     return null;
   }
 
+  // --- THIS IS THE FIX ---
+  // Check if 'message' is an object with our specific keys, or just a string.
+  const isMessageObject = typeof message === 'object' && message !== null && message.description;
+
+  const dialogTitle = isMessageObject ? message.title : title;
+  const dialogDescription = isMessageObject ? message.description : message;
+  // --- END FIX ---
+
   return (
     <Dialog
       open={isOpen}
@@ -24,11 +32,11 @@ const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel, title = "Conf
       aria-describedby="confirmation-dialog-description"
     >
       <DialogTitle id="confirmation-dialog-title">
-        {title}
+        {dialogTitle} {/* <-- Use the new variable */}
       </DialogTitle>
       <DialogContent>
         <DialogContentText id="confirmation-dialog-description">
-          {message}
+          {dialogDescription} {/* <-- Use the new variable */}
         </DialogContentText>
       </DialogContent>
       <DialogActions>
