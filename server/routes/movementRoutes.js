@@ -2,10 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const { getProductMovements } = require('../controllers/movementController');
-// --- ADDED authorize middleware ---
-const { protect, authorize } = require('../middleware/authMiddleware');
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
-// --- UPDATED: Restricted access to Owner and Admin ---
-router.get('/:productId', protect, authorize('Owner', 'Admin'), getProductMovements);
+// 'canViewInventory' (Default: Admin, Salesperson)
+router.get('/:productId', protect, checkPermission('canViewInventory'), getProductMovements);
 
 module.exports = router;

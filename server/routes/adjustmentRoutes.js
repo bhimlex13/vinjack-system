@@ -2,9 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const { createStockAdjustment } = require('../controllers/adjustmentController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
-// This action should be restricted to administrators
-router.post('/', protect, authorize('Owner', 'Admin'), createStockAdjustment);
+// 'canAdjustStock' (Default: Admin)
+router.post('/', protect, checkPermission('canAdjustStock'), createStockAdjustment);
 
 module.exports = router;

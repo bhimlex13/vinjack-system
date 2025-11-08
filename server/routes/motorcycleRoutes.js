@@ -7,17 +7,20 @@ const {
   updateMotorcycle,
   deleteMotorcycle,
 } = require('../controllers/motorcycleController');
-const { protect } = require('../middleware/authMiddleware');
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
-// Protect all routes
-router.use(protect);
+// All motorcycle routes require 'canManageMotorcycles' (Default: Admin, Salesperson)
+const canManageMotorcycles = checkPermission('canManageMotorcycles');
 
-router.route('/').post(createMotorcycle);
+router.route('/')
+  .post(protect, canManageMotorcycles, createMotorcycle);
 
 router.route('/:id')
-  .put(updateMotorcycle)
-  .delete(deleteMotorcycle);
+  .put(protect, canManageMotorcycles, updateMotorcycle)
+  .delete(protect, canManageMotorcycles, deleteMotorcycle);
 
-router.route('/customer/:customerId').get(getMotorcyclesByCustomer);
+router.route('/customer/:customerId')
+  .get(protect, canManageMotorcycles, getMotorcyclesByCustomer);
 
 module.exports = router;

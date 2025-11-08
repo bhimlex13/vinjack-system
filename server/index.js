@@ -31,6 +31,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const adjustmentRoutes = require('./routes/adjustmentRoutes');
+const permissionRoutes = require('./routes/permissionRoutes'); // <-- NEW
 
 // Connect to Database
 connectDB();
@@ -92,6 +93,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/adjustments', adjustmentRoutes);
+app.use('/api/permissions', permissionRoutes); // <-- NEW
 
 // Serve static upload files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

@@ -1,16 +1,19 @@
 // client/src/pages/UserManagementPage.js
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../api/axios';
 import { approveUserUpdate, rejectUserUpdate } from '../api/userApi';
 import EditUserModal from '../components/EditUserModal';
 import CreateUserModal from '../components/CreateUserModal'; 
 import CredentialsDisplayModal from '../components/CredentialsDisplayModal';
 import { toast } from 'react-toastify';
+import AuthContext from '../context/AuthContext'; 
 
 // MUI Imports
-import { Box, Button, Typography, Paper, Stack, Chip, Alert, Grid } from '@mui/material'; // Grid imported
+// --- 1. FIXED: Removed 'Alert' from this line ---
+import { Box, Button, Typography, Paper, Stack, Chip, Grid } from '@mui/material'; 
 import { DataGrid } from '@mui/x-data-grid';
-import AddIcon from '@mui/icons-material/Add';
+// --- 2. FIXED: Changed import path for the icon ---
+import { Add as AddIcon } from '@mui/icons-material';
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
@@ -20,8 +23,9 @@ const UserManagementPage = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newCredentials, setNewCredentials] = useState(null);
 
+  const { user: currentUser } = useContext(AuthContext);
+
   const fetchUsers = async () => {
-    // No need to set loading here as DataGrid has its own loading spinner
     try {
       const response = await api.get('/users');
       setUsers(response.data);
@@ -39,7 +43,11 @@ const UserManagementPage = () => {
   }, []);
 
   const profileUpdateRequests = useMemo(() => users.filter(u => u.hasPendingChanges), [users]);
-  const managedUsers = useMemo(() => users.filter(u => u.role !== 'Owner'), [users]);
+  
+  const managedUsers = useMemo(() => {
+    if (!currentUser) return [];
+    return users.filter(u => u._id !== currentUser._id);
+  }, [users, currentUser]);
 
   const handleUserCreated = (credentials) => {
     setIsCreateModalOpen(false);
@@ -129,7 +137,7 @@ const UserManagementPage = () => {
           variant="outlined" 
           size="small" 
           onClick={() => openEditModal(params.row)}
-          disabled={params.row.role === 'Owner'}
+          disabled={params.row.role === 'Super Admin'}
         >
           Edit
         </Button>

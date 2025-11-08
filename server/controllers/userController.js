@@ -6,18 +6,23 @@ const crypto = require('crypto');
 const { sendVerificationEmail } = require('../utils/emailService');
 const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
+// --- NEW: Import the RolePermission model ---
+const { RolePermission } = require('../models/permissionModel');
 
-// ... (createUserByAdmin, loginUser, forceChangePassword, getMe, requestProfileUpdate, verifyOwnerUpdate, approveUserUpdate, rejectUserUpdate, getAllUsers, updateUser, deleteUser, logoutUser, generateToken, getUserDetails, adminResetPassword functions remain unchanged)
-// ... (Make sure all those functions are present in your file) ...
-
-// --- [Previous functions like createUserByAdmin, loginUser, etc. go here] ---
-
+// @desc    Create a new user (by a Super Admin)
+// @route   POST /api/users
 const createUserByAdmin = async (req, res) => {
   try {
     const { fullName, email, role } = req.body;
     if (!fullName || !email || !role) {
       return res.status(400).json({ message: 'Please provide Full Name, Email, and Role.' });
     }
+
+    const allowedRoles = ['Admin', 'Salesperson'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role specified. Can only create Admin or Salesperson.' });
+    }
+
     const emailExists = await User.findOne({ email });
     if (emailExists) {
       return res.status(400).json({ message: 'Email is already in use.' });
@@ -33,7 +38,7 @@ const createUserByAdmin = async (req, res) => {
       username,
       email,
       password: temporaryPassword,
-      role,
+      role, 
       status: 'active',
       mustChangePassword: true,
     });
@@ -52,6 +57,8 @@ const createUserByAdmin = async (req, res) => {
   }
 };
 
+// @desc    Authenticate a user & get token
+// @route   POST /api/users/login
 const loginUser = async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -65,7 +72,21 @@ const loginUser = async (req, res) => {
         }
         logAction(user, 'LOGIN', `User '${username}' logged in successfully.`, { entityType: 'User', entityId: user._id });
 
-        // --- MODIFIED: Return preferences on login ---
+        // --- NEW: Fetch permissions based on role ---
+        let permissions = [];
+        if (user.role === 'Super Admin') {
+          // Super Admin gets all permissions. We use a special key.
+          permissions = ['SUPER_ADMIN_ALL'];
+        } else if (user.role === 'Admin' || user.role === 'Salesperson') {
+          // Fetch the specific permissions for Admin or Salesperson
+          const rolePerms = await RolePermission.findOne({ role: user.role }).lean();
+          if (rolePerms) {
+            permissions = rolePerms.allowedPermissions;
+          }
+          // If no permissions are set, they get an empty array (no access)
+        }
+        // --- END NEW ---
+
         res.json({
           _id: user._id,
           fullName: user.fullName,
@@ -74,7 +95,8 @@ const loginUser = async (req, res) => {
           role: user.role,
           token: generateToken(user._id),
           mustChangePassword: user.mustChangePassword || false,
-          dashboardPreferences: user.dashboardPreferences // Send preferences
+          dashboardPreferences: user.dashboardPreferences,
+          permissions: permissions // <-- ADDED: Send permissions to the client
         });
       } else {
         logAction(user, 'LOGIN_FAILED', `Login attempt failed: Invalid password for user '${username}'.`, { entityType: 'User', entityId: user._id });
@@ -89,6 +111,8 @@ const loginUser = async (req, res) => {
   }
 };
 
+// @desc    Force password change for new/reset users
+// @route   POST /api/users/force-change-password
 const forceChangePassword = async (req, res) => {
     try {
         const { newPassword, confirmPassword } = req.body;
@@ -112,19 +136,22 @@ const forceChangePassword = async (req, res) => {
     }
 };
 
+// @desc    Get current user data
+// @route   GET /api/users/me
 const getMe = async (req, res) => {
   try {
-    // --- MODIFIED: Populate dashboardPreferences ---
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user); // dashboardPreferences is now included
+    res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
+// @desc    Request a profile update (for self)
+// @route   PUT /api/users/profile/request-update
 const requestProfileUpdate = async (req, res) => {
   const io = req.app.get('socketio');
   try {
@@ -154,7 +181,8 @@ const requestProfileUpdate = async (req, res) => {
     if (Object.keys(requestedChanges).length === 0) {
       return res.status(400).json({ message: 'No changes were requested.' });
     }
-    if (user.role === 'Owner') {
+
+    if (user.role === 'Super Admin') {
       const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       user.verificationCode = verificationCode;
       user.verificationCodeExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
@@ -173,7 +201,7 @@ const requestProfileUpdate = async (req, res) => {
         }
       });
       const newNotifications = await createNotification({
-        recipientRole: 'Owner',
+        recipientRole: 'Super Admin',
         message: `${user.fullName} has requested a profile update.`,
         type: 'USER_ACTION',
         link: '/user-management'
@@ -183,7 +211,7 @@ const requestProfileUpdate = async (req, res) => {
               io.to(notification.user.toString()).emit('new_notification', notification);
           });
       }
-      res.json({ message: 'Update request submitted successfully. Waiting for owner approval.' });
+      res.json({ message: 'Update request submitted successfully. Waiting for Super Admin approval.' });
     }
   } catch (error) {
     console.error('Error in requestProfileUpdate:', error);
@@ -191,7 +219,9 @@ const requestProfileUpdate = async (req, res) => {
   }
 };
 
-const verifyOwnerUpdate = async (req, res) => {
+// @desc    Verify and apply self-update with an email code
+// @route   POST /api/users/profile/verify-update
+const verifySelfUpdateWithCode = async (req, res) => {
   try {
     const { code } = req.body;
     const user = await User.findById(req.user.id);
@@ -216,6 +246,8 @@ const verifyOwnerUpdate = async (req, res) => {
   }
 };
 
+// @desc    Approve a pending update for another user (Super Admin only)
+// @route   PUT /api/users/approve-update/:id
 const approveUserUpdate = async (req, res) => {
   const io = req.app.get('socketio');
   try {
@@ -248,6 +280,8 @@ const approveUserUpdate = async (req, res) => {
   }
 };
 
+// @desc    Reject a pending update for another user (Super Admin only)
+// @route   PUT /api/users/reject-update/:id
 const rejectUserUpdate = async (req, res) => {
     const io = req.app.get('socketio');
     try {
@@ -276,6 +310,8 @@ const rejectUserUpdate = async (req, res) => {
     }
 };
 
+// @desc    Get all users (Super Admin only)
+// @route   GET /api/users
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({}).select('-password');
@@ -285,47 +321,68 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+// @desc    Update a user's role or status (Super Admin only)
+// @route   PUT /api/users/:id
 const updateUser = async (req, res) => {
   try {
     const { role, status } = req.body;
     const user = await User.findById(req.params.id);
-    if (user) {
-      let details = [];
-      if (role && user.role !== role) details.push(`role to '${role}'`);
-      if (status && user.status !== status) details.push(`status to '${status}'`);
-      if (details.length > 0) {
-        logAction(req.user, 'UPDATE_USER', `Updated user ${user.fullName}'s ${details.join(' and ')}.`, { entityType: 'User', entityId: user._id });
-      }
-      user.role = role || user.role;
-      user.status = status || user.status;
-      const updatedUser = await user.save();
-      res.json({
-        _id: updatedUser._id,
-        fullName: updatedUser.fullName,
-        username: updatedUser.username,
-        email: updatedUser.email,
-        role: updatedUser.role,
-        status: updatedUser.status,
-      });
-    } else {
-      res.status(44).json({ message: 'User not found' });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
+
+    if (user.role === 'Super Admin' && user._id.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'Cannot modify another Super Admin account.' });
+    }
+    if (role === 'Super Admin' && req.user.role !== 'Super Admin') {
+        return res.status(403).json({ message: 'Not authorized to promote users to Super Admin.' });
+    }
+    if (user.role === 'Super Admin' && role !== 'Super Admin' && role) {
+        return res.status(403).json({ message: 'A Super Admin cannot be demoted.' });
+    }
+
+    let details = [];
+    if (role && user.role !== role) details.push(`role to '${role}'`);
+    if (status && user.status !== status) details.push(`status to '${status}'`);
+
+    if (details.length > 0) {
+      logAction(req.user, 'UPDATE_USER', `Updated user ${user.fullName}'s ${details.join(' and ')}.`, { entityType: 'User', entityId: user._id });
+    }
+
+    user.role = role || user.role;
+    user.status = status || user.status;
+    const updatedUser = await user.save();
+
+    res.json({
+      _id: updatedUser._id,
+      fullName: updatedUser.fullName,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      status: updatedUser.status,
+    });
   } catch (error) {
     res.status(400).json({ message: 'Error updating user' });
   }
 };
 
+// @desc    Delete a user (Super Admin only)
+// @route   DELETE /api/users/:id
 const deleteUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (user) {
+      if (user.role === 'Super Admin') {
+        return res.status(403).json({ message: 'Super Admin accounts cannot be deleted.' });
+      }
       const deletedUserName = user.fullName;
       const deletedUserId = user._id;
       await user.deleteOne();
       logAction(req.user, 'DELETE_USER', `Deleted user: '${deletedUserName}'`, { entityType: 'User', entityId: deletedUserId });
       res.json({ message: 'User removed' });
     } else {
-      res.status(404).json({ message: 'User not found' });
+      res.status(4404).json({ message: 'User not found' });
     }
   } catch (error) {
     console.error("Error in deleteUser:", error);
@@ -333,6 +390,8 @@ const deleteUser = async (req, res) => {
   }
 };
 
+// @desc    Log out a user
+// @route   POST /api/users/logout
 const logoutUser = (req, res) => {
   try {
     const userFullName = req.user ? req.user.fullName : 'Unknown User';
@@ -351,6 +410,8 @@ const generateToken = (id) => {
   });
 };
 
+// @desc    Get a specific user's details (Super Admin only)
+// @route   GET /api/users/:id
 const getUserDetails = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
@@ -364,6 +425,8 @@ const getUserDetails = async (req, res) => {
   }
 };
 
+// @desc    Reset a non-Super Admin's password (Super Admin only)
+// @route   POST /api/users/admin-reset-password/:id
 const adminResetPassword = async (req, res) => {
     try {
         const { adminPassword } = req.body;
@@ -380,8 +443,8 @@ const adminResetPassword = async (req, res) => {
         if (!targetUser) {
             return res.status(404).json({ message: 'Target user not found.' });
         }
-        if (targetUser.role === 'Owner') {
-            return res.status(403).json({ message: 'Cannot reset password for another Owner account.' });
+        if (targetUser.role === 'Super Admin') {
+            return res.status(403).json({ message: 'Cannot reset password for another Super Admin account.' });
         }
         const temporaryPassword = crypto.randomBytes(8).toString('hex').slice(0, 10);
         targetUser.password = temporaryPassword;
@@ -399,7 +462,8 @@ const adminResetPassword = async (req, res) => {
     }
 };
 
-// --- NEW: Controller for getting preferences ---
+// @desc    Get current user's dashboard preferences
+// @route   GET /api/users/dashboard-preferences
 const getDashboardPreferences = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('dashboardPreferences');
@@ -413,7 +477,8 @@ const getDashboardPreferences = async (req, res) => {
   }
 };
 
-// --- NEW: Controller for saving preferences ---
+// @desc    Save current user's dashboard preferences
+// @route   PUT /api/users/dashboard-preferences
 const saveDashboardPreferences = async (req, res) => {
   try {
     const { timeRange, selectedCategory, selectedSupplier } = req.body;
@@ -441,8 +506,6 @@ const saveDashboardPreferences = async (req, res) => {
   }
 };
 
-
-// --- MODIFIED: Added new functions to export ---
 module.exports = {
   createUserByAdmin,
   loginUser,
@@ -452,12 +515,12 @@ module.exports = {
   updateUser,
   deleteUser,
   requestProfileUpdate,
-  verifyOwnerUpdate,
+  verifySelfUpdateWithCode,
   approveUserUpdate,
   rejectUserUpdate,
   getUserDetails,
   adminResetPassword,
   logoutUser,
-  getDashboardPreferences, // NEW
-  saveDashboardPreferences // NEW
+  getDashboardPreferences,
+  saveDashboardPreferences
 };

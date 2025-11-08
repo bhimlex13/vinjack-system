@@ -8,18 +8,19 @@ const {
   updateCustomer,
   deleteCustomer
 } = require('../controllers/customerController');
-const { protect, admin } = require('../middleware/authMiddleware'); // Assuming you have role middleware
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
-// Protect all routes
-router.use(protect);
+// All customer routes require 'canManageCustomers' (Default: Admin, Salesperson)
+const canManageCustomers = checkPermission('canManageCustomers');
 
 router.route('/')
-  .post(createCustomer)
-  .get(getAllCustomers);
+  .post(protect, canManageCustomers, createCustomer)
+  .get(protect, canManageCustomers, getAllCustomers);
 
 router.route('/:id')
-  .get(getCustomerById)
-  .put(updateCustomer)
-  .delete(deleteCustomer); // Consider restricting delete to admin/owner
+  .get(protect, canManageCustomers, getCustomerById)
+  .put(protect, canManageCustomers, updateCustomer)
+  .delete(protect, canManageCustomers, deleteCustomer);
 
 module.exports = router;

@@ -1,8 +1,6 @@
 // server/routes/purchaseOrderRoutes.js
 const express = require('express');
 const router = express.Router();
-// --- MODIFIED: 'uploadWithErrorHandler' is no longer needed here ---
-// const uploadWithErrorHandler = require('../middleware/uploadMiddleware'); 
 const { 
   createPurchaseOrder, 
   getAllPurchaseOrders, 
@@ -14,31 +12,32 @@ const {
   updateBySupplier,
   approveSupplierChanges
 } = require('../controllers/purchaseOrderController');
-
-const { protect, authorize } = require('../middleware/authMiddleware');
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // Public routes for supplier interaction
 router.route('/supplier/:token')
   .get(getPurchaseOrderByToken)
   .put(updateBySupplier);
 
+// --- UPDATED: All PO management routes now use 'checkPermission' ---
+const canManagePOs = checkPermission('canManagePurchaseOrders');
+
 // Protected route for the buyer to approve changes
-router.post('/:id/approve', protect, authorize('Owner', 'Admin'), approveSupplierChanges);
+router.post('/:id/approve', protect, canManagePOs, approveSupplierChanges);
 
 
 // Existing Routes
 router.route('/')
-  .post(protect, authorize('Owner', 'Admin'), createPurchaseOrder)
-  .get(protect, authorize('Owner', 'Admin'), getAllPurchaseOrders);
+  .post(protect, canManagePOs, createPurchaseOrder)
+  .get(protect, canManagePOs, getAllPurchaseOrders);
 
 router.route('/:id')
-  .get(protect, authorize('Owner', 'Admin'), getPurchaseOrderById)
-  .put(protect, authorize('Owner', 'Admin'), updatePurchaseOrder);
+  .get(protect, canManagePOs, getPurchaseOrderById)
+  .put(protect, canManagePOs, updatePurchaseOrder);
 
-// --- MODIFIED: Removed 'uploadWithErrorHandler' middleware ---
-// The route now expects JSON, not FormData
-router.post('/:id/receive', protect, authorize('Owner', 'Admin'), receivePurchaseOrder);
+router.post('/:id/receive', protect, canManagePOs, receivePurchaseOrder);
 
-router.post('/:id/cancel', protect, authorize('Owner', 'Admin'), cancelPurchaseOrder);
+router.post('/:id/cancel', protect, canManagePOs, cancelPurchaseOrder);
 
 module.exports = router;

@@ -1,24 +1,24 @@
 // server/routes/returnRoutes.js
 const express = require('express');
 const router = express.Router();
-// --- MODIFIED: Import getReturnsBySale ---
 const { createReturn, getAllReturns, getReturnById, getReturnsBySale } = require('../controllers/returnController');
-const { protect } = require('../middleware/authMiddleware');
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // Protect all routes
 router.use(protect);
 
+// --- UPDATED: All return routes now require the 'canManageReturns' permission ---
+const canManageReturns = checkPermission('canManageReturns');
+
 router.route('/')
-  .post(createReturn)
-  .get(getAllReturns);
+  .post(canManageReturns, createReturn)
+  .get(canManageReturns, getAllReturns);
 
-// Existing route for getting a specific return by its own ID
 router.route('/:id')
-  .get(getReturnById);
+  .get(canManageReturns, getReturnById);
 
-// --- NEW ROUTE: Get returns by original Sale ID ---
 router.route('/by-sale/:saleId')
-  .get(getReturnsBySale);
-// --- END NEW ROUTE ---
+  .get(canManageReturns, getReturnsBySale);
 
 module.exports = router;

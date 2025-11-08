@@ -5,11 +5,11 @@ const { getCategories, createCategory, updateCategory, deleteCategory } = requir
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.route('/')
-    .get(protect, getCategories) // All users can get categories (for dropdowns)
-    .post(protect, authorize('Owner'), createCategory); // Only owner can create
+    .get(protect, getCategories) // All users can get categories
+    .post(protect, authorize('Super Admin'), createCategory); // <-- UPDATED
 
 router.route('/:id')
-    .put(protect, authorize('Owner'), updateCategory)
-    .delete(protect, authorize('Owner'), deleteCategory);
+    .put(protect, authorize('Super Admin'), updateCategory) // <-- UPDATED
+    .delete(protect, authorize('Super Admin'), deleteCategory); // <-- UPDATED
 
 module.exports = router;
