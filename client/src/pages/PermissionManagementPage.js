@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+
 import ConfirmationContext from '../context/ConfirmationContext';
 
 const groupPermissions = (permissions) => {
@@ -27,25 +28,44 @@ const PermissionManagementPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [currentTab, setCurrentTab] = useState('Admin');
-  const confirm = useContext(ConfirmationContext);
+  
+  const { confirm } = useContext(ConfirmationContext);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [allPermsRes, adminPermsRes, salesPermsRes] = await Promise.all([
-        api.get('/permissions/all'),
-        api.get('/permissions/Admin'),
-        api.get('/permissions/Salesperson'),
-      ]);
-
+      const allPermsRes = await api.get('/permissions/all');
       setAllPermissions(allPermsRes.data);
-      setAdminPermissions(new Set(adminPermsRes.data.allowedPermissions));
-      setSalespersonPermissions(new Set(salesPermsRes.data.allowedPermissions));
+
+      let adminPerms = [];
+      try {
+        const adminPermsRes = await api.get('/permissions/Admin');
+        adminPerms = adminPermsRes.data.allowedPermissions || [];
+      } catch (error) {
+        if (error.response && error.response.status !== 404) {
+          console.warn("Failed to fetch Admin permissions:", error);
+        }
+      }
+      
+      let salesPerms = [];
+      try {
+        const salesPermsRes = await api.get('/permissions/Salesperson');
+        salesPerms = salesPermsRes.data.allowedPermissions || [];
+      } catch (error) {
+        if (error.response && error.response.status !== 404) {
+          console.warn("Failed to fetch Salesperson permissions:", error);
+        }
+      }
+
+      setAdminPermissions(new Set(adminPerms));
+      setSalespersonPermissions(new Set(salesPerms));
 
     } catch (error) {
-      console.error("Failed to fetch permissions", error);
-      // --- UPDATED: Show the specific error from the API ---
-      toast.error(error.response?.data?.message || 'Failed to load permissions.');
+      if (error.response && error.response.status === 404) {
+          toast.warn('Permissions list is empty. Please reset to default to seed the database.');
+      } else {
+          toast.error(error.response?.data?.message || 'Failed to load permissions list.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -65,21 +85,15 @@ const PermissionManagementPage = () => {
     if (currentTab === 'Admin') {
       setAdminPermissions(prev => {
         const newSet = new Set(prev);
-        if (checked) {
-          newSet.add(name);
-        } else {
-          newSet.delete(name);
-        }
+        if (checked) newSet.add(name);
+        else newSet.delete(name);
         return newSet;
       });
     } else {
       setSalespersonPermissions(prev => {
         const newSet = new Set(prev);
-        if (checked) {
-          newSet.add(name);
-        } else {
-          newSet.delete(name);
-        }
+        if (checked) newSet.add(name);
+        else newSet.delete(name);
         return newSet;
       });
     }
@@ -105,21 +119,23 @@ const PermissionManagementPage = () => {
 
   const handleSeedPermissions = async () => {
     try {
-      await confirm({
+      const result = await confirm({
         title: 'Confirm Reset',
         description: 'Are you sure you want to reset all permissions? This will restore both Admin and Salesperson roles to their original default settings.'
       });
       
-      setIsLoading(true);
-      await api.post('/permissions/seed'); // This is the API call
+      if (!result) return; 
+
+      setIsLoading(true); 
+      await api.post('/permissions/seed'); 
       toast.success('Permissions successfully reset to default.');
-      await fetchData(); // Refetch data to show the new defaults
+      await fetchData(); 
 
     } catch (error) {
-      if (error) { 
-         console.error("Failed to seed permissions", error);
+       console.error("Failed to seed permissions", error);
+       if (error && error.response) {
          toast.error(error.response?.data?.message || 'Failed to reset permissions.');
-      }
+       }
     } finally {
        setIsLoading(false);
     }
@@ -156,8 +172,7 @@ const PermissionManagementPage = () => {
         {isLoading ? (
           <Grid container spacing={3}>
             {[...Array(4)].map((_, i) => (
-              // --- FIXED: Removed 'item' prop ---
-              <Grid xs={12} md={6} lg={4} key={i}>
+              <Grid item xs={12} md={6} lg={4} key={i}>
                 <Skeleton variant="text" width="40%" height={40} />
                 <Skeleton variant="rectangular" width="100%" height={120} />
               </Grid>
@@ -166,8 +181,7 @@ const PermissionManagementPage = () => {
         ) : (
           <Grid container spacing={3}>
             {Object.keys(groupedPerms).map((category) => (
-              // --- FIXED: Removed 'item' prop ---
-              <Grid xs={12} md={6} lg={4} key={category}>
+              <Grid item xs={12} md={6} lg={4} key={category}>
                 <Typography variant="h6" gutterBottom>{category}</Typography>
                 <FormGroup>
                   {groupedPerms[category].map((perm) => (
@@ -199,7 +213,9 @@ const PermissionManagementPage = () => {
             disabled={isLoading || isSaving}
             onClick={handleSavePermissions}
           >
-            Save {currentTab} Permissions
+            {/* --- THIS IS THE CHANGE --- */}
+            Save
+            {/* --- END CHANGE --- */}
           </Button>
         </Box>
 
