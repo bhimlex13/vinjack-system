@@ -2,16 +2,20 @@
 const express = require('express');
 const router = express.Router();
 const { getSuppliers, createSupplier, updateSupplier, deleteSupplier } = require('../controllers/supplierController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 
-
-// All routes are now protected
 router.route('/')
-    .get(protect, getSuppliers)
-    .post(protect, authorize('Owner'), createSupplier); // Only Owner can create
+    // 'canViewSuppliers' (Default: Admin)
+    .get(protect, checkPermission('canViewSuppliers'), getSuppliers)
+    // 'canManageSuppliers' (Default: Admin)
+    .post(protect, checkPermission('canManageSuppliers'), createSupplier);
 
 router.route('/:id')
-    .put(protect, authorize('Owner'), updateSupplier) // Only Owner can update
-    .delete(protect, authorize('Owner'), deleteSupplier); // Only Owner can delete
+    // 'canManageSuppliers' (Default: Admin)
+    .put(protect, checkPermission('canManageSuppliers'), updateSupplier)
+    // 'canManageSuppliers' (Default: Admin)
+    // We keep 'authorize' here as a safeguard to ensure only Super Admin can delete
+    .delete(protect, authorize('Super Admin'), deleteSupplier);
 
 module.exports = router;

@@ -6,45 +6,40 @@ const {
   updateSettings,
   getGlobalSetting,
   updateGlobalSetting,
-  triggerManualBackupToGCS, // <-- Import RENAMED function
+  triggerManualBackupToGCS,
   getBackupSettings,
   updateBackupSettings,
-  restoreBackup,           // <-- Import MODIFIED function
-  listGCSBackups           // <-- Import NEW function
+  restoreBackup,
+  listGCSBackups
 } = require('../controllers/settingsController');
 const { protect, authorize } = require('../middleware/authMiddleware');
-// --- REMOVE upload middleware import ---
-// const { handleBackupUpload } = require('../middleware/backupUploadMiddleware');
 
 // Personal notification settings (accessible by all logged-in users)
 router.route('/')
   .get(protect, getSettings)
   .put(protect, updateSettings);
 
-// Global app settings (Owner only)
+// Global app settings (Super Admin only)
 router.route('/global/:key')
-  .get(protect, authorize('Owner'), getGlobalSetting);
+  .get(protect, authorize('Super Admin'), getGlobalSetting); // <-- UPDATED
 router.route('/global')
-  .put(protect, authorize('Owner'), updateGlobalSetting);
+  .put(protect, authorize('Super Admin'), updateGlobalSetting); // <-- UPDATED
 
-// Automated backup configuration (Owner only)
+// Automated backup configuration (Super Admin only)
 router.route('/backup/config')
-    .get(protect, authorize('Owner'), getBackupSettings)
-    .put(protect, authorize('Owner'), updateBackupSettings);
+    .get(protect, authorize('Super Admin'), getBackupSettings) // <-- UPDATED
+    .put(protect, authorize('Super Admin'), updateBackupSettings); // <-- UPDATED
 
-// --- MODIFIED: Manual Backup Trigger Route (Owner only) ---
-// Changed to POST and new endpoint/controller
+// Manual Backup Trigger Route (Super Admin only)
 router.route('/backup/gcs')
-    .post(protect, authorize('Owner'), triggerManualBackupToGCS);
+    .post(protect, authorize('Super Admin'), triggerManualBackupToGCS); // <-- UPDATED
 
-// --- NEW: List GCS Backups Route (Owner only) ---
+// List GCS Backups Route (Super Admin only)
 router.route('/backup/list')
-    .get(protect, authorize('Owner'), listGCSBackups);
+    .get(protect, authorize('Super Admin'), listGCSBackups); // <-- UPDATED
 
-// --- MODIFIED: Restore from GCS Backup Route (Owner only) ---
-// Removed handleBackupUpload middleware, points to modified controller
+// Restore from GCS Backup Route (Super Admin only)
 router.route('/backup/restore')
-    .post(protect, authorize('Owner'), restoreBackup);
-// --- END MODIFICATIONS ---
+    .post(protect, authorize('Super Admin'), restoreBackup); // <-- UPDATED
 
 module.exports = router;

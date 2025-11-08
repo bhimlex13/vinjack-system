@@ -10,12 +10,13 @@ import {
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'; // <-- NEW Icon
 
 // React Icons
 import {
   FaTachometerAlt, FaBoxOpen, FaShoppingCart, FaTruck, FaChartBar,
   FaUsersCog, FaDatabase, FaFileAlt, FaReceipt, FaFileInvoice,
-  FaTruckLoading, FaUserFriends, FaUndo // --- ADDED ICON ---
+  FaTruckLoading, FaUserFriends, FaUndo
 } from 'react-icons/fa';
 
 const drawerWidth = 250;
@@ -64,39 +65,58 @@ const NavListItem = ({ to, icon, text, isCollapsed }) => (
 );
 
 const Sidebar = ({ isCollapsed, toggleSidebar }) => {
-  const { user } = useContext(AuthContext);
+  // --- UPDATED: Get 'user' and 'hasPermission' from context ---
+  const { user, hasPermission } = useContext(AuthContext);
 
+  // --- UPDATED: All nav items are now defined with permission checks ---
   const mainNav = [
-    { text: 'Dashboard', to: '/dashboard', icon: <FaTachometerAlt /> },
+    { text: 'Dashboard', to: '/dashboard', icon: <FaTachometerAlt />, perm: hasPermission('canViewDashboard') },
   ];
   
-  // --- MODIFIED: Added Returns link ---
   const salesNav = [
-    { text: 'Sales (POS)', to: '/sales', icon: <FaShoppingCart /> },
-    { text: 'Customers', to: '/customers', icon: <FaUserFriends /> },
-    { text: 'Returns', to: '/returns', icon: <FaUndo /> },
+    { text: 'Sales (POS)', to: '/sales', icon: <FaShoppingCart />, perm: hasPermission('canManageSales') },
+    { text: 'Customers', to: '/customers', icon: <FaUserFriends />, perm: hasPermission('canManageCustomers') },
+    { text: 'Returns', to: '/returns', icon: <FaUndo />, perm: hasPermission('canManageReturns') },
   ];
 
   const inventoryNav = [
-    { text: 'Inventory', to: '/inventory', icon: <FaBoxOpen /> }
+    { text: 'Inventory', to: '/inventory', icon: <FaBoxOpen />, perm: hasPermission('canViewInventory') }
   ];
 
   const purchasingNav = [
-    { text: 'Deliveries', to: '/deliveries', icon: <FaTruckLoading /> },
-    { text: 'Purchase Orders', to: '/purchase-orders', icon: <FaFileInvoice /> },
-    { text: 'Suppliers', to: '/suppliers', icon: <FaTruck /> },
+    { text: 'Deliveries', to: '/deliveries', icon: <FaTruckLoading />, perm: hasPermission('canManageDeliveries') },
+    { text: 'Purchase Orders', to: '/purchase-orders', icon: <FaFileInvoice />, perm: hasPermission('canManagePurchaseOrders') },
+    { text: 'Suppliers', to: '/suppliers', icon: <FaTruck />, perm: hasPermission('canViewSuppliers') },
   ];
 
   const reportingNav = [
-    { text: 'Reports', to: '/reports', icon: <FaChartBar /> },
-    { text: 'Transactions', to: '/transactions', icon: <FaReceipt /> },
+    { text: 'Reports', to: '/reports', icon: <FaChartBar />, perm: hasPermission('canViewReports') },
+    { text: 'Transactions', to: '/transactions', icon: <FaReceipt />, perm: hasPermission('canViewReports') }, // Also tied to reports
   ];
 
   const adminNav = [
-    { text: 'User Management', to: '/user-management', icon: <FaUsersCog /> },
-    { text: 'Data Management', to: '/data-management', icon: <FaDatabase /> },
-    { text: 'Audit Log', to: '/audit-log', icon: <FaFileAlt /> },
+    { text: 'User Management', to: '/user-management', icon: <FaUsersCog />, perm: true }, // Only Super Admin sees this section
+    { text: 'Data Management', to: '/data-management', icon: <FaDatabase />, perm: true }, // Only Super Admin sees this section
+    { text: 'Audit Log', to: '/audit-log', icon: <FaFileAlt />, perm: true }, // Only Super Admin sees this section
+    // --- NEW: Link to Permission Management Page ---
+    { text: 'Permissions', to: '/permissions', icon: <AdminPanelSettingsIcon />, perm: true }, // Only Super Admin sees this section
   ];
+  // --- END UPDATES ---
+
+  // Helper to filter nav items based on permissions
+  const renderNav = (items) => {
+    return items
+      .filter(item => item.perm) // <-- Only include items where perm is true
+      .map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />);
+  };
+
+  const renderedMainNav = renderNav(mainNav);
+  const renderedSalesNav = renderNav(salesNav);
+  const renderedInventoryNav = renderNav(inventoryNav);
+  const renderedPurchasingNav = renderNav(purchasingNav);
+  const renderedReportingNav = renderNav(reportingNav);
+  const renderedAdminNav = renderNav(adminNav);
+
 
   return (
     <StyledDrawer variant="permanent" open={!isCollapsed}>
@@ -109,27 +129,44 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
       </Toolbar>
       <Divider />
       <List component="nav">
-        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Main</ListSubheader>
-        {mainNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
+
+        {renderedMainNav.length > 0 && (
+          <>
+            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Main</ListSubheader>
+            {renderedMainNav}
+          </>
+        )}
         
-        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1, lineHeight: '30px', mt: 1 }}>Sales</ListSubheader>
-        {salesNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
+        {renderedSalesNav.length > 0 && (
+          <>
+            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1, lineHeight: '30px', mt: 1 }}>Sales</ListSubheader>
+            {renderedSalesNav}
+          </>
+        )}
+        
+        {/* --- UPDATED: Combined Inventory & Purchasing into one Management section --- */}
+        {(renderedInventoryNav.length > 0 || renderedPurchasingNav.length > 0) && (
+          <>
+            <Divider sx={{ my: 1 }} />
+            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Management</ListSubheader>
+            {renderedInventoryNav}
+            {renderedPurchasingNav}
+          </>
+        )}
 
-        <Divider sx={{ my: 1 }} />
-        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Management</ListSubheader>
-        {inventoryNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
+        {renderedReportingNav.length > 0 && (
+          <>
+            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1, lineHeight: '30px', mt: 1 }}>Logs & Reports</ListSubheader>
+            {renderedReportingNav}
+          </>
+        )}
 
-        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1, lineHeight: '30px', mt: 1 }}>Purchasing</ListSubheader>
-        {purchasingNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
-
-        <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1, lineHeight: '30px', mt: 1 }}>Logs & Reports</ListSubheader>
-        {reportingNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
-
-        {user && user.role === 'Owner' && (
+        {/* --- UPDATED: Check for Super Admin role --- */}
+        {user && user.role === 'Super Admin' && (
           <>
             <Divider sx={{ my: 1 }} />
             <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Administration</ListSubheader>
-            {adminNav.map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />)}
+            {renderedAdminNav}
           </>
         )}
       </List>

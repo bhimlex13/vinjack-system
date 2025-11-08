@@ -1,37 +1,36 @@
 // server/routes/saleRoutes.js
 const express = require('express');
 const router = express.Router();
-// --- MODIFIED: Import new controller, remove old one ---
 const {
   createSale,
   getAllSales,
   getSaleById,
   searchSales,
-  saveReceiptString // <-- NEW
+  saveReceiptString
 } = require('../controllers/saleController');
-const { protect, authorize } = require('../middleware/authMiddleware');
-// --- REMOVED: uploadMiddleware is no longer needed for sales ---
-// const uploadMiddleware = require('../middleware/uploadMiddleware');
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 
 router.route('/')
-    .post(protect, authorize('Owner', 'Admin', 'Clerk'), createSale)
-    .get(protect, authorize('Owner', 'Admin'), getAllSales);
+    // 'canManageSales' (Default: Admin, Salesperson)
+    .post(protect, checkPermission('canManageSales'), createSale)
+    // 'canViewReports' (Default: Admin)
+    .get(protect, checkPermission('canViewReports'), getAllSales);
 
+// 'canManageSales' (Default: Admin, Salesperson)
 router.route('/search')
-    .get(protect, authorize('Owner', 'Admin', 'Clerk'), searchSales);
+    .get(protect, checkPermission('canManageSales'), searchSales);
 
-// --- NEW: Route for saving the Base64 receipt string ---
-// This route expects a JSON body with { receiptImageString: "data:image/..." }
+// 'canManageSales' (Default: Admin, Salesperson)
 router.route('/:id/save-receipt-string')
     .post(
         protect,
-        authorize('Owner', 'Admin', 'Clerk'),
-        saveReceiptString // Does NOT use multer middleware
+        checkPermission('canManageSales'),
+        saveReceiptString
     );
-// --- END NEW ---
 
-// This route gets a single sale by its ID (must be last with :id)
+// 'canManageSales' (Default: Admin, Salesperson)
 router.route('/:id')
-    .get(protect, authorize('Owner', 'Admin', 'Clerk'), getSaleById);
+    .get(protect, checkPermission('canManageSales'), getSaleById);
 
 module.exports = router;

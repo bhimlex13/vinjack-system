@@ -13,7 +13,7 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
-    role: 'Clerk', // Default role
+    role: 'Salesperson', // <-- UPDATED: Default role
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -81,9 +81,10 @@ const CreateUserModal = ({ onClose, onUserCreated }) => {
               label="Role"
               onChange={handleChange}
             >
-              <MenuItem value="Clerk">Clerk</MenuItem>
-              <MenuItem value="Mechanic">Mechanic</MenuItem>
-              {/* Owner role is not assignable here */}
+              {/* --- UPDATED: New roles --- */}
+              <MenuItem value="Admin">Admin</MenuItem>
+              <MenuItem value="Salesperson">Salesperson</MenuItem>
+              {/* Super Admin role is not assignable here */}
             </Select>
           </FormControl>
         </Box>

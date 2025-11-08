@@ -1,7 +1,7 @@
 // client/src/App.js
-import React, { useEffect, useContext } from 'react'; // Added useEffect
+import React, { useEffect, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ToastContainer, toast } from 'react-toastify'; // Added toast
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider, default as AuthContext } from './context/AuthContext';
@@ -32,27 +32,25 @@ import DeliveriesPage from './pages/DeliveriesPage';
 import CustomersPage from './pages/CustomersPage';
 import ReturnsPage from './pages/ReturnsPage';
 import SupplierPOReviewPage from './pages/SupplierPOReviewPage';
+// --- NEW: Import the new page ---
+import PermissionManagementPage from './pages/PermissionManagementPage';
 
 
 const InnerApp = () => {
   const { user, mustChangePassword, isInitializing } = useContext(AuthContext);
 
-  // --- ADDED: useEffect to check for restore flag ---
   useEffect(() => {
-    // Check only after initialization and if user is logged in
     if (!isInitializing && user) {
       const restoreFlag = localStorage.getItem('restoreCompleted');
       if (restoreFlag === 'true') {
-        // Use a slightly more prominent toast for this important message
         toast.success('System successfully restored from backup.', {
           position: "top-center",
-          autoClose: 6000, // Keep visible a bit longer
+          autoClose: 6000, 
         });
-        localStorage.removeItem('restoreCompleted'); // Clear the flag so it only shows once
+        localStorage.removeItem('restoreCompleted'); 
       }
     }
-  }, [user, isInitializing]); // Run when user or initialization state changes
-  // --- END ADDITION ---
+  }, [user, isInitializing]); 
 
   if (isInitializing) {
     return <div>Loading Application...</div>;
@@ -64,7 +62,7 @@ const InnerApp = () => {
 
       <WarningModal />
       <ToastContainer
-        position="top-right" // Default position for regular toasts
+        position="top-right" 
         autoClose={3500}
         hideProgressBar={false}
         newestOnTop={false}
@@ -98,6 +96,8 @@ const InnerApp = () => {
             <Route path="/data-management" element={<DataManagementPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/returns" element={<ReturnsPage />} />
+            {/* --- NEW: Add the route for the permissions page --- */}
+            <Route path="/permissions" element={<PermissionManagementPage />} />
             <Route path="/" element={<Navigate to="/dashboard" />} />
           </Route>
         </Route>

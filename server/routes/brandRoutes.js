@@ -6,10 +6,10 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.route('/')
     .get(protect, getBrands) // All users can get brands
-    .post(protect, authorize('Owner'), createBrand); // Only owner can create
+    .post(protect, authorize('Super Admin'), createBrand); // <-- UPDATED
 
 router.route('/:id')
-    .put(protect, authorize('Owner'), updateBrand)
-    .delete(protect, authorize('Owner'), deleteBrand);
+    .put(protect, authorize('Super Admin'), updateBrand) // <-- UPDATED
+    .delete(protect, authorize('Super Admin'), deleteBrand); // <-- UPDATED
 
 module.exports = router;

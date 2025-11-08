@@ -15,9 +15,9 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ['Owner', 'Clerk', 'Mechanic'],
+    enum: ['Super Admin', 'Admin', 'Salesperson'], // <-- UPDATED
     required: true,
-    default: 'Clerk'
+    default: 'Salesperson' // <-- UPDATED
   },
   status: { type: String, default: 'pending' },
   

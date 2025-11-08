@@ -9,18 +9,20 @@ const {
     getRecentActivities,
     getPendingPurchaseOrders
 } = require('../controllers/reportController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, checkPermission } = require('../middleware/authMiddleware');
 
-// --- MODIFIED: All dashboard/report routes now accessible to all roles ---
-// The frontend will still hide sensitive filters from non-Owners.
-// This aligns with the thesis requirement for read-only dashboard access for all roles.
-const allRoles = [protect, authorize('Owner', 'Admin', 'Clerk', 'Mechanic')];
+// These routes feed the dashboard widgets
+// 'canViewDashboard' (Default: Admin, Salesperson)
+const canViewDashboard = checkPermission('canViewDashboard'); 
+router.get('/summary', protect, canViewDashboard, getDashboardSummary);
+router.get('/low-stock', protect, canViewDashboard, getLowStockProducts);
+router.get('/sales-trend', protect, canViewDashboard, getSalesTrend);
+router.get('/recent-activities', protect, canViewDashboard, getRecentActivities);
+router.get('/pending-pos', protect, canViewDashboard, getPendingPurchaseOrders);
 
-router.get('/summary', allRoles, getDashboardSummary);
-router.get('/sales', allRoles, getSalesReport);
-router.get('/low-stock', allRoles, getLowStockProducts);
-router.get('/sales-trend', allRoles, getSalesTrend);
-router.get('/recent-activities', allRoles, getRecentActivities);
-router.get('/pending-pos', allRoles, getPendingPurchaseOrders);
+// This route feeds the dedicated, detailed Sales Report page
+// 'canViewReports' (Default: Admin)
+router.get('/sales', protect, checkPermission('canViewReports'), getSalesReport);
 
 module.exports = router;

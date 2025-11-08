@@ -8,26 +8,33 @@ const {
   deleteProduct,
   getLowStockProducts,
   getProductsBySupplier,
-  recalculateAllProductStatuses, // <-- 1. IMPORTED
+  recalculateAllProductStatuses,
 } = require('../controllers/productController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+// --- UPDATED: Import 'checkPermission' ---
+const { protect, authorize, checkPermission } = require('../middleware/authMiddleware');
 
 router.route('/')
-  .get(protect, getProducts)
-  .post(protect, authorize('Owner', 'Clerk'), createProduct);
+  // 'canViewInventory' (Default: Admin, Salesperson)
+  .get(protect, checkPermission('canViewInventory'), getProducts) 
+  // 'canManageInventory' (Default: Admin)
+  .post(protect, checkPermission('canManageInventory'), createProduct); 
 
 router.route('/:id')
-  .put(protect, authorize('Owner'), updateProduct)
-  .delete(protect, authorize('Owner'), deleteProduct);
+  // 'canManageInventory' (Default: Admin)
+  .put(protect, checkPermission('canManageInventory'), updateProduct) 
+  // 'canManageInventory' (Default: Admin)
+  .delete(protect, checkPermission('canManageInventory'), deleteProduct); 
 
-router.route('/low-stock').get(protect, getLowStockProducts);
+// 'canViewInventory' (Default: Admin, Salesperson)
+router.route('/low-stock')
+  .get(protect, checkPermission('canViewInventory'), getLowStockProducts); 
 
+// 'canViewInventory' (Default: Admin, Salesperson)
 router.route('/by-supplier/:supplierId')
-  .get(protect, getProductsBySupplier);
+  .get(protect, checkPermission('canViewInventory'), getProductsBySupplier);
 
-// --- 2. NEW ROUTE ADDED ---
+// This is a Super Admin only system task, so 'authorize' is still best
 router.route('/recalculate-statuses')
-  .post(protect, authorize('Owner'), recalculateAllProductStatuses);
-
+  .post(protect, authorize('Super Admin'), recalculateAllProductStatuses); 
 
 module.exports = router;
