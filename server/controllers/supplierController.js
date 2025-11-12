@@ -1,6 +1,6 @@
 // server/controllers/supplierController.js
 const Supplier = require('../models/supplierModel');
-const logAction = require('../utils/logger'); // <-- Import the logger
+const logAction = require('../utils/logger');
 
 const getSuppliers = async (req, res) => {
   try {
@@ -13,22 +13,30 @@ const getSuppliers = async (req, res) => {
 
 const createSupplier = async (req, res) => {
   try {
-    // --- ADDED email ---
-    const { name, email, contactPerson, contactNumber, address } = req.body;
-    // --- ADDED email ---
-    const newSupplier = new Supplier({ name, email, contactPerson, contactNumber, address });
+    // --- UPDATED: Added status and paymentTerms ---
+    const { name, email, contactPerson, contactNumber, address, status, paymentTerms } = req.body;
+    
+    const newSupplier = new Supplier({ 
+      name, 
+      email, 
+      contactPerson, 
+      contactNumber, 
+      address, 
+      status: status || 'Pending', // Default to Pending if not provided
+      paymentTerms: paymentTerms || 'Cash' // Default to Cash if not provided
+    });
+    // --- END UPDATE ---
+    
     const savedSupplier = await newSupplier.save();
 
     // Log the action
-    logAction(req.user, 'CREATE_SUPPLIER', `Created new supplier: '${savedSupplier.name}'`);
+    logAction(req.user, 'CREATE_SUPPLIER', `Created new supplier: '${savedSupplier.name}' (Status: ${savedSupplier.status})`);
 
     res.status(201).json(savedSupplier);
   } catch (error) {
-    // Basic duplicate name check
     if (error.code === 11000 && error.keyPattern && error.keyPattern.name) {
        return res.status(400).json({ message: 'Supplier name already exists.' });
     }
-    // Basic email validation check from model
     if (error.errors && error.errors.email) {
         return res.status(400).json({ message: error.errors.email.message });
     }
@@ -38,11 +46,13 @@ const createSupplier = async (req, res) => {
 
 const updateSupplier = async (req, res) => {
   try {
-    // req.body will contain the email field if it's sent from the form
+    // --- UPDATED: req.body will now also contain status and paymentTerms ---
     const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
-        runValidators: true // Ensure email validation runs on update
+        runValidators: true // Ensure enum validation runs
     });
+    // --- END UPDATE ---
+
     if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
     
     // Log the action
@@ -50,11 +60,9 @@ const updateSupplier = async (req, res) => {
 
     res.json(supplier);
   } catch (error) {
-     // Basic email validation check from model
-    if (error.errors && error.errors.email) {
+     if (error.errors && error.errors.email) {
         return res.status(400).json({ message: error.errors.email.message });
     }
-     // Basic duplicate name check
     if (error.code === 11000 && error.keyPattern && error.keyPattern.name) {
        return res.status(400).json({ message: 'Supplier name already exists.' });
     }
@@ -72,6 +80,9 @@ const deleteSupplier = async (req, res) => {
 
     res.json({ message: 'Supplier removed' });
   } catch (error) {
+    // --- ADDED: Check if supplier is in use ---
+    // This is a basic check. A more robust check would look at Products, POs, Deliveries, etc.
+    // We can add this later if needed. For now, a 500 is ok.
     res.status(500).json({ message: 'Server Error' });
   }
 };

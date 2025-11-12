@@ -2,7 +2,7 @@
 import React, { useState, useContext } from 'react';
 import api from '../api/axios';
 import ConfirmationContext from '../context/ConfirmationContext';
-import AdminConfirmPasswordModal from './AdminConfirmPasswordModal'; // 1. Import new components
+import AdminConfirmPasswordModal from './AdminConfirmPasswordModal';
 import { adminResetPassword } from '../api/userApi';
 import { toast } from 'react-toastify';
 
@@ -11,33 +11,37 @@ import {
   Button, FormControl, InputLabel, Select, MenuItem, Stack, Box, Divider
 } from '@mui/material';
 
-// 2. Add 'onPasswordResetSuccess' prop
 const EditUserModal = ({ user, open, onClose, onUserUpdate, onPasswordResetSuccess }) => { 
   const [role, setRole] = useState(user.role);
   const [status, setStatus] = useState(user.status);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false); // 3. State for confirm modal
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const { confirm } = useContext(ConfirmationContext);
 
   const handleUpdate = async () => {
-    const isConfirmed = await confirm('Are you sure you want to save these changes?');
+    // --- UPDATED: Confirmation text ---
+    const isConfirmed = await confirm({
+        title: 'Confirm Update',
+        description: `Are you sure you want to update ${user.fullName}'s role to '${role}' and status to '${status}'?`
+    });
+    // --- END UPDATE ---
+    
     if (isConfirmed) {
       try {
         await api.put(`/users/${user._id}`, { role, status });
         toast.success("User updated successfully.");
-        onUserUpdate();
-        onClose();
+        onUserUpdate(); // Refreshes the user list
+        onClose(); // Closes this modal
       } catch (error) {
-        toast.error('Failed to update user.');
+        toast.error(error.response?.data?.message || 'Failed to update user.');
         console.error('Failed to update user.', error);
       }
     }
   };
 
-  // 4. New handler for the reset password flow
   const handleResetPasswordConfirm = async (adminPassword) => {
     try {
       const response = await adminResetPassword(user._id, adminPassword);
-      onPasswordResetSuccess(response); // Pass new credentials up to the parent
+      onPasswordResetSuccess(response); // Pass new credentials up
     } catch (err) {
       toast.error(err.response?.data?.message || 'Password reset failed.');
     }
@@ -66,8 +70,10 @@ const EditUserModal = ({ user, open, onClose, onUserUpdate, onPasswordResetSucce
                 label="Role"
                 onChange={(e) => setRole(e.target.value)}
               >
-                <MenuItem value="Mechanic">Mechanic</MenuItem>
-                <MenuItem value="Clerk">Clerk</MenuItem>
+                {/* --- UPDATED: New roles --- */}
+                <MenuItem value="Admin">Admin</MenuItem>
+                <MenuItem value="Salesperson">Salesperson</MenuItem>
+                {/* You cannot change a user to Super Admin here */}
               </Select>
             </FormControl>
             <FormControl fullWidth>
@@ -79,11 +85,10 @@ const EditUserModal = ({ user, open, onClose, onUserUpdate, onPasswordResetSucce
                 onChange={(e) => setStatus(e.target.value)}
               >
                 <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Archived (Inactive)</MenuItem>
+                <MenuItem value="inactive">Inactive</MenuItem> {/* <-- UPDATED text */}
               </Select>
             </FormControl>
             <Divider />
-            {/* 5. Add the "Reset Password" button */}
             <Button
               variant="outlined"
               color="warning"

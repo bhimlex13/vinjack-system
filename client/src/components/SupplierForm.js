@@ -1,5 +1,4 @@
 // client/src/components/SupplierForm.js
-
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 
@@ -10,17 +9,22 @@ import {
   TextField,
   Alert,
   DialogContent,
-  DialogActions
+  DialogActions,
+  FormControl, // <-- NEW
+  InputLabel,  // <-- NEW
+  Select,      // <-- NEW
+  MenuItem     // <-- NEW
 } from '@mui/material';
 
 const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
   const [formData, setFormData] = useState({
     name: '',
-    // --- 1. ADDED email ---
     email: '',
     contactPerson: '',
     contactNumber: '',
-    address: ''
+    address: '',
+    paymentTerms: 'Cash', // <-- NEW
+    status: 'Pending'     // <-- NEW
   });
   const [error, setError] = useState('');
 
@@ -28,15 +32,24 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
     if (supplierToEdit) {
       setFormData({
         name: supplierToEdit.name || '',
-        // --- 2. ADDED email ---
         email: supplierToEdit.email || '',
         contactPerson: supplierToEdit.contactPerson || '',
         contactNumber: supplierToEdit.contactNumber || '',
-        address: supplierToEdit.address || ''
+        address: supplierToEdit.address || '',
+        paymentTerms: supplierToEdit.paymentTerms || 'Cash', // <-- NEW
+        status: supplierToEdit.status || 'Pending'           // <-- NEW
       });
     } else {
-      // --- Also add email here for resetting ---
-      setFormData({ name: '', email: '', contactPerson: '', contactNumber: '', address: '' });
+      // Reset form, including new fields
+      setFormData({ 
+        name: '', 
+        email: '', 
+        contactPerson: '', 
+        contactNumber: '', 
+        address: '', 
+        paymentTerms: 'Cash', 
+        status: 'Pending' 
+      });
     }
   }, [supplierToEdit]);
 
@@ -75,18 +88,16 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
           value={formData.name}
           onChange={handleChange}
         />
-        {/* --- 3. ADDED EMAIL FIELD --- */}
         <TextField
           margin="dense"
           name="email"
           label="Email Address"
-          type="email" // Use type="email" for basic validation
+          type="email"
           fullWidth
           variant="outlined"
           value={formData.email}
           onChange={handleChange}
         />
-        {/* --- END ADDED FIELD --- */}
         <TextField
           margin="dense"
           name="contactPerson"
@@ -117,6 +128,44 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
           value={formData.address}
           onChange={handleChange}
         />
+
+        {/* --- NEW FIELDS ADDED --- */}
+        <FormControl fullWidth margin="dense">
+          <InputLabel id="paymentTerms-select-label">Payment Terms</InputLabel>
+          <Select
+            labelId="paymentTerms-select-label"
+            id="paymentTerms"
+            name="paymentTerms"
+            value={formData.paymentTerms}
+            label="Payment Terms"
+            onChange={handleChange}
+          >
+            <MenuItem value="Cash">Cash</MenuItem>
+            <MenuItem value="Consignment">Consignment</MenuItem>
+            <MenuItem value="Terms">Terms</MenuItem>
+          </Select>
+        </FormControl>
+
+        {/* Status field is only shown when EDITING a supplier (for the approval workflow) */}
+        {supplierToEdit && (
+          <FormControl fullWidth margin="dense">
+            <InputLabel id="status-select-label">Status</InputLabel>
+            <Select
+              labelId="status-select-label"
+              id="status"
+              name="status"
+              value={formData.status}
+              label="Status"
+              onChange={handleChange}
+            >
+              <MenuItem value="Pending">Pending</MenuItem>
+              <MenuItem value="Approved">Approved</MenuItem>
+              <MenuItem value="Rejected">Rejected</MenuItem>
+            </Select>
+          </FormControl>
+        )}
+        {/* --- END NEW FIELDS --- */}
+
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
