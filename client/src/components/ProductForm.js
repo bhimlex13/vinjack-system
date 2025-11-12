@@ -365,8 +365,8 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
              <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="quantity" label="Current Qty" value={formData.quantity} onChange={handleChange} inputProps={{ min: 0 }} disabled={!!productToEdit} InputProps={productToEdit ? { endAdornment: ( <InputAdornment position="end"> <Tooltip title="Use 'Adjust Stock' button in the inventory list to change quantity."> <InfoOutlinedIcon color="action" /> </Tooltip> </InputAdornment> ) }: {}} /> {!!productToEdit && <FormHelperText>Quantity is managed via transactions. Use Adjust Stock for corrections.</FormHelperText>} </Grid>
              <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="maxStock" label="Max Stock" value={formData.maxStock} onChange={handleChange} inputProps={{ min: 1 }} /> </Grid>
              
-             {/* --- NEW: Status Dropdown (Owner only, Edit mode only) --- */}
-             {productToEdit && (user?.role === 'Owner' || user?.role === 'Admin') && (
+             {/* --- UPDATED: Status Dropdown (Super Admin or Admin only, Edit mode only) --- */}
+             {productToEdit && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
                 <Grid item size={{ xs: 6 }}>
                     <FormControl fullWidth required>
                         <InputLabel>Status</InputLabel>
@@ -385,7 +385,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
                     </FormControl>
                 </Grid>
              )}
-             {/* --- END NEW --- */}
+             {/* --- END UPDATED --- */}
 
 
             {/* Helper Text for Thresholds */}
@@ -409,9 +409,15 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
           {error && !(error.includes('supplier') || error.includes('cost')) && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert> }
 
           {/* Buttons */}
-          <Stack direction="row" justifyContent={productToEdit && (user.role === 'Owner' || user.role === 'Admin') ? "space-between" : "flex-end"} alignItems="center" sx={{ mt: 3 }}>
-            {/* --- MODIFIED: Archive Button --- */}
-            {productToEdit && (user.role === 'Owner' || user.role === 'Admin') && formData.status === 'active' && (
+          <Stack 
+            direction="row" 
+            // --- UPDATED: Check for Super Admin or Admin ---
+            justifyContent={productToEdit && (user.role === 'Super Admin' || user.role === 'Admin') ? "space-between" : "flex-end"} 
+            alignItems="center" 
+            sx={{ mt: 3 }}
+          >
+            {/* --- UPDATED: Archive Button --- */}
+            {productToEdit && (user.role === 'Super Admin' || user.role === 'Admin') && formData.status === 'active' && (
               <Button 
                 color="warning" 
                 onClick={handleArchive}
@@ -420,7 +426,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
                 Archive Product
               </Button>
             )}
-            {/* --- END MODIFICATION --- */}
+            {/* --- END UPDATED --- */}
             
             <Stack direction="row" spacing={2}> 
               <Button onClick={onClose}>Cancel</Button> 

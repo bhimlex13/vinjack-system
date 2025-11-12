@@ -11,7 +11,7 @@ import StockGauge from '../components/StockGauge';
 import {
   Box, Button, Typography, TextField, Select, MenuItem, FormControl, InputLabel,
   Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent,
-  Container, Tooltip, IconButton, Stack, Chip // --- NEW: Import Chip ---
+  Container, Tooltip, IconButton, Stack, Chip 
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
@@ -189,7 +189,8 @@ const InventoryPage = () => {
     {
       field: 'actions', headerName: 'Actions', width: 180, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => (
-        (user?.role === 'Owner' || user?.role === 'Admin') && (
+        // --- UPDATED: Changed roles to 'Super Admin' and 'Admin' ---
+        (user?.role === 'Super Admin' || user?.role === 'Admin') && (
           <Box>
             <Tooltip title="View History">
               <IconButton size="small" color="info" onClick={() => setHistoryProduct(params.row)}>
@@ -255,7 +256,8 @@ const InventoryPage = () => {
         </Typography>
         
         <Stack direction="row" spacing={2}>
-          {(user?.role === 'Owner' || user?.role === 'Admin') && (
+          {/* --- UPDATED: Changed roles to 'Super Admin' and 'Admin' --- */}
+          {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
             <Tooltip title="Recalculate stock status for all products">
               {/* <Button 
                 variant="outlined" 
@@ -267,7 +269,8 @@ const InventoryPage = () => {
             </Tooltip>
           )}
           
-          {user && (user.role === 'Owner' || user.role === 'Clerk') && (
+          {/* --- **CORRECTED**: Changed roles to 'Super Admin' and 'Admin' based on image --- */}
+          {user && (user.role === 'Super Admin' || user.role === 'Admin') && (
             <Button variant="contained" startIcon={<AddIcon />} onClick={openProductModalForAdd}>
               Add New Product
             </Button>
