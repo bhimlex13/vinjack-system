@@ -127,9 +127,10 @@ const DashboardPage = () => {
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
 
-  // Load user preferences on mount (for Owner)
+  // Load user preferences on mount
   useEffect(() => {
-    if (user?.role === 'Owner') {
+    // --- UPDATED: Use 'Super Admin' role ---
+    if (user?.role === 'Super Admin' || user?.role === 'Admin') {
       const loadPreferences = async () => {
         try {
           if (user.dashboardPreferences) {
@@ -138,6 +139,7 @@ const DashboardPage = () => {
              if (prefs.selectedCategory) setSelectedCategory(prefs.selectedCategory);
              if (prefs.selectedSupplier) setSelectedSupplier(prefs.selectedSupplier);
           } else {
+             // Fallback to fetch from /me if not on initial user object
              const { data } = await api.get('/users/me');
              if (data.dashboardPreferences) {
                 const prefs = data.dashboardPreferences;
@@ -156,7 +158,8 @@ const DashboardPage = () => {
 
   // useEffect to load filter dropdown data
   useEffect(() => {
-    if (user?.role === 'Owner') {
+    // --- UPDATED: Use 'Super Admin' role ---
+    if (user?.role === 'Super Admin' || user?.role === 'Admin') {
       const fetchFilterData = async () => {
         setIsFilterDataLoading(true);
         try {
@@ -310,7 +313,7 @@ const DashboardPage = () => {
   };
 
 
-  if (isLoading || (user?.role === 'Owner' && isFilterDataLoading)) {
+  if (isLoading || (user?.role === 'Super Admin' && isFilterDataLoading)) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <CircularProgress />
@@ -341,8 +344,8 @@ const DashboardPage = () => {
 
         {/* Filter Stack */}
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center">
-            {/* Owner Only Filters */}
-            {user?.role === 'Owner' && (
+            {/* --- UPDATED: Use 'Super Admin' and 'Admin' roles --- */}
+            {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
               <>
                 <FormControl size="small" sx={{ minWidth: 180 }}>
                   <InputLabel id="category-filter-label">Category</InputLabel>
@@ -387,7 +390,8 @@ const DashboardPage = () => {
             </ToggleButtonGroup>
 
             {/* Save Preferences Button */}
-            {user?.role === 'Owner' && (
+            {/* --- UPDATED: Use 'Super Admin' and 'Admin' roles --- */}
+            {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
               <Button
                 variant="outlined"
                 size="small"

@@ -253,8 +253,7 @@ const DataManagementPage = () => {
         </Box>
       </Paper>
 
-      {/* --- NEW: Backup Section (Owner Only) --- */}
-      {user?.role === 'Owner' && (
+      {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
         <Paper sx={{ p: 3, mt: 4 }}>
           <Typography variant="h6" gutterBottom>Backup & Export</Typography>
           <Divider sx={{ mb: 2 }}/>

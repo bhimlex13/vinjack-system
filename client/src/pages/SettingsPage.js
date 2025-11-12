@@ -107,7 +107,7 @@ const SettingsPage = () => {
            api.get('/settings'), // Personal settings
            api.get('/users/me') // User profile
          ];
-         if (user.role === 'Owner') {
+         if (user.role === 'Super Admin') {
            apiCalls.push(api.get('/settings/backup/config'));
          }
          const responses = await Promise.all(apiCalls);
@@ -133,7 +133,7 @@ const SettingsPage = () => {
          }
 
          // --- MODIFIED: Process backup config ---
-         if (user.role === 'Owner' && responses[2]?.data) {
+         if (user.role === 'Super Admin' && responses[2]?.data) {
            setBackupSettings(responses[2].data);
            // --- Store original state ---
            setOriginalBackupSettings(responses[2].data);
@@ -178,7 +178,7 @@ const SettingsPage = () => {
 
   // Fetch GCS Backup List (unchanged)
   useEffect(() => { /* ... unchanged ... */
-    if (user?.role === 'Owner') {
+    if (user?.role === 'Super Admin') {
         const fetchBackupList = async () => {
             setIsLoadingBackups(true);
             try {
@@ -423,7 +423,7 @@ const SettingsPage = () => {
         setTimer(180);
       } else {
         setUpdateMessage(response.data.message);
-        if (user.role !== 'Owner') {
+        if (user.role !== 'Super Admin') {
             setPendingChanges({ /* Store relevant pending changes if needed */ });
         }
         setShowSuccessModal(true);
@@ -477,7 +477,7 @@ const SettingsPage = () => {
                     <AccountCircleIcon color="action" sx={{ mr: 1 }} />
                     <Typography variant="h6" component="h3">My Profile</Typography>
                 </Box>
-                {pendingChanges && user.role !== 'Owner' && <Alert severity="info" sx={{ mb: 2 }}>You have pending profile changes awaiting owner approval.</Alert>}
+                {pendingChanges && user.role !== 'Super Admin' && <Alert severity="info" sx={{ mb: 2 }}>You have pending profile changes awaiting owner approval.</Alert>}
                 <List dense sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
                   <ListItem><ListItemIcon><BadgeIcon /></ListItemIcon><ListItemText primary="Full Name" secondary={profile.fullName} /></ListItem>
                   <ListItem><ListItemIcon><AccountCircleIcon /></ListItemIcon><ListItemText primary="Username" secondary={profile.username} /></ListItem>
@@ -485,7 +485,7 @@ const SettingsPage = () => {
                   <ListItem><ListItemIcon><VpnKeyIcon /></ListItemIcon><ListItemText primary="Password" secondary="********" /></ListItem>
                 </List>
                 <Box sx={{ mt: 'auto', pt: 2, flexShrink: 0 }}>
-                    <Button variant="contained" onClick={openUpdateModal} disabled={!!pendingChanges && user.role !== 'Owner'}>
+                    <Button variant="contained" onClick={openUpdateModal} disabled={!!pendingChanges && user.role !== 'Super Admin'}>
                         Request Profile Update
                     </Button>
                 </Box>
@@ -534,8 +534,7 @@ const SettingsPage = () => {
             </Paper>
         </Grid>
         
-        {/* --- MODIFIED: Automated Backup Settings Section (Owner Only) --- */}
-        {user?.role === 'Owner' && (
+        {user?.role === 'Super Admin' && (
           <Grid item size={{ xs: 12 }}>
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
@@ -597,7 +596,7 @@ const SettingsPage = () => {
 
 
         {/* Manual Backup & Restore Section (unchanged) */}
-        {user?.role === 'Owner' && (
+        {user?.role === 'Super Admin' && (
           <Grid item size={{ xs: 12 }}>
              {/* ... unchanged GCS Backup/Restore JSX ... */}
              <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
