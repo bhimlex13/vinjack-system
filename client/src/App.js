@@ -32,8 +32,8 @@ import DeliveriesPage from './pages/DeliveriesPage';
 import CustomersPage from './pages/CustomersPage';
 import ReturnsPage from './pages/ReturnsPage';
 import SupplierPOReviewPage from './pages/SupplierPOReviewPage';
-// --- NEW: Import the new page ---
-import PermissionManagementPage from './pages/PermissionManagementPage';
+// --- 1. NEW: Import the new page ---
+import SupplierReturnsPage from './pages/SupplierReturnsPage';
 
 
 const InnerApp = () => {
@@ -96,8 +96,10 @@ const InnerApp = () => {
             <Route path="/data-management" element={<DataManagementPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/returns" element={<ReturnsPage />} />
-            {/* --- NEW: Add the route for the permissions page --- */}
-            <Route path="/permissions" element={<PermissionManagementPage />} />
+            
+            {/* --- 2. NEW: Add the route for supplier returns --- */}
+            <Route path="/supplier-returns" element={<SupplierReturnsPage />} />
+
             <Route path="/" element={<Navigate to="/dashboard" />} />
           </Route>
         </Route>

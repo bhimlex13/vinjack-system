@@ -12,10 +12,23 @@ import {
   Stack,
   Dialog,
   DialogTitle,
-  Container // <-- IMPORTED CONTAINER
+  Container,
+  Chip // <-- NEW
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
+
+// --- NEW: Status Chip Component ---
+const StatusChip = ({ status }) => {
+  const statusConfig = {
+    'Pending': { label: 'Pending', color: 'warning' },
+    'Approved': { label: 'Approved', color: 'success' },
+    'Rejected': { label: 'Rejected', color: 'error' },
+  };
+  const config = statusConfig[status] || { label: status, color: 'default' };
+  return <Chip label={config.label} color={config.color} size="small" sx={{ textTransform: 'capitalize' }} />;
+};
+// --- END NEW ---
 
 const SuppliersPage = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -54,6 +67,7 @@ const SuppliersPage = () => {
   };
 
   const handleDelete = async (supplierId) => {
+    // We should use the confirmation context here, but keeping old syntax for now
     if (window.confirm('Are you sure you want to delete this supplier?')) {
       try {
         await api.delete(`/suppliers/${supplierId}`);
@@ -64,8 +78,20 @@ const SuppliersPage = () => {
     }
   };
 
+  // --- UPDATED: Added 'status' and 'paymentTerms' columns ---
   const columns = [
     { field: 'name', headerName: 'Supplier Name', flex: 1 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: (params) => <StatusChip status={params.row.status} />
+    },
+    {
+      field: 'paymentTerms',
+      headerName: 'Payment Terms',
+      width: 150,
+    },
     { 
       field: 'contactPerson', 
       headerName: 'Contact Person', 
@@ -91,9 +117,9 @@ const SuppliersPage = () => {
       )
     }
   ];
+  // --- END UPDATE ---
 
   return (
-    // --- THIS IS THE KEY CHANGE ---
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       <Dialog 
         open={isSupplierModalOpen} 
@@ -120,7 +146,7 @@ const SuppliersPage = () => {
         </Stack>
       </Box>
 
-      <Paper sx={{ height: '75vh', width: ' ১০০%' }}>
+      <Paper sx={{ height: '75vh', width: ' 100%' }}>
         <DataGrid
           rows={suppliers}
           columns={columns}
