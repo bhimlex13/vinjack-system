@@ -7,13 +7,13 @@ const {
     getLowStockProducts,
     getSalesTrend,
     getRecentActivities,
-    getPendingPurchaseOrders
+    getPendingPurchaseOrders,
+    // --- IMPORT NEW FUNCTION ---
+    getReturnsReport
 } = require('../controllers/reportController');
-// --- UPDATED: Import 'checkPermission' ---
 const { protect, checkPermission } = require('../middleware/authMiddleware');
 
-// These routes feed the dashboard widgets
-// 'canViewDashboard' (Default: Admin, Salesperson)
+// Dashboard routes
 const canViewDashboard = checkPermission('canViewDashboard'); 
 router.get('/summary', protect, canViewDashboard, getDashboardSummary);
 router.get('/low-stock', protect, canViewDashboard, getLowStockProducts);
@@ -21,8 +21,12 @@ router.get('/sales-trend', protect, canViewDashboard, getSalesTrend);
 router.get('/recent-activities', protect, canViewDashboard, getRecentActivities);
 router.get('/pending-pos', protect, canViewDashboard, getPendingPurchaseOrders);
 
-// This route feeds the dedicated, detailed Sales Report page
-// 'canViewReports' (Default: Admin)
-router.get('/sales', protect, checkPermission('canViewReports'), getSalesReport);
+// --- Dedicated Report Page Routes ---
+const canViewReports = checkPermission('canViewReports');
+router.get('/sales', protect, canViewReports, getSalesReport);
+
+// --- NEW ROUTE FOR RETURNS REPORT ---
+router.get('/returns', protect, canViewReports, getReturnsReport);
+// --- END NEW ROUTE ---
 
 module.exports = router;
