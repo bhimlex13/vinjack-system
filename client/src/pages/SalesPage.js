@@ -377,14 +377,12 @@ const SalesPage = () => {
     });
   }, [products, searchTerm, selectedBrand, selectedCategory]);
 
-  // --- THIS IS THE STYLYING FIX ---
   const activeToggleButtonSx = {
     '&.Mui-selected, &.Mui-selected:hover': {
       color: 'white',
       backgroundColor: 'primary.main',
     }
   };
-  // --- END OF FIX ---
 
   const handleFilterChange = (setter) => (event, newValue) => { setter(newValue); };
 
@@ -402,7 +400,6 @@ const SalesPage = () => {
             fullWidth label="Search Products" variant="outlined" size="small" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }} sx={{ mb: 1 }}
           />
-          {/* --- CATEGORY TOGGLE BUTTONS (STYLED) --- */}
           <Box sx={{ mb: 1 }}>
             <ToggleButtonGroup value={selectedCategory} exclusive onChange={handleFilterChange(setSelectedCategory)} size="small" fullWidth sx={{ display: 'flex' }}>
               <ToggleButton value={null} sx={{ flex: 1, ...activeToggleButtonSx }}>All</ToggleButton>
@@ -413,7 +410,6 @@ const SalesPage = () => {
               ))}
             </ToggleButtonGroup>
           </Box>
-          {/* --- BRAND TOGGLE BUTTONS (STYLED) --- */}
           <Box sx={{ mb: 2 }}>
             <ToggleButtonGroup value={selectedBrand} exclusive onChange={handleFilterChange(setSelectedBrand)} size="small" fullWidth sx={{ display: 'flex' }}>
                 <ToggleButton value={null} sx={{ flex: 1, ...activeToggleButtonSx }}>All</ToggleButton>
@@ -595,12 +591,20 @@ const SalesPage = () => {
               onFormSubmit={handleNewCustomerSubmit}
           />
       </Dialog>
-      {showReceiptModal && lastSaleData && (
+      
+      {/* --- THIS IS THE FIX --- */}
+      {/* Always render the ReceiptModal if there is data, 
+        but pass the 'showReceiptModal' state to its 'open' prop.
+      */}
+      {lastSaleData && (
           <ReceiptModal 
+              open={showReceiptModal} 
               saleData={lastSaleData} 
               onClose={() => setShowReceiptModal(false)} 
           />
       )}
+      {/* --- END FIX --- */}
+      
       <AddServiceModal 
           open={isServiceModalOpen} 
           onClose={() => setIsServiceModalOpen(false)} 
