@@ -10,9 +10,9 @@ const {
   updatePurchaseOrder,
   getPurchaseOrderByToken,
   updateBySupplier,
-  approveSupplierChanges
+  approveSupplierChanges,
+  uploadSignedAgreement // --- NEW: Import ---
 } = require('../controllers/purchaseOrderController');
-// --- UPDATED: Import 'checkPermission' ---
 const { protect, checkPermission } = require('../middleware/authMiddleware');
 
 // Public routes for supplier interaction
@@ -20,12 +20,14 @@ router.route('/supplier/:token')
   .get(getPurchaseOrderByToken)
   .put(updateBySupplier);
 
-// --- UPDATED: All PO management routes now use 'checkPermission' ---
 const canManagePOs = checkPermission('canManagePurchaseOrders');
 
 // Protected route for the buyer to approve changes
 router.post('/:id/approve', protect, canManagePOs, approveSupplierChanges);
 
+// --- NEW: Route for uploading signed consignment agreement ---
+router.post('/:id/upload-agreement', protect, canManagePOs, uploadSignedAgreement);
+// --- END NEW ---
 
 // Existing Routes
 router.route('/')

@@ -11,6 +11,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendVerificationEmail = async (recipientEmail, code) => {
+  // ... (existing function, no changes)
   const mailOptions = {
     from: `"VinJack System" <${process.env.EMAIL_USER}>`,
     to: recipientEmail,
@@ -33,6 +34,7 @@ const sendVerificationEmail = async (recipientEmail, code) => {
 
 
 const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
+  // ... (existing function, no changes)
   if (!lowStockItems || lowStockItems.length === 0) {
     console.log('No low stock items to report. Email not sent.');
     return;
@@ -66,6 +68,7 @@ const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
 
 
 const sendPoLink = async (supplierEmail, supplierName, poNumber, token) => {
+  // ... (existing function, no changes)
   // Construct the link using the client URL from environment variables
   const link = `${process.env.CLIENT_URL}/supplier/po/${token}`; // Ensure CLIENT_URL is in your .env
 
@@ -101,8 +104,8 @@ const sendPoLink = async (supplierEmail, supplierName, poNumber, token) => {
   }
 };
 
-// --- NEW FUNCTION: Send PO Approval Notification ---
 const sendPOApprovalNotification = async (recipientEmail, supplierName, poNumber) => {
+    // ... (existing function, no changes)
     const mailOptions = {
         from: `"VinJack System" <${process.env.EMAIL_USER}>`,
         to: recipientEmail,
@@ -122,9 +125,77 @@ const sendPOApprovalNotification = async (recipientEmail, supplierName, poNumber
         console.log(`PO Approval notification sent successfully to ${recipientEmail} for PO ${poNumber}`);
     } catch (error) {
         console.error(`Error sending PO Approval email to ${recipientEmail} for PO ${poNumber}:`, error);
-        // Log the error but don't necessarily stop the main process
-        // Consider adding more robust error logging if needed
     }
+};
+
+// --- NEW FUNCTION: Send Daily Sales Report ---
+const sendDailySalesReport = async ({ reportData, recipientEmail, reportDateStr }) => {
+  const { totalRevenue, totalProfit, totalSales, totalItemsSold, topSellingProducts } = reportData;
+
+  // Format top selling products into an HTML table
+  const productsHtml = topSellingProducts.length > 0
+    ? topSellingProducts.map(item => `
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;">${item.productInfo?.name || 'N/A'}</td>
+          <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.totalQuantitySold}</td>
+        </tr>
+      `).join('')
+    : '<tr><td colspan="2" style="border: 1px solid #ddd; padding: 8px; text-align: center;">No products sold today.</td></tr>';
+
+  const mailOptions = {
+    from: `"VinJack System Report" <${process.env.EMAIL_USER}>`,
+    to: recipientEmail,
+    subject: `Daily Sales Report for ${reportDateStr}`,
+    html: `
+      <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px;">
+        <h1 style="color: #333;">Daily Sales Report</h1>
+        <p>Here is the sales summary for ${reportDateStr}:</p>
+        
+        <table style="width: 100%; max-width: 400px; border-collapse: collapse; margin-bottom: 20px; font-size: 16px;">
+          <tr style="background-color: #f4f4f4;">
+            <td style="border: 1px solid #ddd; padding: 12px; font-weight: bold;">Total Revenue</td>
+            <td style="border: 1px solid #ddd; padding: 12px; color: #28a745; font-weight: bold;">₱${totalRevenue.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 12px; font-weight: bold;">Total Profit</td>
+            <td style="border: 1px solid #ddd; padding: 12px; color: #007bff; font-weight: bold;">₱${totalProfit.toFixed(2)}</td>
+          </tr>
+          <tr style="background-color: #f4f4f4;">
+            <td style="border: 1px solid #ddd; padding: 12px; font-weight: bold;">Total Sales</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">${totalSales}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 12px; font-weight: bold;">Total Items Sold</td>
+            <td style="border: 1px solid #ddd; padding: 12px;">${totalItemsSold}</td>
+          </tr>
+        </table>
+
+        <h2 style="color: #333;">Top Selling Products</h2>
+        <table style="width: 100%; max-width: 400px; border-collapse: collapse; font-size: 14px;">
+          <thead style="background-color: #007bff; color: white;">
+            <tr>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Product Name</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Quantity Sold</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${productsHtml}
+          </tbody>
+        </table>
+        
+        <p style="margin-top: 30px; font-size: 12px; color: #777;">
+          This is an automated report. Please do not reply.
+        </p>
+      </body>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Daily sales report sent successfully to ${recipientEmail}.`);
+  } catch (error) {
+    console.error(`Error sending daily sales report to ${recipientEmail}:`, error);
+  }
 };
 // --- END NEW FUNCTION ---
 
@@ -133,5 +204,6 @@ module.exports = {
     sendLowStockEmail,
     sendVerificationEmail,
     sendPoLink,
-    sendPOApprovalNotification // --- EXPORT NEW FUNCTION ---
+    sendPOApprovalNotification,
+    sendDailySalesReport // --- EXPORT NEW FUNCTION ---
 };

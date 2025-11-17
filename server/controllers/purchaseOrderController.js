@@ -4,11 +4,13 @@ const PurchaseOrder = require('../models/purchaseOrderModel');
 const Counter = require('../models/counterModel');
 const Product = require('../models/productModel');
 const Supplier = require('../models/supplierModel');
-const Delivery = require('../models/deliveryModel');
+// --- UPDATED: Delivery model no longer needed here, stock receiving is self-contained ---
+// const Delivery = require('../models/deliveryModel');
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
 const { checkStockLevelAndNotify } = require('../utils/stockManager');
 const { sendPoLink, sendPOApprovalNotification } = require('../utils/emailService');
+const mongoose = require('mongoose'); // --- NEW: Added for session ---
 
 // Helper function to get the next sequence number for PO
 async function getNextSequenceValue(sequenceName) {
@@ -21,21 +23,30 @@ async function getNextSequenceValue(sequenceName) {
 // Create a new Purchase Order
 const createPurchaseOrder = async (req, res) => {
   try {
-    const { supplier, items, notes } = req.body;
+    // --- UPDATED: Added poType ---
+    const { supplier, items, notes, poType } = req.body;
+    // --- END UPDATED ---
+
     if (!supplier || !items || items.length === 0) {
       return res.status(400).json({ message: 'Supplier and items are required.' });
     }
     const token = crypto.randomBytes(32).toString('hex');
     let totalAmount = 0;
     const processedItems = items.map(item => {
-      const itemTotal = item.quantity * item.unitCost;
+      // --- UPDATED: Use 'unitCost' from request, fallback to 'cost' ---
+      const cost = item.unitCost || item.cost;
+      const itemTotal = item.quantity * cost;
+      // --- END UPDATED ---
       totalAmount += itemTotal;
-      return { product: item.product, quantity: item.quantity, cost: item.unitCost, total: itemTotal };
+      return { product: item.product, quantity: item.quantity, cost: cost, total: itemTotal };
     });
     const sequence = await getNextSequenceValue('purchaseOrder');
     const poNumber = `PO-${new Date().getFullYear()}-${String(sequence).padStart(4, '0')}`;
     const purchaseOrder = new PurchaseOrder({
       poNumber, supplier, items: processedItems, totalAmount, notes,
+      // --- NEW: Save the poType ---
+      poType: poType || 'Purchase', // Default to 'Purchase' if not provided
+      // --- END NEW ---
       supplierResponseToken: token, history: [{ status: 'Pending', notes: 'PO created by user.' }]
     });
     const createdPurchaseOrder = await purchaseOrder.save();
@@ -54,7 +65,8 @@ const createPurchaseOrder = async (req, res) => {
         console.log(`Supplier email not found for PO ${poNumber}. Email not sent.`);
     }
     res.status(201).json(populatedPO);
-  } catch (error) {
+  } catch (error)
+ {
     console.error('Error creating purchase order:', error);
     res.status(500).json({ message: 'Server error while creating purchase order.', error: error.message });
   }
@@ -71,7 +83,7 @@ const getPurchaseOrderByToken = async (req, res) => {
     if (!purchaseOrder) {
       return res.status(404).json({ message: 'Purchase Order link is invalid or has expired.' });
     }
-    if (['Approved', 'Completed', 'Cancelled'].includes(purchaseOrder.status)) {
+    if (['Approved', 'Completed', 'Cancelled', 'Agreement Uploaded - Awaiting Delivery'].includes(purchaseOrder.status)) { // --- UPDATED ---
         return res.status(400).json({ message: 'This purchase order has already been finalized.' });
     }
     res.json(purchaseOrder);
@@ -96,7 +108,9 @@ const updateBySupplier = async (req, res) => {
     }
 
     po.items.forEach(originalItem => {
-        const updatedItem = items.find(i => i.product === originalItem.product.toString());
+        // --- UPDATED: Ensure updatedItem.product is a string for comparison ---
+        const updatedItem = items.find(i => i.product && i.product.toString() === originalItem.product.toString());
+        // --- END UPDATED ---
         if (updatedItem) {
             originalItem.supplierUpdatedCost = parseFloat(updatedItem.supplierUpdatedCost);
             originalItem.isAvailable = Boolean(updatedItem.isAvailable);
@@ -151,14 +165,23 @@ const approveSupplierChanges = async (req, res) => {
 
     po.items = availableItems;
     po.totalAmount = finalTotalAmount;
-    po.status = 'Approved';
-    po.history.push({ status: 'Approved', notes: 'Supplier changes approved by user.', updatedBy: req.user.name });
+    // --- UPDATED: Set correct status based on poType ---
+    // If it's a purchase, it's 'Approved'. 
+    // If it's consignment, it's ready for agreement upload (or receiving if no upload required)
+    if (po.poType === 'Consignment') {
+      po.status = 'Agreement Uploaded - Awaiting Delivery'; // Or 'Approved' if you skip upload
+    } else {
+      po.status = 'Approved';
+    }
+    // --- END UPDATED ---
+
+    po.history.push({ status: po.status, notes: 'Supplier changes approved by user.', updatedBy: req.user.name });
 
     const updatedPurchaseOrder = await po.save();
 
     logAction(req.user, 'APPROVE_PO', `Approved supplier changes for PO #${po.poNumber}`, { entityType: 'PurchaseOrder', entityId: updatedPurchaseOrder._id });
 
-    if (po.supplier && po.supplier.email) {
+    if (po.poType !== 'Consignment' && po.supplier && po.supplier.email) { // Only notify for purchases
         sendPOApprovalNotification(
             po.supplier.email,
             po.supplier.name,
@@ -166,8 +189,6 @@ const approveSupplierChanges = async (req, res) => {
         ).catch(err => {
             console.error(`Failed to send PO Approval email for ${po.poNumber}:`, err);
         });
-    } else {
-        console.log(`Supplier email not found for approved PO ${po.poNumber}. Approval email not sent.`);
     }
 
     const populatedPO = await PurchaseOrder.findById(updatedPurchaseOrder._id)
@@ -249,28 +270,33 @@ const updatePurchaseOrder = async (req, res) => {
     }
 };
 
-
 // Receive stock for a Purchase Order
 const receivePurchaseOrder = async (req, res) => {
   const io = req.app.get('socketio');
+  // --- NEW: Use Mongoose Session for transaction ---
+  const session = await mongoose.startSession();
+  // --- END NEW ---
   try {
-    const po = await PurchaseOrder.findById(req.params.id);
+    session.startTransaction(); // Start transaction
+
+    const po = await PurchaseOrder.findById(req.params.id).session(session);
     if (!po) {
-      return res.status(404).json({ message: 'Purchase Order not found.' });
+      throw new Error('Purchase Order not found.');
     }
-    if (!['Approved', 'Partially Received'].includes(po.status)) {
-      return res.status(400).json({ message: `Cannot receive stock for a PO with status '${po.status}'.` });
+    
+    // --- UPDATED: Allow receiving for 'Consignment' POs in this new status ---
+    const allowedStatuses = ['Approved', 'Partially Received', 'Agreement Uploaded - Awaiting Delivery'];
+    if (!allowedStatuses.includes(po.status)) {
+    // --- END UPDATED ---
+      throw new Error(`Cannot receive stock for a PO with status '${po.status}'.`);
     }
 
-    // --- MODIFIED: Read 'items' and 'receiptImageString' from JSON body ---
-    const { items: receivedItems, receiptImageString } = req.body;
-    // --- END MODIFICATION ---
+    const { items: receivedItems, deliveryReceiptUrl } = req.body;
 
     let itemsActuallyReceived = false;
     
-    // Check if receivedItems is an array
     if (!Array.isArray(receivedItems)) {
-        return res.status(400).json({ message: 'Invalid format for received items.' });
+        throw new Error('Invalid format for received items.');
     }
 
     for (const receivedItem of receivedItems) {
@@ -281,7 +307,7 @@ const receivePurchaseOrder = async (req, res) => {
 
         if (qtyToReceive > 0 && qtyToReceive <= maxReceivable) {
             itemsActuallyReceived = true;
-            const product = await Product.findById(receivedItem.productId);
+            const product = await Product.findById(receivedItem.productId).session(session);
             if (!product) {
                 console.warn(`Product ID ${receivedItem.productId} not found during PO receive for ${po.poNumber}`);
                 continue; 
@@ -289,20 +315,26 @@ const receivePurchaseOrder = async (req, res) => {
 
             const stockBefore = product.quantity;
             product.quantity = Number(product.quantity) + qtyToReceive;
-            await product.save();
 
-            await checkStockLevelAndNotify(product, io);
+            // --- NEW: Check poType and update consignedStock if needed ---
+            if (po.poType === 'Consignment') {
+              product.consignedStock = (Number(product.consignedStock) || 0) + qtyToReceive;
+            }
+            // --- END NEW ---
+
+            await product.save({ session });
+            // We will notify *after* the transaction commits
 
             poItem.quantityReceived = (poItem.quantityReceived || 0) + qtyToReceive;
 
             await logMovement({
               product: receivedItem.productId,
-              type: 'DELIVERY (PO)',
+              type: po.poType === 'Consignment' ? 'DELIVERY (CONSIGN)' : 'DELIVERY (PO)',
               quantityChange: qtyToReceive,
               stockBefore: stockBefore,
               referenceId: po._id,
               recordedBy: req.user.id
-            });
+            }, { session }); // Pass session to movement logger
         } else if (qtyToReceive > maxReceivable) {
             console.warn(`Attempted to receive ${qtyToReceive} for product ${receivedItem.productId} on PO ${po.poNumber}, but only ${maxReceivable} were remaining.`);
         }
@@ -311,22 +343,36 @@ const receivePurchaseOrder = async (req, res) => {
 
     const isCompleted = po.items.every(item => (item.quantityReceived || 0) >= item.quantity);
     po.status = isCompleted ? 'Completed' : (itemsActuallyReceived || po.status === 'Partially Received' ? 'Partially Received' : 'Approved');
-
-    // --- MODIFIED: Save the Base64 string if provided ---
-    if (receiptImageString) {
-      po.receiptImageUrl = receiptImageString; // Save the string
+    
+    // --- UPDATED: Use correct field name 'deliveryReceiptUrl' ---
+    if (deliveryReceiptUrl) {
+      po.deliveryReceiptUrl = deliveryReceiptUrl; // Save the string/URL
     }
-    // --- END MODIFICATION ---
+    // --- END UPDATED ---
 
-    // --- MODIFIED: Update history note ---
     po.history.push({
       status: po.status,
-      notes: `Received stock. ${itemsActuallyReceived ? '' : 'No items received in this transaction. '}Receipt: ${receiptImageString ? 'Uploaded' : 'Not uploaded.'}`,
+      notes: `Received stock. ${itemsActuallyReceived ? '' : 'No items received in this transaction.'} Receipt: ${deliveryReceiptUrl ? 'Uploaded' : 'Not uploaded.'}`,
       updatedBy: req.user.name
     });
-    // --- END MODIFICATION ---
 
-    const updatedPO = await po.save();
+    const updatedPO = await po.save({ session });
+
+    await session.commitTransaction(); // Commit the transaction
+    session.endSession();
+
+    // --- NEW: Notify stock levels *after* transaction commits ---
+    try {
+      for (const receivedItem of receivedItems) {
+        if (receivedItem.quantityReceived > 0) {
+          const product = await Product.findById(receivedItem.productId);
+          if (product) await checkStockLevelAndNotify(product, io);
+        }
+      }
+    } catch (notifyError) {
+      console.error("Failed to send stock notifications after PO receive:", notifyError);
+    }
+    // --- END NEW ---
 
     logAction(req.user, 'RECEIVE_PO_STOCK', `Received stock for PO #${po.poNumber}. Status: ${updatedPO.status}`, { entityType: 'PurchaseOrder', entityId: updatedPO._id });
 
@@ -337,6 +383,8 @@ const receivePurchaseOrder = async (req, res) => {
     res.json({ message: 'Stock received and inventory updated successfully!', purchaseOrder: populatedPO });
 
   } catch (error) {
+    await session.abortTransaction(); // Abort on error
+    session.endSession();
     console.error('Error receiving stock:', error);
     res.status(500).json({ message: 'Server error while receiving stock.', error: error.message });
   }
@@ -368,6 +416,54 @@ const cancelPurchaseOrder = async (req, res) => {
     }
 };
 
+// --- NEW: Function to upload the signed consignment agreement ---
+const uploadSignedAgreement = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { signedAgreementUrl } = req.body; // Expecting a URL or Base64 string
+
+    if (!signedAgreementUrl) {
+      return res.status(400).json({ message: 'No agreement image/URL provided.' });
+    }
+
+    const po = await PurchaseOrder.findById(id);
+    if (!po) {
+      return res.status(404).json({ message: 'Purchase Order not found.' });
+    }
+    if (po.poType !== 'Consignment') {
+      return res.status(400).json({ message: 'This PO is not a consignment order.' });
+    }
+    // Can upload agreement if it's 'Pending' or 'Awaiting Approval'
+    if (!['Pending', 'Awaiting Approval'].includes(po.status)) {
+       return res.status(400).json({ message: `Cannot upload agreement for PO with status '${po.status}'.` });
+    }
+
+    po.signedAgreementUrl = signedAgreementUrl;
+    po.status = 'Agreement Uploaded - Awaiting Delivery';
+    po.history.push({ 
+      status: po.status, 
+      notes: 'Signed consignment agreement uploaded by user.', 
+      updatedBy: req.user.name 
+    });
+
+    const updatedPO = await po.save();
+
+    logAction(req.user, 'UPLOAD_PO_AGREEMENT', `Uploaded signed agreement for PO #${updatedPO.poNumber}`, { entityType: 'PurchaseOrder', entityId: updatedPO._id });
+    
+    const populatedPO = await PurchaseOrder.findById(updatedPO._id)
+      .populate('supplier')
+      .populate('items.product');
+
+    res.json(populatedPO);
+
+  } catch (error) {
+    console.error('Error uploading signed agreement:', error);
+    res.status(500).json({ message: 'Server error uploading agreement.', error: error.message });
+  }
+};
+// --- END NEW ---
+
+
 module.exports = {
     createPurchaseOrder,
     getAllPurchaseOrders,
@@ -377,5 +473,6 @@ module.exports = {
     updatePurchaseOrder,
     getPurchaseOrderByToken,
     updateBySupplier,
-    approveSupplierChanges
+    approveSupplierChanges,
+    uploadSignedAgreement // --- NEW: Export new function ---
 };

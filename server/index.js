@@ -31,7 +31,8 @@ const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const adjustmentRoutes = require('./routes/adjustmentRoutes');
 const permissionRoutes = require('./routes/permissionRoutes');
-const supplierReturnRoutes = require('./routes/supplierReturnRoutes'); // <-- NEW
+const supplierReturnRoutes = require('./routes/supplierReturnRoutes');
+const consignmentRoutes = require('./routes/consignmentRoutes');
 
 // Connect to Database
 connectDB();
@@ -92,7 +93,8 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/adjustments', adjustmentRoutes);
 app.use('/api/permissions', permissionRoutes);
-app.use('/api/supplier-returns', supplierReturnRoutes); // <-- NEW
+app.use('/api/supplier-returns', supplierReturnRoutes);
+app.use('/api/consignment', consignmentRoutes);
 
 // Serve static upload files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

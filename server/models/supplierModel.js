@@ -30,20 +30,22 @@ const supplierSchema = new mongoose.Schema({
     trim: true
   },
   
-  // --- NEW FIELDS START ---
   status: {
     type: String,
     enum: ['Pending', 'Approved', 'Rejected'],
     default: 'Pending',
     required: true
   },
-  paymentTerms: {
+
+  // --- UPDATED ---
+  // Renamed from paymentTerms to defaultPaymentTerms for clarity
+  defaultPaymentTerms: {
+  // --- END UPDATED ---
     type: String,
     enum: ['Cash', 'Consignment', 'Terms'], 
     default: 'Cash',
     required: true
   }
-  // --- NEW FIELDS END ---
 
 }, { timestamps: true });
 

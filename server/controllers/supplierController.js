@@ -4,7 +4,9 @@ const logAction = require('../utils/logger');
 
 const getSuppliers = async (req, res) => {
   try {
-    const suppliers = await Supplier.find({});
+    // --- UPDATED: Added sort by name ---
+    const suppliers = await Supplier.find({}).sort({ name: 1 });
+    // --- END UPDATED ---
     res.json(suppliers);
   } catch (error) {
     res.status(500).json({ message: 'Server Error' });
@@ -13,8 +15,8 @@ const getSuppliers = async (req, res) => {
 
 const createSupplier = async (req, res) => {
   try {
-    // --- UPDATED: Added status and paymentTerms ---
-    const { name, email, contactPerson, contactNumber, address, status, paymentTerms } = req.body;
+    // --- UPDATED: Changed 'paymentTerms' to 'defaultPaymentTerms' ---
+    const { name, email, contactPerson, contactNumber, address, status, defaultPaymentTerms } = req.body;
     
     const newSupplier = new Supplier({ 
       name, 
@@ -22,8 +24,8 @@ const createSupplier = async (req, res) => {
       contactPerson, 
       contactNumber, 
       address, 
-      status: status || 'Pending', // Default to Pending if not provided
-      paymentTerms: paymentTerms || 'Cash' // Default to Cash if not provided
+      status: status || 'Pending',
+      defaultPaymentTerms: defaultPaymentTerms || 'Cash' // Use correct field name
     });
     // --- END UPDATE ---
     
@@ -46,10 +48,10 @@ const createSupplier = async (req, res) => {
 
 const updateSupplier = async (req, res) => {
   try {
-    // --- UPDATED: req.body will now also contain status and paymentTerms ---
+    // --- UPDATED: req.body will now also contain defaultPaymentTerms ---
     const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
-        runValidators: true // Ensure enum validation runs
+        runValidators: true 
     });
     // --- END UPDATE ---
 
@@ -80,10 +82,10 @@ const deleteSupplier = async (req, res) => {
 
     res.json({ message: 'Supplier removed' });
   } catch (error) {
-    // --- ADDED: Check if supplier is in use ---
-    // This is a basic check. A more robust check would look at Products, POs, Deliveries, etc.
-    // We can add this later if needed. For now, a 500 is ok.
-    res.status(500).json({ message: 'Server Error' });
+    // A more robust check should be added here to see if supplier is in use
+    // in Products, POs, or Deliveries before deleting.
+    console.error("Error deleting supplier: ", error);
+    res.status(400).json({ message: 'Error deleting supplier. They may be in use in other records.' });
   }
 };
 

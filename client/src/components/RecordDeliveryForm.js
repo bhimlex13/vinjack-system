@@ -1,34 +1,19 @@
 // client/src/components/RecordDeliveryForm.js
-import React, { useState, useEffect, useContext, useMemo } from 'react'; // Added useMemo
+import React, { useState, useEffect, useContext, useMemo } from 'react';
+// --- NEW: Import createDelivery from the API file ---
+import { createDelivery } from '../api/deliveryApi';
 import api from '../api/axios';
+// --- END NEW ---
 import AuthContext from '../context/AuthContext';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
 
 // MUI Imports
 import {
-  Box,
-  Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Grid,
-  TextField,
-  Typography,
-  IconButton,
-  Divider,
-  Alert,
-  Tooltip,
-  Autocomplete, // <-- NEW: Import Autocomplete
-  TableContainer, // <-- NEW: Import Table components
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Paper, // <-- NEW: Import Paper
-  CircularProgress // <-- NEW: Import CircularProgress
+  Box, Button, FormControl, InputLabel, Select, MenuItem, Grid, TextField,
+  Typography, IconButton, Divider, Alert, Tooltip, Autocomplete,
+  TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper,
+  CircularProgress
 } from '@mui/material';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -47,46 +32,58 @@ const RecordDeliveryForm = ({ onClose }) => {
   const { confirm } = useContext(ConfirmationContext);
 
   const [suppliers, setSuppliers] = useState([]);
-  const [products, setProducts] = useState([]); // List of available products for Autocomplete
+  const [products, setProducts] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
+  // --- NEW: State for Delivery Type ---
+  const [deliveryType, setDeliveryType] = useState('Purchase');
+  // --- END NEW ---
   const [deliveryDate, setDeliveryDate] = useState(formatDateForInput(new Date()));
-  const [productsReceived, setProductsReceived] = useState([]); // Items added to the delivery list
+  const [productsReceived, setProductsReceived] = useState([]);
 
-  // --- MODIFIED: State for the current item being added ---
-  const [selectedProduct, setSelectedProduct] = useState(null); // Holds the selected product object from Autocomplete
-  const [quantity, setQuantity] = useState(''); // Current quantity input
-  const [costAtTime, setCostAtTime] = useState(''); // Current cost input
-  // --- END MODIFICATION ---
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [quantity, setQuantity] = useState('');
+  const [costAtTime, setCostAtTime] = useState('');
 
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // General loading state
-  const [isProductLoading, setIsProductLoading] = useState(false); // Product list loading state
+  const [isLoading, setIsLoading] = useState(false);
+  const [isProductLoading, setIsProductLoading] = useState(false);
 
-  // Fetch initial suppliers and products
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true); // Start general loading
+      setIsLoading(true);
       setIsProductLoading(true);
       try {
         const [suppliersRes, productsRes] = await Promise.all([
-          api.get('/suppliers'),
-          api.get('/products?status=active'), // Fetch only active products
+          api.get('/suppliers?status=Approved'), // --- NEW: Only get Approved suppliers
+          api.get('/products?status=active'),
         ]);
         setSuppliers(suppliersRes.data);
         setProducts(productsRes.data);
-        setError(''); // Clear error on success
+        setError('');
       } catch (error) {
         setError('Failed to load initial data.');
         console.error("Error fetching form data:", error);
       } finally {
-        setIsLoading(false); // Stop general loading
+        setIsLoading(false);
         setIsProductLoading(false);
       }
     };
     fetchData();
   }, []);
+  
+  // --- NEW: Handle supplier change to update default delivery type ---
+  const handleSupplierChange = (e) => {
+    const supplierId = e.target.value;
+    setSelectedSupplier(supplierId);
+    const supplier = suppliers.find(s => s._id === supplierId);
+    if (supplier) {
+      setDeliveryType(supplier.defaultPaymentTerms === 'Consignment' ? 'Consignment' : 'Purchase');
+    } else {
+      setDeliveryType('Purchase');
+    }
+  };
+  // --- END NEW ---
 
-  // Calculate total cost using useMemo for efficiency
   const totalCost = useMemo(() => {
       return productsReceived.reduce((sum, item) => {
           const qty = Number(item.quantity) || 0;
@@ -95,31 +92,33 @@ const RecordDeliveryForm = ({ onClose }) => {
       }, 0);
   }, [productsReceived]);
 
-  // --- NEW: Handle Autocomplete product selection ---
   const handleProductSelection = (event, newValue) => {
     setSelectedProduct(newValue);
-    // Optionally pre-fill cost if available (e.g., defaultCost)
-    setCostAtTime(newValue?.defaultCost?.toString() || ''); // Use default cost if available
-    setQuantity('1'); // Reset quantity to 1 when selecting a new product
+    // --- UPDATED: Find supplier-specific cost if available ---
+    if (newValue && selectedSupplier) {
+      const supplierCost = newValue.supplierCosts?.find(c => c.supplier === selectedSupplier);
+      setCostAtTime(supplierCost?.cost?.toString() ?? newValue.defaultCost?.toString() ?? '');
+    } else if (newValue) {
+      setCostAtTime(newValue.defaultCost?.toString() || '');
+    } else {
+      setCostAtTime('');
+    }
+    // --- END UPDATED ---
+    setQuantity('1');
   };
-  // --- END NEW ---
 
-  // Handle quantity input change
   const handleQuantityChange = (e) => {
     const value = e.target.value;
     if (value === '' || (Number(value) >= 1 && Number.isInteger(Number(value)))) {
        setQuantity(value);
     } else if (Number(value) < 1) {
-       setQuantity('1'); // Reset to 1 if below 1
+       setQuantity('1');
     }
   };
 
-  // Handle cost input change
   const handleCostChange = (e) => {
     const value = e.target.value;
-    // Allow empty, numbers, and one decimal point
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      // Basic check for non-negative
       if (parseFloat(value) < 0) {
         setCostAtTime('0');
       } else {
@@ -128,7 +127,6 @@ const RecordDeliveryForm = ({ onClose }) => {
     }
   };
 
-  // Add the selected item to the delivery list table
   const handleAddItem = () => {
     setError('');
     if (!selectedProduct || !quantity || !costAtTime) {
@@ -146,7 +144,6 @@ const RecordDeliveryForm = ({ onClose }) => {
         return;
     }
 
-    // Check if product already exists in the list
     if (productsReceived.some(p => p.product._id === selectedProduct._id)) {
       setError(`${selectedProduct.name} is already in the list. Remove it first to change quantity/cost.`);
       return;
@@ -155,24 +152,21 @@ const RecordDeliveryForm = ({ onClose }) => {
     setProductsReceived([
       ...productsReceived,
       {
-          product: selectedProduct, // Store the whole product object temporarily for display
+          product: selectedProduct,
           quantity: numQuantity,
           costAtTime: numCost,
        },
     ]);
 
-    // Reset inputs
-    setSelectedProduct(null); // Clear Autocomplete
+    setSelectedProduct(null);
     setQuantity('');
     setCostAtTime('');
   };
 
-  // Remove item from the delivery list table
   const handleRemoveItem = (productId) => {
     setProductsReceived(productsReceived.filter((p) => p.product._id !== productId));
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -186,63 +180,67 @@ const RecordDeliveryForm = ({ onClose }) => {
         return;
     }
 
-    // Prepare data for API: only send necessary fields
     const deliveryData = {
       supplier: selectedSupplier,
       deliveryDate: deliveryDate,
-      // Map productsReceived to send only product ID and numeric quantity/cost
+      // --- NEW: Add deliveryType ---
+      deliveryType: deliveryType,
+      // --- END NEW ---
       productsReceived: productsReceived.map(item => ({
-        product: item.product._id, // Send only the ID
+        product: item.product._id,
         quantity: Number(item.quantity),
         costAtTime: Number(item.costAtTime)
       })),
-      totalCost: totalCost, // Send calculated total cost
+      totalCost: totalCost,
     };
 
     const supplierName = suppliers.find(s => s._id === selectedSupplier)?.name || 'Unknown Supplier';
     const formattedDate = new Date(deliveryDate).toLocaleDateString();
     const formattedTotal = totalCost.toFixed(2);
 
+    // --- NEW: Dynamic confirmation message ---
     const isConfirmed = await confirm(
-        'Confirm Delivery Record',
-        `Save delivery from ${supplierName} on ${formattedDate} with ${productsReceived.length} item(s) and a total cost of ₱${formattedTotal}? Stock levels will be updated.`
+        `Confirm ${deliveryType} Delivery`,
+        `Save ${deliveryType.toUpperCase()} delivery from ${supplierName} on ${formattedDate} with ${productsReceived.length} item(s) (Total: ₱${formattedTotal})? Stock levels will be updated.`
     );
+    // --- END NEW ---
 
     if (isConfirmed) {
-      setIsLoading(true); // Indicate submission processing
+      setIsLoading(true);
       try {
-        await api.post('/deliveries', deliveryData);
+        // --- UPDATED: Use centralized API function ---
+        await createDelivery(deliveryData);
+        // --- END UPDATED ---
         toast.success('Direct delivery recorded successfully and stock updated!');
-        onClose(); // Close modal on success
+        onClose();
       } catch (err) {
         const errMsg = err.response?.data?.message || err.message || 'Failed to record delivery.';
         setError(`Failed to record delivery: ${errMsg}`);
         toast.error(`Error: ${errMsg}`);
       } finally {
-        setIsLoading(false); // Stop loading indicator
+        setIsLoading(false);
       }
     }
   };
 
-  // Filter products for Autocomplete - exclude those already added
   const productOptions = useMemo(() => {
     const addedIds = new Set(productsReceived.map(item => item.product._id));
     return products.filter(p => !addedIds.has(p._id));
   }, [products, productsReceived]);
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}> {/* Added margin top */}
+    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {/* --- SYNTAX CHANGED TO 'size={{...}}' --- */}
       <Grid container spacing={2}>
-          {/* Supplier */}
-          <Grid item size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth required margin="dense"> {/* Changed margin */}
+          <Grid item size={{ xs: 12, sm: 5 }}>
+              <FormControl fullWidth required margin="dense">
                 <InputLabel>Supplier</InputLabel>
                 <Select
                   value={selectedSupplier}
                   label="Supplier"
-                  onChange={(e) => setSelectedSupplier(e.target.value)}
-                  disabled={isLoading} // Disable while loading
+                  onChange={handleSupplierChange}
+                  disabled={isLoading}
                 >
                   <MenuItem value=""><em>Select Supplier...</em></MenuItem>
                   {suppliers.map((s) => (
@@ -253,8 +251,7 @@ const RecordDeliveryForm = ({ onClose }) => {
                 </Select>
               </FormControl>
           </Grid>
-          {/* Delivery Date */}
-          <Grid item size={{ xs: 12, sm: 6 }}>
+          <Grid item size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Delivery Date"
                 type="date"
@@ -263,9 +260,23 @@ const RecordDeliveryForm = ({ onClose }) => {
                 InputLabelProps={{ shrink: true }}
                 required
                 fullWidth
-                margin="dense" // Changed margin
-                disabled={isLoading} // Disable while loading
+                margin="dense"
+                disabled={isLoading}
               />
+          </Grid>
+          <Grid item size={{ xs: 12, sm: 3 }}>
+            <FormControl fullWidth required margin="dense">
+              <InputLabel>Type</InputLabel>
+              <Select
+                value={deliveryType}
+                label="Type"
+                onChange={(e) => setDeliveryType(e.target.value)}
+                disabled={isLoading || !selectedSupplier}
+              >
+                <MenuItem value="Purchase">Purchase</MenuItem>
+                <MenuItem value="Consignment">Consignment</MenuItem>
+              </Select>
+            </FormControl>
           </Grid>
       </Grid>
 
@@ -273,23 +284,22 @@ const RecordDeliveryForm = ({ onClose }) => {
         <Typography variant="overline">Add Products Received</Typography>
       </Divider>
 
-      {/* --- MODIFIED: Product Input Row using Autocomplete --- */}
-      <Grid container spacing={1} alignItems="center" sx={{ mb: 2 }}> {/* Reduced spacing */}
-        {/* Product Autocomplete */}
+      <Grid container spacing={1} alignItems="center" sx={{ mb: 2 }}>
         <Grid item size={{ xs: 12, md: 5 }}>
           <Autocomplete
-            options={productOptions} // Use filtered options
+            options={productOptions}
             getOptionLabel={(option) => `${option.name} (${option.itemCode})`}
             isOptionEqualToValue={(option, value) => option._id === value._id}
             value={selectedProduct}
             onChange={handleProductSelection}
             loading={isProductLoading}
-            disabled={isLoading || isProductLoading} // Disable while loading
-            size="small" // Make Autocomplete smaller
+            disabled={isLoading || isProductLoading || !selectedSupplier}
+            size="small"
             renderInput={(params) => (
               <TextField
                 {...params}
                 label="Select Product"
+                helperText={!selectedSupplier ? "Select supplier first" : ""}
                 InputProps={{
                   ...params.InputProps,
                   endAdornment: (
@@ -303,42 +313,38 @@ const RecordDeliveryForm = ({ onClose }) => {
             )}
           />
         </Grid>
-        {/* Quantity */}
         <Grid item size={{ xs: 4, md: 2 }}>
           <TextField
             label="Quantity"
-            type="number" // Keep as number type
+            type="number"
             value={quantity}
             onChange={handleQuantityChange}
-            inputProps={{ min: 1 }} // Min 1
+            inputProps={{ min: 1 }}
             fullWidth
-            size="small" // Make smaller
-            disabled={isLoading || !selectedProduct} // Disable if no product selected or loading
+            size="small"
+            disabled={isLoading || !selectedProduct}
           />
         </Grid>
-        {/* Cost */}
         <Grid item size={{ xs: 5, md: 3 }}>
           <TextField
             label="Cost per Item (₱)"
-            type="number" // Keep as number type
+            type="number"
             value={costAtTime}
             onChange={handleCostChange}
-            inputProps={{ step: "0.01", min: 0 }} // Min 0
+            inputProps={{ step: "0.01", min: 0 }}
             fullWidth
-            size="small" // Make smaller
-            disabled={isLoading || !selectedProduct} // Disable if no product selected or loading
+            size="small"
+            disabled={isLoading || !selectedProduct}
           />
         </Grid>
-        {/* Add Button */}
         <Grid item size={{ xs: 3, md: 2 }} sx={{ textAlign: 'center' }}>
           <Tooltip title="Add Product to Delivery List">
-            {/* Wrap IconButton in Box for centering/sizing if needed */}
-            <span> {/* Span needed for Tooltip when button is disabled */}
+            <span>
               <IconButton
                 color="primary"
                 onClick={handleAddItem}
-                disabled={!selectedProduct || !quantity || !costAtTime || isLoading || isProductLoading} // Disable if fields missing or loading
-                size="large" // Keep button prominent
+                disabled={!selectedProduct || !quantity || !costAtTime || isLoading || isProductLoading}
+                size="large"
               >
                 <AddCircleIcon fontSize="inherit"/>
               </IconButton>
@@ -346,15 +352,14 @@ const RecordDeliveryForm = ({ onClose }) => {
           </Tooltip>
         </Grid>
       </Grid>
-      {/* --- END MODIFICATION --- */}
+      {/* --- END OF SYNTAX CHANGE --- */}
 
-      <Typography variant="h6" sx={{ mt: 2, mb: 1 }}> {/* Reduced margin */}
+      <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
         Items in this Delivery
       </Typography>
 
-      {/* --- MODIFIED: Items Table (similar to CreatePurchaseOrderPage) --- */}
-      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 250, mb: 2 }}> {/* Added max height and margin */}
-        <Table stickyHeader size="small"> {/* Make table smaller */}
+      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 250, mb: 2 }}>
+        <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
               <TableCell>Product</TableCell>
@@ -380,7 +385,6 @@ const RecordDeliveryForm = ({ onClose }) => {
                   <TableCell align="right">₱{(item.quantity * item.costAtTime).toFixed(2)}</TableCell>
                   <TableCell align="center">
                     <Tooltip title="Remove Item">
-                      {/* Disable remove button while submitting */}
                       <span>
                         <IconButton
                           onClick={() => handleRemoveItem(item.product._id)}
@@ -396,29 +400,25 @@ const RecordDeliveryForm = ({ onClose }) => {
                 </TableRow>
               ))
             )}
-            {/* Show Total Row only if items exist */}
             {productsReceived.length > 0 && (
                  <TableRow sx={{ '& td': { borderTop: '2px solid black', fontWeight: 'bold' } }}>
                      <TableCell colSpan={3} align="right">Total Cost:</TableCell>
                      <TableCell align="right">₱{totalCost.toFixed(2)}</TableCell>
-                     <TableCell /> {/* Empty cell for actions column */}
+                     <TableCell />
                  </TableRow>
              )}
           </TableBody>
         </Table>
       </TableContainer>
-      {/* --- END MODIFICATION --- */}
 
-
-      {/* Action Buttons */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, gap: 1 }}> {/* Reduced margin */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, gap: 1 }}>
           <Button onClick={onClose} color="inherit" disabled={isLoading}>Cancel</Button>
           <Button
             type="submit"
             variant="contained"
             disabled={productsReceived.length === 0 || !selectedSupplier || !deliveryDate || isLoading}
           >
-            {isLoading ? <CircularProgress size={24} /> : 'Save Delivery & Update Stock'} {/* Updated text */}
+            {isLoading ? <CircularProgress size={24} /> : 'Save Delivery & Update Stock'}
           </Button>
       </Box>
     </Box>

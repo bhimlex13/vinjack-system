@@ -19,22 +19,21 @@ import SearchIcon from '@mui/icons-material/Search';
 
 const DeliveriesPage = () => {
   const [deliveries, setDeliveries] = useState([]);
-  const [suppliers, setSuppliers] = useState([]); // State for filter dropdown
+  const [suppliers, setSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(''); // State for search
-  const [filterSupplier, setFilterSupplier] = useState(''); // State for filter
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterSupplier, setFilterSupplier] = useState('');
   const navigate = useNavigate();
 
   const fetchDeliveries = async () => {
     try {
       setIsLoading(true);
-      // Fetch both deliveries and the full list of suppliers for the filter dropdown
       const [deliveriesResponse, suppliersResponse] = await Promise.all([
         getDeliveries(),
-        api.get('/suppliers')
+        api.get('/suppliers?status=Approved')
       ]);
       setDeliveries(deliveriesResponse);
       setSuppliers(suppliersResponse.data);
@@ -57,7 +56,8 @@ const DeliveriesPage = () => {
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const searchMatch = !searchTerm ||
         (delivery.supplier?.name?.toLowerCase().includes(lowerCaseSearchTerm)) ||
-        (delivery.purchaseOrder?.poNumber?.toLowerCase().includes(lowerCaseSearchTerm));
+        (delivery.purchaseOrder?.poNumber?.toLowerCase().includes(lowerCaseSearchTerm)) ||
+        (delivery.deliveryType?.toLowerCase().includes(lowerCaseSearchTerm));
       
       return supplierMatch && searchMatch;
     });
@@ -70,24 +70,48 @@ const DeliveriesPage = () => {
 
   const columns = [
     {
-      field: 'createdAt', headerName: 'Date', flex: 1, minWidth: 200,
-      renderCell: (params) => new Date(params.value).toLocaleString('en-US', {
+      field: 'date',
+      headerName: 'Date', flex: 1, minWidth: 200,
+      // --- FIX: Changed (params) to (value, row) ---
+      valueGetter: (value, row) => {
+        // Try deliveryDate first, fall back to createdAt
+        const date = row.deliveryDate || row.createdAt;
+        return date ? new Date(date) : null;
+      },
+      // --- END FIX ---
+      renderCell: (params) => params.value ? params.value.toLocaleString('en-US', {
         year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-      }),
+      }) : 'N/A',
     },
     { 
       field: 'supplier', headerName: 'Supplier', flex: 1, minWidth: 180,
-      renderCell: (params) => params.row.supplier?.name || 'N/A'
+      // --- FIX: Changed (params) to (value, row) ---
+      valueGetter: (value, row) => row.supplier?.name || 'N/A'
+      // --- END FIX ---
     },
     {
       field: 'purchaseOrder', headerName: 'Origin', flex: 1, minWidth: 150,
+      sortable: false,
       renderCell: (params) => params.row.purchaseOrder 
         ? <Chip label={`PO: ${params.row.purchaseOrder.poNumber}`} color="primary" variant="outlined" size="small" /> 
         : <Chip label="Direct Delivery" color="secondary" variant="outlined" size="small" />
     },
     {
+      field: 'deliveryType', headerName: 'Type', flex: 0.5, minWidth: 120,
+      renderCell: (params) => (
+        <Chip 
+          label={params.value || 'Purchase'} // Default old data to 'Purchase'
+          color={params.value === 'Consignment' ? 'info' : 'default'} 
+          variant="filled" 
+          size="small" 
+        />
+      )
+    },
+    {
       field: 'recordedBy', headerName: 'Recorded By', flex: 1, minWidth: 180,
-      renderCell: (params) => params.row.recordedBy?.fullName || 'N/A'
+      // --- FIX: Changed (params) to (value, row) ---
+      valueGetter: (value, row) => row.recordedBy?.fullName || 'N/A'
+      // --- END FIX ---
     },
     {
       field: 'actions', headerName: 'Actions', width: 150, sortable: false, align: 'center', headerAlign: 'center',
@@ -133,10 +157,9 @@ const DeliveriesPage = () => {
         </Stack>
       </Box>
 
-      {/* --- Filter and Search Bar --- */}
       <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
         <TextField
-          label="Search by Supplier or PO Number"
+          label="Search by Supplier, PO Number, or Type"
           variant="outlined"
           size="small"
           value={searchTerm}
@@ -172,7 +195,7 @@ const DeliveriesPage = () => {
           loading={isLoading}
           getRowId={(row) => row._id}
           initialState={{
-            sorting: { sortModel: [{ field: 'createdAt', sort: 'desc' }] },
+            sorting: { sortModel: [{ field: 'date', sort: 'desc' }] },
           }}
         />
       </Paper>
@@ -184,17 +207,27 @@ const DeliveriesPage = () => {
               <>
                 <Box sx={{ mb: 2 }}>
                   <Grid container spacing={2}>
-                    <Grid item size={{ xs: 12, sm: 6 }}>
+                    <Grid item xs={12} sm={4}>
                       <Typography variant="body2" color="text.secondary">Supplier</Typography>
                       <Typography variant="h6" component="p">{selectedDelivery.supplier?.name || 'N/A'}</Typography>
                     </Grid>
-                    <Grid item size={{ xs: 12, sm: 6 }}>
+                    <Grid item xs={12} sm={4}>
                       <Typography variant="body2" color="text.secondary">Origin</Typography>
                       <Typography variant="h6" component="p">
                         {selectedDelivery.purchaseOrder
                           ? `Purchase Order #${selectedDelivery.purchaseOrder.poNumber}`
                           : 'Direct Delivery'
                         }
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="body2" color="text.secondary">Delivery Type</Typography>
+                      <Typography variant="h6" component="p">
+                        <Chip 
+                          label={selectedDelivery.deliveryType || 'Purchase'} // Default old data
+                          color={selectedDelivery.deliveryType === 'Consignment' ? 'info' : 'default'} 
+                          variant="filled"
+                        />
                       </Typography>
                     </Grid>
                   </Grid>
@@ -211,8 +244,8 @@ const DeliveriesPage = () => {
                     </TableHead>
                     <TableBody>
                         {selectedDelivery.productsReceived.map(item => (
-                            <TableRow key={item.product._id}>
-                                <TableCell>{item.product.name}</TableCell>
+                            <TableRow key={item.product?._id || item._id}> {/* Safer key */}
+                                <TableCell>{item.product?.name || 'Unknown Product'}</TableCell>
                                 <TableCell align="right">{item.quantity}</TableCell>
                                 <TableCell align="right">{new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(item.costAtTime)}</TableCell>
                             </TableRow>

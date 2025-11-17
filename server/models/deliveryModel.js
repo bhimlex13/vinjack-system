@@ -5,20 +5,28 @@ const deliverySchema = new mongoose.Schema({
   supplier: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Supplier'
-    // Removed required: true as direct delivery might not always have a supplier selected? Re-add if needed.
   },
   purchaseOrder: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'PurchaseOrder',
     required: false // Optional link
   },
-  // --- NEW: deliveryDate field ---
   deliveryDate: {
     type: Date,
     required: true,
-    default: Date.now // Default to now if not provided
+    default: Date.now 
+  },
+  
+  // --- NEW ---
+  // Specifies if this delivery adds to owned stock or consigned stock
+  deliveryType: {
+    type: String,
+    enum: ['Purchase', 'Consignment'],
+    default: 'Purchase',
+    required: true
   },
   // --- END NEW ---
+
   productsReceived: [{
     product: {
       type: mongoose.Schema.Types.ObjectId,
@@ -32,20 +40,18 @@ const deliverySchema = new mongoose.Schema({
     },
     costAtTime: {
       type: Number,
-      required: true // Cost is usually required for deliveries
+      required: true
     }
   }],
-  // --- NEW: totalCost field (optional but good for summary) ---
   totalCost: {
       type: Number,
-      required: false // Calculated or provided
+      required: false 
   },
-  // --- END NEW ---
   recordedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   }
-}, { timestamps: true }); // Keep timestamps for createdAt/updatedAt
+}, { timestamps: true });
 
 module.exports = mongoose.model('Delivery', deliverySchema);

@@ -15,9 +15,9 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ['Super Admin', 'Admin', 'Salesperson'], // <-- UPDATED
+    enum: ['Super Admin', 'Admin', 'Salesperson'],
     required: true,
-    default: 'Salesperson' // <-- UPDATED
+    default: 'Salesperson'
   },
   status: { type: String, default: 'pending' },
   
@@ -28,17 +28,18 @@ const userSchema = new mongoose.Schema({
 
   emailSettings: {
     notificationsEnabled: { type: Boolean, default: true },
-    notificationTime: { type: String, default: '08:00' }
+    notificationTime: { type: String, default: '08:00' },
+    // --- NEW: Add fields for the daily sales report ---
+    dailySalesReportEnabled: { type: Boolean, default: false },
+    dailySalesReportTime: { type: String, default: '08:30' }
+    // --- END NEW ---
   },
   
-  // --- NEW: For Dashboard Preferences ---
   dashboardPreferences: {
     timeRange: { type: String, default: 'all' },
     selectedCategory: { type: String, default: '' },
     selectedSupplier: { type: String, default: '' },
-    // You could add chart types here in the future
   },
-  // --- END NEW ---
 
   hasPendingChanges: {
     type: Boolean,

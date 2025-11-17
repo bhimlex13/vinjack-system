@@ -10,10 +10,10 @@ import {
   Alert,
   DialogContent,
   DialogActions,
-  FormControl, // <-- NEW
-  InputLabel,  // <-- NEW
-  Select,      // <-- NEW
-  MenuItem     // <-- NEW
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 
 const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
@@ -23,8 +23,10 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
     contactPerson: '',
     contactNumber: '',
     address: '',
-    paymentTerms: 'Cash', // <-- NEW
-    status: 'Pending'     // <-- NEW
+    // --- UPDATED: Use correct field name ---
+    defaultPaymentTerms: 'Cash',
+    // --- END UPDATED ---
+    status: 'Pending'
   });
   const [error, setError] = useState('');
 
@@ -36,8 +38,10 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
         contactPerson: supplierToEdit.contactPerson || '',
         contactNumber: supplierToEdit.contactNumber || '',
         address: supplierToEdit.address || '',
-        paymentTerms: supplierToEdit.paymentTerms || 'Cash', // <-- NEW
-        status: supplierToEdit.status || 'Pending'           // <-- NEW
+        // --- UPDATED: Use correct field name ---
+        defaultPaymentTerms: supplierToEdit.defaultPaymentTerms || 'Cash',
+        // --- END UPDATED ---
+        status: supplierToEdit.status || 'Pending'
       });
     } else {
       // Reset form, including new fields
@@ -47,7 +51,9 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
         contactPerson: '', 
         contactNumber: '', 
         address: '', 
-        paymentTerms: 'Cash', 
+        // --- UPDATED: Use correct field name ---
+        defaultPaymentTerms: 'Cash', 
+        // --- END UPDATED ---
         status: 'Pending' 
       });
     }
@@ -129,15 +135,15 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
           onChange={handleChange}
         />
 
-        {/* --- NEW FIELDS ADDED --- */}
+        {/* --- UPDATED: Use correct field name 'defaultPaymentTerms' --- */}
         <FormControl fullWidth margin="dense">
-          <InputLabel id="paymentTerms-select-label">Payment Terms</InputLabel>
+          <InputLabel id="defaultPaymentTerms-select-label">Default Payment Terms</InputLabel>
           <Select
-            labelId="paymentTerms-select-label"
-            id="paymentTerms"
-            name="paymentTerms"
-            value={formData.paymentTerms}
-            label="Payment Terms"
+            labelId="defaultPaymentTerms-select-label"
+            id="defaultPaymentTerms"
+            name="defaultPaymentTerms" // This must match the state
+            value={formData.defaultPaymentTerms} // This must match the state
+            label="Default Payment Terms"
             onChange={handleChange}
           >
             <MenuItem value="Cash">Cash</MenuItem>
@@ -145,8 +151,8 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
             <MenuItem value="Terms">Terms</MenuItem>
           </Select>
         </FormControl>
+        {/* --- END UPDATED --- */}
 
-        {/* Status field is only shown when EDITING a supplier (for the approval workflow) */}
         {supplierToEdit && (
           <FormControl fullWidth margin="dense">
             <InputLabel id="status-select-label">Status</InputLabel>
@@ -164,7 +170,6 @@ const SupplierForm = ({ onFormSubmit, supplierToEdit, onClose }) => {
             </Select>
           </FormControl>
         )}
-        {/* --- END NEW FIELDS --- */}
 
       </DialogContent>
       <DialogActions>

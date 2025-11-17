@@ -15,10 +15,12 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import {
   FaTachometerAlt, FaBoxOpen, FaShoppingCart, FaTruck, FaChartBar,
   FaUsersCog, FaDatabase, FaFileAlt, FaReceipt, FaFileInvoice,
-  FaTruckLoading, FaUserFriends, FaUndo
+  FaTruckLoading, FaUserFriends, FaUndo,
+  // --- NEW: Added Hand Holding USD icon ---
+  FaHandHoldingUsd,
+  // --- END NEW ---
+  FaTruckMoving 
 } from 'react-icons/fa';
-// --- NEW: Import an icon for supplier returns ---
-import { FaTruckMoving } from 'react-icons/fa';
 
 const drawerWidth = 250;
 
@@ -78,14 +80,15 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
     { text: 'Returns', to: '/returns', icon: <FaUndo />, perm: hasPermission('canManageReturns') },
   ];
 
-  // --- UPDATED: Added Supplier Returns ---
   const managementNav = [
     { text: 'Inventory', to: '/inventory', icon: <FaBoxOpen />, perm: hasPermission('canViewInventory') },
     { text: 'Deliveries', to: '/deliveries', icon: <FaTruckLoading />, perm: hasPermission('canManageDeliveries') },
     { text: 'Purchase Orders', to: '/purchase-orders', icon: <FaFileInvoice />, perm: hasPermission('canManagePurchaseOrders') },
     { text: 'Suppliers', to: '/suppliers', icon: <FaTruck />, perm: hasPermission('canViewSuppliers') },
-    // --- THIS IS THE NEW LINE ---
     { text: 'Supplier Returns', to: '/supplier-returns', icon: <FaTruckMoving />, perm: hasPermission('canManageSuppliers') },
+    // --- NEW: Consignment Payouts Page Link ---
+    { text: 'Consignment Payouts', to: '/consignment-payouts', icon: <FaHandHoldingUsd />, perm: hasPermission('canManageSuppliers') },
+    // --- END NEW ---
   ];
 
   const reportingNav = [

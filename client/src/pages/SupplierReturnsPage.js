@@ -5,66 +5,21 @@ import { toast } from 'react-toastify';
 import AuthContext from '../context/AuthContext';
 import ConfirmationContext from '../context/ConfirmationContext';
 
-// MUI Imports
 import {
   Container, Typography, Button, Box, Paper, Dialog, DialogTitle,
   DialogContent, DialogActions, Grid, TextField, Autocomplete,
-  IconButton, CircularProgress, Tooltip, FormControl, InputLabel, Select, MenuItem
+  IconButton, CircularProgress, Tooltip, FormControl, InputLabel, Select, MenuItem,
+  Checkbox, FormControlLabel, Chip,
+  List,
+  ListItem,
+  Divider,
+  FormHelperText
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'; 
 
-// Helper component for the modal's item row
-const ReturnItemRow = ({ item, index, products, onUpdate, onRemove }) => {
-  const product = products.find(p => p._id === item.product) || null;
-
-  return (
-    <Grid container spacing={2} sx={{ mb: 2 }} alignItems="center">
-      <Grid item xs={5}>
-        <Autocomplete
-          options={products}
-          getOptionLabel={(option) => `${option.name} (${option.itemCode})` || ''}
-          value={product}
-          onChange={(e, newValue) => onUpdate(index, 'product', newValue?._id || null)}
-          renderInput={(params) => <TextField {...params} label="Select Product" />}
-        />
-      </Grid>
-      <Grid item xs={2}>
-        <TextField
-          label="Quantity"
-          type="number"
-          value={item.quantity}
-          onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value, 10) || 1)}
-          fullWidth
-          inputProps={{ min: 1 }}
-        />
-      </Grid>
-      <Grid item xs={4}>
-        <FormControl fullWidth>
-          <InputLabel>Reason</InputLabel>
-          <Select
-            label="Reason"
-            value={item.reason}
-            onChange={(e) => onUpdate(index, 'reason', e.target.value)}
-          >
-            <MenuItem value="Defective">Defective</MenuItem>
-            <MenuItem value="Wrong Item">Wrong Item</MenuItem>
-            <MenuItem value="Overstock">Overstock</MenuItem>
-            <MenuItem value="Other">Other</MenuItem>
-          </Select>
-        </FormControl>
-      </Grid>
-      <Grid item xs={1}>
-        <Tooltip title="Remove Item">
-          <IconButton onClick={() => onRemove(index)} color="error">
-            <DeleteIcon />
-          </IconButton>
-        </Tooltip>
-      </Grid>
-    </Grid>
-  );
-};
 
 // Main Page Component
 const SupplierReturnsPage = () => {
@@ -78,7 +33,7 @@ const SupplierReturnsPage = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
-  const [itemsToReturn, setItemsToReturn] = useState([{ product: null, quantity: 1, reason: 'Defective' }]);
+  const [itemsToReturn, setItemsToReturn] = useState([{ product: null, quantity: 1, reason: 'Defective', wasConsigned: false }]);
   const [notes, setNotes] = useState('');
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -103,11 +58,11 @@ const SupplierReturnsPage = () => {
     setModalLoading(true);
     try {
       const [suppliersRes, productsRes] = await Promise.all([
-        api.get('/suppliers?status=Approved'), // Only load approved suppliers
-        api.get('/products') // Load all products
+        api.get('/suppliers?status=Approved'),
+        api.get('/products?status=active')
       ]);
       setSuppliers(suppliersRes.data.filter(s => s.status === 'Approved'));
-      setProducts(productsRes.data.filter(p => p.status === 'active')); // Only active products
+      setProducts(productsRes.data.filter(p => p.status === 'active'));
     } catch (err) {
       toast.error('Failed to load data for form.');
     } finally {
@@ -116,18 +71,17 @@ const SupplierReturnsPage = () => {
   };
 
   const openModal = () => {
-    // Reset form state
     setSelectedSupplier(null);
-    setItemsToReturn([{ product: null, quantity: 1, reason: 'Defective' }]);
+    setItemsToReturn([{ product: null, quantity: 1, reason: 'Defective', wasConsigned: false }]);
     setNotes('');
     setReturnDate(new Date().toISOString().split('T')[0]);
     
     setIsModalOpen(true);
-    fetchModalData(); // Fetch suppliers/products
+    fetchModalData();
   };
 
   const handleAddItem = () => {
-    setItemsToReturn([...itemsToReturn, { product: null, quantity: 1, reason: 'Defective' }]);
+    setItemsToReturn([...itemsToReturn, { product: null, quantity: 1, reason: 'Defective', wasConsigned: false }]);
   };
 
   const handleRemoveItem = (index) => {
@@ -137,6 +91,20 @@ const SupplierReturnsPage = () => {
   const handleUpdateItem = (index, field, value) => {
     const newItems = [...itemsToReturn];
     newItems[index] = { ...newItems[index], [field]: value };
+    
+    if (field === 'product' && value) {
+      const product = products.find(p => p._id === value);
+      if (product) {
+        const ownedStock = (product.quantity || 0) - (product.consignedStock || 0);
+        if (ownedStock <= 0 && product.consignedStock > 0) {
+          newItems[index].wasConsigned = true;
+          toast.info(`${product.name} is only available in consigned stock.`, { autoClose: 2000 });
+        } else {
+          newItems[index].wasConsigned = false;
+        }
+      }
+    }
+    
     setItemsToReturn(newItems);
   };
 
@@ -163,6 +131,7 @@ const SupplierReturnsPage = () => {
           product: item.product,
           quantity: item.quantity,
           reason: item.reason,
+          wasConsigned: item.wasConsigned || false
         })),
         notes,
         returnDate,
@@ -171,11 +140,15 @@ const SupplierReturnsPage = () => {
       await api.post('/supplier-returns', payload);
       toast.success('Supplier return logged successfully!');
       setIsModalOpen(false);
-      fetchReturns(); // Refresh the list
+      fetchReturns();
     } catch (err) {
-      // If 'err' is null, it means the user cancelled the confirmation
       if (err) {
-        toast.error(err.response?.data?.message || 'Failed to log return.');
+        let errMsg = err.response?.data?.message || 'Failed to log return.';
+        if (errMsg.includes('consigned stock')) {
+          toast.error(errMsg, { autoClose: 5000 });
+        } else {
+          toast.error(errMsg);
+        }
       }
     } finally {
       setModalLoading(false);
@@ -184,50 +157,69 @@ const SupplierReturnsPage = () => {
 
   const columns = [
     { 
-      field: 'returnDate', 
+      field: 'date',
       headerName: 'Return Date', 
       width: 150,
-      valueGetter: (params) => new Date(params.row.returnDate).toLocaleDateString()
+      valueGetter: (value, row) => {
+        const date = row.returnDate || row.createdAt;
+        return date ? new Date(date) : null;
+      },
+      renderCell: (params) => params.value ? params.value.toLocaleDateString() : 'N/A'
     },
     { 
       field: 'supplier', 
       headerName: 'Supplier', 
       flex: 1,
-      valueGetter: (params) => params.row.supplier?.name || 'N/A'
+      valueGetter: (value, row) => row.supplier?.name || 'N/A'
     },
     { 
       field: 'productsReturned', 
       headerName: 'Items Returned', 
       flex: 2,
+      sortable: false,
       renderCell: (params) => (
-        <Box>
+        <Box sx={{ py: 1 }}>
           {params.row.productsReturned.map(item => (
-            <Typography key={item._id} variant="body2">
+            <Typography key={item._id} variant="body2" sx={{ whiteSpace: 'normal' }}>
               {item.quantity}x {item.product?.name || 'Unknown Product'} ({item.reason})
+              {item.wasConsigned && (
+                <Chip label="Consigned" size="small" color="info" sx={{ ml: 1 }} />
+              )}
             </Typography>
           ))}
         </Box>
       )
     },
-    { field: 'notes', headerName: 'Notes', flex: 1 },
+    { 
+      field: 'notes', 
+      headerName: 'Notes', 
+      flex: 1, 
+      sortable: false 
+    },
     { 
       field: 'recordedBy', 
       headerName: 'Recorded By', 
       width: 180,
-      valueGetter: (params) => params.row.recordedBy?.fullName || 'N/A'
+      valueGetter: (value, row) => row.recordedBy?.fullName || 'N/A'
     },
   ];
 
   return (
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       {/* --- MODAL FOR LOGGING A NEW RETURN --- */}
-      <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} fullWidth maxWidth="md">
+      <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} fullWidth maxWidth="lg">
         <DialogTitle>Log New Return to Supplier</DialogTitle>
         <DialogContent>
-          {modalLoading ? <CircularProgress /> : (
+          {modalLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
             <Box component="form" sx={{ mt: 2 }}>
+              {/* --- SYNTAX CHANGED TO 'size={{...}}' --- */}
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={8}>
+                
+                <Grid item size={{ xs: 12, sm: 8 }}>
                   <Autocomplete
                     options={suppliers}
                     getOptionLabel={(option) => option.name || ''}
@@ -236,7 +228,7 @@ const SupplierReturnsPage = () => {
                     renderInput={(params) => <TextField {...params} label="Select Supplier" />}
                   />
                 </Grid>
-                <Grid item xs={12} sm={4}>
+                <Grid item size={{ xs: 12, sm: 4 }}>
                   <TextField
                     label="Return Date"
                     type="date"
@@ -246,33 +238,116 @@ const SupplierReturnsPage = () => {
                     InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
+
+                <Grid item size={{ xs: 12 }}>
+                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+                    Items to Return
+                  </Typography>
+                </Grid>
+
+                <Grid item size={{ xs: 12 }}>
+                  <Paper variant="outlined">
+                    <List dense disablePadding>
+                      {itemsToReturn.map((item, index) => {
+                        const product = products.find(p => p._id === item.product) || null;
+                        return (
+                          <React.Fragment key={index}>
+                            <ListItem sx={{ p: 2 }}>
+                              <Grid container spacing={2} alignItems="center">
+                                <Grid item size={{ xs: 12, sm: 4 }}>
+                                  <Autocomplete
+                                    options={products}
+                                    getOptionLabel={(option) => `${option.name} (${option.itemCode})` || ''}
+                                    value={product}
+                                    onChange={(e, newValue) => handleUpdateItem(index, 'product', newValue?._id || null)}
+                                    renderInput={(params) => <TextField {...params} label="Select Product" size="small" />}
+                                  />
+                                </Grid>
+                                <Grid item size={{ xs: 6, sm: 2 }}>
+                                  <TextField
+                                    label="Quantity"
+                                    type="number"
+                                    value={item.quantity}
+                                    onChange={(e) => handleUpdateItem(index, 'quantity', parseInt(e.target.value, 10) || 1)}
+                                    fullWidth
+                                    inputProps={{ min: 1 }}
+                                    size="small"
+                                  />
+                                </Grid>
+                                <Grid item size={{ xs: 6, sm: 3 }}>
+                                  <FormControl fullWidth size="small">
+                                    <InputLabel>Reason</InputLabel>
+                                    <Select
+                                      label="Reason"
+                                      value={item.reason}
+                                      onChange={(e) => handleUpdateItem(index, 'reason', e.target.value)}
+                                    >
+                                      <MenuItem value="Defective">Defective</MenuItem>
+                                      <MenuItem value="Wrong Item">Wrong Item</MenuItem>
+                                      <MenuItem value="Overstock">Overstock</MenuItem>
+                                      <MenuItem value="Other">Other</MenuItem>
+                                    </Select>
+                                  </FormControl>
+                                </Grid>
+                                <Grid item size={{ xs: 12, sm: 2 }}>
+                                  <FormControlLabel
+                                    control={
+                                      <Checkbox
+                                        checked={item.wasConsigned}
+                                        onChange={(e) => handleUpdateItem(index, 'wasConsigned', e.target.checked)}
+                                        disabled={!product}
+                                      />
+                                    }
+                                    label="Consigned?"
+                                    sx={{ height: '100%' }}
+                                  />
+                                </Grid>
+                                <Grid item size={{ xs: 12, sm: 1 }} sx={{ textAlign: 'right' }}>
+                                  <Tooltip title="Remove Item">
+                                    <IconButton onClick={() => handleRemoveItem(index)} color="error">
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Grid>
+                              </Grid>
+                            </ListItem>
+                            {index < itemsToReturn.length - 1 && <Divider component="li" />}
+                          </React.Fragment>
+                        );
+                      })}
+                    </List>
+                    {itemsToReturn.length === 0 && (
+                      <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                        No items added yet.
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+                
+                <Grid item size={{ xs: 12 }}>
+                  <Button size="small" startIcon={<AddCircleOutlineIcon />} onClick={handleAddItem}>
+                    Add Item
+                  </Button>
+                </Grid>
+
+                <Grid item size={{ xs: 12 }}>
+                  <TextField
+                    label="Notes (Optional)"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    fullWidth
+                    multiline
+                    rows={3}
+                    sx={{ mt: 1 }}
+                  />
+                </Grid>
+
               </Grid>
-              
-              <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>Items to Return</Typography>
-              {itemsToReturn.map((item, index) => (
-                <ReturnItemRow
-                  key={index}
-                  item={item}
-                  index={index}
-                  products={products}
-                  onUpdate={handleUpdateItem}
-                  onRemove={handleRemoveItem}
-                />
-              ))}
-              <Button onClick={handleAddItem} sx={{ mt: 1 }}>Add Item</Button>
-              
-              <TextField
-                label="Notes (Optional)"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                fullWidth
-                multiline
-                rows={3}
-                sx={{ mt: 3 }}
-              />
+              {/* --- END OF SYNTAX CHANGE --- */}
             </Box>
           )}
         </DialogContent>
+
         <DialogActions>
           <Button onClick={() => setIsModalOpen(false)} disabled={modalLoading}>Cancel</Button>
           <Button onClick={handleSubmitReturn} variant="contained" disabled={modalLoading}>
@@ -297,7 +372,15 @@ const SupplierReturnsPage = () => {
           columns={columns}
           loading={isLoading}
           getRowId={(row) => row._id}
-          rowHeight={100} // Set a custom row height to accommodate multiple items
+          getRowHeight={() => 'auto'}
+          sx={{
+            '& .MuiDataGrid-cell': {
+              py: 1.5
+            }
+          }}
+          initialState={{
+            sorting: { sortModel: [{ field: 'date', sort: 'desc' }] },
+          }}
         />
       </Paper>
     </Container>

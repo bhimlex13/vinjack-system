@@ -1,31 +1,43 @@
 // server/controllers/settingsController.js
 const User = require('../models/userModel');
 const Setting = require('../models/settingModel');
-// Removed unused Model imports for brevity (Product, Category, etc.)
-// --- Import NEW utility functions ---
 const {
   restoreDatabase,
-  backupDatabaseToGCS, // Renamed import for clarity, though function name is same
+  backupDatabaseToGCS,
   listBackupsFromGCS,
   downloadBackupFromGCS
 } = require('../utils/backupService');
 const logAction = require('../utils/logger');
 
-// --- getSettings, updateSettings, getGlobalSetting, updateGlobalSetting remain unchanged ---
-const getSettings = async (req, res) => { /* ... unchanged ... */
+// --- UPDATED: getSettings ---
+const getSettings = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).lean();
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const settings = user.emailSettings || { notificationsEnabled: true, notificationTime: '08:00' };
+    
+    // --- Define defaults for all email settings ---
+    const defaultSettings = {
+        notificationsEnabled: true,
+        notificationTime: '08:00',
+        dailySalesReportEnabled: false,
+        dailySalesReportTime: '08:30'
+    };
+
+    // Merge defaults with user's saved settings
+    const settings = { ...defaultSettings, ...(user.emailSettings || {}) };
+    
     res.json(settings);
   } catch (error) {
     console.error('Error fetching user settings:', error);
     res.status(500).json({ message: 'Server Error fetching user settings.' });
   }
 };
-const updateSettings = async (req, res) => { /* ... unchanged ... */
+// --- END UPDATE ---
+
+// --- UPDATED: updateSettings ---
+const updateSettings = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -34,15 +46,30 @@ const updateSettings = async (req, res) => { /* ... unchanged ... */
     if (!user.emailSettings) {
         user.emailSettings = {};
     }
+
+    // Low stock settings (existing)
     if (req.body.notificationsEnabled !== undefined) {
       user.emailSettings.notificationsEnabled = req.body.notificationsEnabled;
     }
     if (req.body.notificationTime !== undefined) {
       if (typeof req.body.notificationTime !== 'string' || !/^\d{2}:\d{2}$/.test(req.body.notificationTime)) {
-          return res.status(400).json({ message: 'Invalid notification time format. Use HH:MM.' });
+          return res.status(400).json({ message: 'Invalid low stock time format. Use HH:MM.' });
       }
       user.emailSettings.notificationTime = req.body.notificationTime;
     }
+
+    // --- NEW: Daily Sales Report settings ---
+    if (req.body.dailySalesReportEnabled !== undefined) {
+      user.emailSettings.dailySalesReportEnabled = req.body.dailySalesReportEnabled;
+    }
+    if (req.body.dailySalesReportTime !== undefined) {
+      if (typeof req.body.dailySalesReportTime !== 'string' || !/^\d{2}:\d{2}$/.test(req.body.dailySalesReportTime)) {
+          return res.status(400).json({ message: 'Invalid daily report time format. Use HH:MM.' });
+      }
+      user.emailSettings.dailySalesReportTime = req.body.dailySalesReportTime;
+    }
+    // --- END NEW ---
+
     const updatedUser = await user.save();
     res.json(updatedUser.emailSettings);
   } catch (error) {
@@ -50,6 +77,8 @@ const updateSettings = async (req, res) => { /* ... unchanged ... */
     res.status(400).json({ message: 'Error updating user settings', error: error.message });
   }
 };
+// --- END UPDATE ---
+
 const getGlobalSetting = async (req, res) => { /* ... unchanged ... */
   try {
     const setting = await Setting.findOne({ key: req.params.key }).lean();
@@ -80,32 +109,17 @@ const updateGlobalSetting = async (req, res) => { /* ... unchanged ... */
     res.status(400).json({ message: 'Error updating setting', error: error.message });
   }
 };
-
-
-// --- RENAMED & MODIFIED: Trigger Manual Backup to GCS ---
-const triggerManualBackupToGCS = async (req, res) => {
+const triggerManualBackupToGCS = async (req, res) => { /* ... unchanged ... */
   try {
     console.log(`[${new Date().toLocaleString()}] User ${req.user.username} initiated manual backup to GCS...`);
-
-    // Call the utility function which returns the filename on success
-    const backupFileName = await backupDatabaseToGCS(); // This now returns a Promise
-
-    // Log the manual GCS backup action (Use a new action type)
+    const backupFileName = await backupDatabaseToGCS();
     logAction(req.user, 'DATA_BACKUP_GCS_MANUAL', `Performed manual data backup to GCS. Filename: ${backupFileName}`);
-
     res.status(200).json({ message: `Manual backup successful. File '${backupFileName}' uploaded to Google Cloud Storage.` });
-
   } catch (error) {
     console.error('Error triggering manual backup to GCS:', error);
-    // Log failure? (Optional, depends if backupDatabaseToGCS logs its own failures adequately)
-    // logAction(req.user, 'DATA_BACKUP_GCS_MANUAL_FAILED', `Failed manual backup to GCS. Error: ${error.message}`);
     res.status(500).json({ message: 'Server error during manual backup to GCS.', error: error.message });
   }
 };
-// --- END MODIFICATION ---
-
-
-// --- getBackupSettings, updateBackupSettings remain unchanged ---
 const getBackupSettings = async (req, res) => { /* ... unchanged ... */
   try {
     const [enabledSetting, timeSetting] = await Promise.all([
@@ -141,42 +155,25 @@ const updateBackupSettings = async (req, res) => { /* ... unchanged ... */
     res.status(400).json({ message: 'Error updating backup settings', error: error.message });
   }
 };
-
-
-// --- MODIFIED: Restore Backup from GCS ---
-const restoreBackup = async (req, res) => {
-  // Now expects 'fileName' in the body, not a file upload
+const restoreBackup = async (req, res) => { /* ... unchanged ... */
   const { fileName } = req.body;
-
   if (!fileName || typeof fileName !== 'string' || !fileName.endsWith('.gz')) {
     return res.status(400).json({ message: 'Invalid or missing backup filename provided.' });
   }
-
   console.log(`Restore request initiated by ${req.user.username} for GCS file: ${fileName}`);
-  let downloadedFilePath = null; // To keep track of the downloaded file for cleanup
-
+  let downloadedFilePath = null;
   try {
-    // Log initiation BEFORE restore starts
     logAction(
       req.user,
       'DATA_RESTORE_INITIATED',
       `Initiated database restore from GCS file: ${fileName}. Current data will be overwritten.`,
       { entityType: 'System' }
     );
-
-    // 1. Download the selected file from GCS
     downloadedFilePath = await downloadBackupFromGCS(fileName);
-
-    // 2. Call the utility function to perform the restore using the downloaded file
-    await restoreDatabase(downloadedFilePath); // restoreDatabase handles cleanup of the downloaded file
-
-    // Log success (only to console as AuditLog is wiped)
+    await restoreDatabase(downloadedFilePath);
     console.log(`[${new Date().toLocaleString()}] User ${req.user.username} successfully completed database restore from GCS file ${fileName}.`);
-
     res.status(200).json({ message: `Database restore from '${fileName}' successful. All data has been overwritten.` });
-
   } catch (error) {
-    // Restore failed (either download or restore step)
     console.error(`Restore from GCS failed: ${error.message}`);
     logAction(
       req.user,
@@ -184,19 +181,13 @@ const restoreBackup = async (req, res) => {
       `Failed to restore database from GCS file: ${fileName}. Error: ${error.message}`,
       { entityType: 'System' }
     );
-
-    // Ensure temporary file is cleaned up even if restoreDatabase didn't run or failed early
     if (downloadedFilePath && require('fs').existsSync(downloadedFilePath)) {
       try { require('fs').unlinkSync(downloadedFilePath); } catch(e) { console.error('Error during manual cleanup of downloaded restore file:', e);}
     }
-
     res.status(500).json({ message: error.message || 'An error occurred during the database restore process.' });
   }
 };
-// --- END MODIFICATION ---
-
-// --- NEW: List GCS Backups ---
-const listGCSBackups = async (req, res) => {
+const listGCSBackups = async (req, res) => { /* ... unchanged ... */
     try {
         const backupFiles = await listBackupsFromGCS();
         res.status(200).json(backupFiles);
@@ -205,17 +196,15 @@ const listGCSBackups = async (req, res) => {
         res.status(500).json({ message: error.message || 'Failed to retrieve backup list.' });
     }
 };
-// --- END NEW ---
-
 
 module.exports = {
   getSettings,
   updateSettings,
   getGlobalSetting,
   updateGlobalSetting,
-  triggerManualBackupToGCS, // <-- EXPORT RENAMED function
+  triggerManualBackupToGCS,
   getBackupSettings,
   updateBackupSettings,
-  restoreBackup,           // <-- EXPORT MODIFIED function
-  listGCSBackups,          // <-- EXPORT NEW function
+  restoreBackup,
+  listGCSBackups,
 };
