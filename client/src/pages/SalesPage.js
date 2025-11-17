@@ -27,7 +27,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import DesignServicesIcon from '@mui/icons-material/DesignServices';
-import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'; // Keep existing icon
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { FaUserTag } from 'react-icons/fa';
 
 const getInitialCartState = () => {
@@ -150,16 +150,12 @@ const SalesPage = () => {
           getServices('active'), getCustomers(),
         ]);
         
-        // --- MODIFICATION: Filter out inactive products ---
         let activeProductsData = productsRes.data.filter(p => p.status === 'active');
-        // --- END MODIFICATION ---
 
-        // Adjust quantities based on current cart
         if (cartItems.length > 0) {
           activeProductsData = activeProductsData.map(product => {
             const itemInCart = cartItems.find(item => item.type === 'product' && item._id === product._id);
             if (itemInCart) {
-              // Ensure we don't go below zero if cart had more than available
               const newQuantity = Math.max(0, product.quantity - itemInCart.cartQuantity); 
               return { ...product, quantity: newQuantity };
             }
@@ -167,9 +163,7 @@ const SalesPage = () => {
           });
         }
         
-        // --- Use the filtered data ---
         setProducts(activeProductsData);
-        // --- ---
         
         setCategories(categoriesRes.data);
         setBrands(brandsRes.data);
@@ -217,7 +211,6 @@ const SalesPage = () => {
   };
 
   const addProductToCart = (product) => {
-    // Double-check status just in case, though it should be filtered out already
     if(product.status !== 'active') return; 
 
     const productInState = products.find(p => p._id === product._id);
@@ -226,19 +219,17 @@ const SalesPage = () => {
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item.type === 'product' && item._id === product._id);
       if (existingItem) {
-        if (existingItem.cartQuantity < existingItem.stock) { // Use original stock from item added to cart
+        if (existingItem.cartQuantity < existingItem.stock) { 
           return prevCart.map(item =>
             item._id === product._id ? { ...item, cartQuantity: item.cartQuantity + 1 } : item
           );
         }
-        return prevCart; // Don't add if cart quantity >= original stock
+        return prevCart; 
       } else {
-        // When adding for the first time, store the CURRENT available quantity as 'stock'
         return [...prevCart, { ...product, cartQuantity: 1, stock: productInState.quantity, type: 'product' }];
       }
     });
 
-    // Decrease quantity in the displayed product list
     setProducts(prevProducts =>
       prevProducts.map(p =>
         p._id === product._id ? { ...p, quantity: p.quantity - 1 } : p
@@ -258,7 +249,9 @@ const SalesPage = () => {
   };
 
   const removeServiceFromCart = (serviceId) => {
-    setCartItems(prevCart => prevCart.filter(item => item._id !== serviceId && item.type === 'service'));
+    setCartItems(prevCart => prevCart.filter(item => 
+      !(item.type === 'service' && item._id === serviceId)
+    ));
   };
 
 
@@ -270,12 +263,10 @@ const SalesPage = () => {
       const existingItem = prevCart[existingItemIndex];
       const newQuantity = existingItem.cartQuantity + amount;
 
-      // Find the product in the main list to get its current display quantity
       const productInList = products.find(p => p._id === product._id);
       const currentAvailableInList = productInList ? productInList.quantity : 0;
 
       if (newQuantity <= 0) {
-        // Remove item from cart, restore full quantity to list
         setProducts(prevProducts =>
           prevProducts.map(p =>
             p._id === product._id ? { ...p, quantity: p.quantity + existingItem.cartQuantity } : p
@@ -286,22 +277,17 @@ const SalesPage = () => {
         return newCart;
       }
       
-      // Check if adding more is allowed (new cart quantity <= original stock in cart item)
-      // AND check if reducing quantity in the list is allowed (amount < 0 requires quantity in list > 0)
       if (newQuantity <= existingItem.stock && (amount > 0 ? currentAvailableInList > 0 : true)) {
-        // Update quantity in list
          setProducts(prevProducts =>
            prevProducts.map(p =>
              p._id === product._id ? { ...p, quantity: p.quantity - amount } : p
            )
          );
-         // Update quantity in cart
         const newCart = [...prevCart];
         newCart[existingItemIndex] = { ...existingItem, cartQuantity: newQuantity };
         return newCart;
       }
       
-      // If checks fail, return original cart
       return prevCart;
     });
   };
@@ -331,7 +317,6 @@ const SalesPage = () => {
         return prevProducts.map(p => {
           const itemInCart = productsToRestore.find(item => item._id === p._id);
           if (itemInCart) {
-            // Restore quantity based on original stock stored in cart item
             return { ...p, quantity: itemInCart.stock }; 
           }
           return p;
@@ -369,27 +354,21 @@ const SalesPage = () => {
         setSelectedMotorcycle(null);
         setCustomerMotorcycles([]);
         
-        // --- RE-FETCH active products after sale ---
         const productsResponse = await api.get('/products');
         setProducts(productsResponse.data.filter(p => p.status === 'active'));
-        // --- END RE-FETCH ---
 
       } catch (error) {
         alert(`Sale failed: ${error.response?.data?.message || error.message}`);
         
-        // --- RE-FETCH active products on failure (to ensure consistency) ---
         const productsResponse = await api.get('/products');
         setProducts(productsResponse.data.filter(p => p.status === 'active'));
-        // --- END RE-FETCH ---
       }
     }
   };
 
   const filteredProducts = useMemo(() => {
-    // Note: 'products' state should already be pre-filtered for 'active' status
     return products.filter(product => {
-        // We can optionally add an extra check here, but it might be redundant
-        // if (product.status !== 'active') return false; 
+        if (product.status !== 'active') return false; 
         
         const searchMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
         const brandMatch = selectedBrand ? product.brand._id === selectedBrand : true;
@@ -398,32 +377,57 @@ const SalesPage = () => {
     });
   }, [products, searchTerm, selectedBrand, selectedCategory]);
 
+  // --- THIS IS THE STYLYING FIX ---
+  const activeToggleButtonSx = {
+    '&.Mui-selected, &.Mui-selected:hover': {
+      color: 'white',
+      backgroundColor: 'primary.main',
+    }
+  };
+  // --- END OF FIX ---
+
   const handleFilterChange = (setter) => (event, newValue) => { setter(newValue); };
 
   return (
-    <Box sx={{ display: 'flex', height: '100%', gap: 2}}>
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column'}}>
-        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%'}}>
+    <Box sx={{ 
+      display: 'flex', 
+      gap: 2, 
+      height: 'calc(100vh - 112px)', 
+    }}>
+      
+      {/* --- Left Column: Product Grid --- */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <TextField
             fullWidth label="Search Products" variant="outlined" size="small" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }} sx={{ mb: 1 }}
           />
+          {/* --- CATEGORY TOGGLE BUTTONS (STYLED) --- */}
           <Box sx={{ mb: 1 }}>
             <ToggleButtonGroup value={selectedCategory} exclusive onChange={handleFilterChange(setSelectedCategory)} size="small" fullWidth sx={{ display: 'flex' }}>
-              <ToggleButton value={null} sx={{ flex: 1 }}>All</ToggleButton>
-              {categories.map(cat => <ToggleButton key={cat._id} value={cat._id} sx={{ flex: 1 }}>{cat.name}</ToggleButton>)}
+              <ToggleButton value={null} sx={{ flex: 1, ...activeToggleButtonSx }}>All</ToggleButton>
+              {categories.map(cat => (
+                <ToggleButton key={cat._id} value={cat._id} sx={{ flex: 1, ...activeToggleButtonSx }}>
+                  {cat.name}
+                </ToggleButton>
+              ))}
             </ToggleButtonGroup>
           </Box>
+          {/* --- BRAND TOGGLE BUTTONS (STYLED) --- */}
           <Box sx={{ mb: 2 }}>
             <ToggleButtonGroup value={selectedBrand} exclusive onChange={handleFilterChange(setSelectedBrand)} size="small" fullWidth sx={{ display: 'flex' }}>
-                <ToggleButton value={null} sx={{ flex: 1 }}>All</ToggleButton>
-                {brands.map(brand => <ToggleButton key={brand._id} value={brand._id} sx={{ flex: 1 }}>{brand.name}</ToggleButton>)}
+                <ToggleButton value={null} sx={{ flex: 1, ...activeToggleButtonSx }}>All</ToggleButton>
+                {brands.map(brand => (
+                  <ToggleButton key={brand._id} value={brand._id} sx={{ flex: 1, ...activeToggleButtonSx }}>
+                    {brand.name}
+                  </ToggleButton>
+                ))}
             </ToggleButtonGroup>
           </Box>
+          
           <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
             <Grid container spacing={2}>
               {filteredProducts.map(product => (
-                // --- Using the 'size' prop as requested ---
                 <Grid item key={product._id} size={{ xs: 12, sm: 4, md: 3, lg: 2 }}> 
                   <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', ...(product.quantity === 0 && { backgroundColor: grey[300], cursor: 'not-allowed' }) }}>
                     <CardActionArea 
@@ -444,8 +448,15 @@ const SalesPage = () => {
           </Box>
         </Paper>
       </Box>
-      <Box sx={{ width: '380px', display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+
+      {/* --- Right Column: "Sticky" Cart --- */}
+      <Box sx={{ 
+        width: '380px', 
+        height: '100%', 
+        position: 'sticky', 
+        top: '88px', 
+      }}>
+        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box sx={{ mb: 2 }}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><FaUserTag style={{ marginRight: '8px' }} /> Customer Details</Typography>
             <Stack direction="row" spacing={1} alignItems="center">
@@ -474,25 +485,27 @@ const SalesPage = () => {
               <ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale
             </Typography>
             
-            <Stack direction="row" spacing={1}>
-              <Button 
-                variant="outlined" 
-                color="error" 
-                size="small" 
-                startIcon={<DeleteSweepIcon />} 
-                onClick={handleClearCart}
-                disabled={cartItems.length === 0}
-              >
-                Clear
-              </Button>
-              <Button 
-                variant="outlined" 
-                size="small" 
-                startIcon={<DesignServicesIcon />} 
-                onClick={() => setIsServiceModalOpen(true)}
-              >
-                Add Service
-              </Button>
+            <Stack direction="row" spacing={0.5}>
+              <Tooltip title="Clear Cart">
+                <span>
+                  <IconButton
+                    color="error" 
+                    onClick={handleClearCart}
+                    disabled={cartItems.length === 0}
+                  >
+                    <DeleteSweepIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              
+              <Tooltip title="Add Service">
+                <IconButton 
+                  color="primary"
+                  onClick={() => setIsServiceModalOpen(true)}
+                >
+                  <DesignServicesIcon />
+                </IconButton>
+              </Tooltip>
             </Stack>
           </Box>
           <Divider sx={{ mb: 1 }} />
@@ -515,7 +528,7 @@ const SalesPage = () => {
                                 <IconButton 
                                     size="small" 
                                     onClick={() => updateQuantity(item, 1)} 
-                                    disabled={item.cartQuantity >= item.stock} // Disable based on original stock
+                                    disabled={item.cartQuantity >= item.stock}
                                 >
                                     <AddIcon fontSize="small"/>
                                 </IconButton>
@@ -563,6 +576,8 @@ const SalesPage = () => {
           </Box>
         </Paper>
       </Box>
+
+      {/* Modals are unchanged */}
       {selectedCustomer && (
         <Dialog open={isMotorcycleModalOpen} onClose={() => setIsMotorcycleModalOpen(false)} maxWidth="sm" fullWidth>
             <DialogTitle>Add New Motorcycle for {selectedCustomer.name}</DialogTitle>

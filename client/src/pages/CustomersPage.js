@@ -1,5 +1,5 @@
 // client/src/pages/CustomersPage.js
-import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react'; // 1. Import useMemo
+import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { getCustomers, deleteCustomer } from '../api/customerApi';
 import CustomerForm from '../components/CustomerForm';
 import CustomerMotorcyclesModal from '../components/CustomerMotorcyclesModal';
@@ -7,10 +7,18 @@ import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
 
 // MUI Imports
-import { Box, Button, Typography, Paper, Stack, Dialog, DialogTitle, Container, TextField, InputAdornment } from '@mui/material'; // Added TextField & InputAdornment
+import { 
+  Box, Button, Typography, Paper, Stack, Dialog, DialogTitle, Container, 
+  TextField, InputAdornment, 
+  IconButton, 
+  Tooltip,
+  Grid
+} from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
-import SearchIcon from '@mui/icons-material/Search'; // Added SearchIcon
+import SearchIcon from '@mui/icons-material/Search';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { FaUserFriends, FaMotorcycle } from 'react-icons/fa';
 
 const CustomersPage = () => {
@@ -20,7 +28,8 @@ const CustomersPage = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [managingCustomer, setManagingCustomer] = useState(null);
   const { confirm } = useContext(ConfirmationContext);
-  const [searchTerm, setSearchTerm] = useState(''); // 2. Add state for the search term
+  const [searchTerm, setSearchTerm] = useState('');
+  const [motorcycleFilter, setMotorcycleFilter] = useState('');
 
   const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
@@ -39,16 +48,24 @@ const CustomersPage = () => {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  // 4. Create the filteredCustomers list using useMemo
   const filteredCustomers = useMemo(() => {
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    const lowerCaseMotorcycleFilter = motorcycleFilter.toLowerCase();
+
     return customers.filter(customer => {
-      const lowerCaseSearchTerm = searchTerm.toLowerCase();
-      const nameMatch = customer.name?.toLowerCase().includes(lowerCaseSearchTerm);
-      const emailMatch = customer.email?.toLowerCase().includes(lowerCaseSearchTerm);
-      const phoneMatch = customer.phone?.toLowerCase().includes(lowerCaseSearchTerm);
-      return nameMatch || emailMatch || phoneMatch;
+      const searchMatch = !lowerCaseSearchTerm ||
+        (customer.name?.toLowerCase().includes(lowerCaseSearchTerm)) ||
+        (customer.email?.toLowerCase().includes(lowerCaseSearchTerm)) ||
+        (customer.phone?.toLowerCase().includes(lowerCaseSearchTerm));
+      
+      const motorcycleMatch = !lowerCaseMotorcycleFilter ||
+        (customer.motorcycles && customer.motorcycles.some(
+          moto => moto.make && moto.make.toLowerCase().includes(lowerCaseMotorcycleFilter)
+        ));
+
+      return searchMatch && motorcycleMatch;
     });
-  }, [customers, searchTerm]);
+  }, [customers, searchTerm, motorcycleFilter]);
 
   const handleFormSubmit = () => {
     fetchCustomers();
@@ -65,17 +82,17 @@ const CustomersPage = () => {
   };
 
   const handleDelete = useCallback(async (customerId) => {
-    const isConfirmed = await confirm(
-      'Are you sure you want to delete this customer?',
-      'Deleting a customer with existing sales may affect historical records. This action cannot be undone.'
-    );
-    if (isConfirmed) {
-      try {
-        await deleteCustomer(customerId);
-        toast.success('Customer deleted successfully.');
-        fetchCustomers();
-      } catch (err)
-      {
+    try {
+      await confirm(
+        'Are you sure you want to delete this customer?',
+        'Deleting a customer with existing sales may affect historical records. This action cannot be undone.'
+      );
+      await deleteCustomer(customerId);
+      toast.success('Customer deleted successfully.');
+      fetchCustomers();
+    } catch (err)
+    {
+      if (err) { 
         console.error('Failed to delete customer', err);
         toast.error(err.response?.data?.message || 'Failed to delete customer.');
       }
@@ -89,31 +106,28 @@ const CustomersPage = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 300,
+      width: 150,
       sortable: false,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => (
-        <Box
-          sx={{
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            justifyContent: "flex-start",
-            alignItems: "center",
-          }}
-        >
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<FaMotorcycle />}
-              onClick={() => setManagingCustomer(params.row)}
-            >
-              Vehicles
-            </Button>
-            <Button variant="outlined" size="small" onClick={() => openModalForEdit(params.row)}>Edit</Button>
-            <Button variant="outlined" size="small" color="error" onClick={() => handleDelete(params.row._id)}>Delete</Button>
-          </Stack>
-        </Box>
+        <Stack direction="row" spacing={0.5}>
+          <Tooltip title="View Vehicles">
+            <IconButton size="small" onClick={() => setManagingCustomer(params.row)}>
+              <FaMotorcycle />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Edit Customer">
+            <IconButton size="small" onClick={() => openModalForEdit(params.row)}>
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Customer">
+            <IconButton size="small" color="error" onClick={() => handleDelete(params.row._id)}>
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        </Stack>
       )
     }
   ];
@@ -149,28 +163,50 @@ const CustomersPage = () => {
         </Button>
       </Box>
       
-      {/* 3. Add the search bar UI */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <TextField
-          label="Search Customers (by Name, Email, or Phone)"
-          variant="outlined"
-          size="small"
-          fullWidth
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
+        <Grid container spacing={2}>
+          {/* --- THIS IS THE FIX --- */}
+          <Grid item size={{ xs: 12, md: 8 }}>
+            <TextField
+              label="Search Customers (by Name, Email, or Phone)"
+              variant="outlined"
+              size="small"
+              fullWidth
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Grid>
+          {/* --- THIS IS THE FIX --- */}
+          <Grid item size={{ xs: 12, md: 4 }}>
+            <TextField
+              label="Filter by Motorcycle Make (e.g., Honda)"
+              variant="outlined"
+              size="small"
+              fullWidth
+              value={motorcycleFilter}
+              onChange={(e) => setMotorcycleFilter(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <FaMotorcycle />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Grid>
+        </Grid>
       </Paper>
 
       <Paper sx={{ height: '70vh', width: '100%' }}>
         <DataGrid
-          rows={filteredCustomers} // 5. Update DataGrid to use the filtered list
+          rows={filteredCustomers} 
           columns={columns}
           loading={isLoading}
           getRowId={(row) => row._id}

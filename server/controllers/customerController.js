@@ -10,12 +10,10 @@ const createCustomer = async (req, res) => {
       return res.status(400).json({ message: 'Customer name is required.' });
     }
 
-    // --- THIS IS THE FIX: Handle empty email strings ---
     const customerData = {
       name,
       phone,
       address,
-      // Only set the email if it's a non-empty string
       ...(email && { email }),
     };
 
@@ -35,7 +33,13 @@ const createCustomer = async (req, res) => {
 
 const getAllCustomers = async (req, res) => {
   try {
-    const customers = await Customer.find({}).sort('name');
+    // --- THIS IS THE FIX ---
+    // We now populate the 'motorcycles' field and only select the 'make', 'model', and 'plateNumber'.
+    const customers = await Customer.find({})
+      .sort('name')
+      .populate('motorcycles', 'make model plateNumber');
+    // --- END OF FIX ---
+    
     res.json(customers);
   } catch (error) {
     res.status(500).json({ message: 'Server error fetching customers', error: error.message });
@@ -44,7 +48,11 @@ const getAllCustomers = async (req, res) => {
 
 const getCustomerById = async (req, res) => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    // --- ALSO UPDATING THIS function to be consistent ---
+    const customer = await Customer.findById(req.params.id)
+      .populate('motorcycles', 'make model plateNumber');
+    // --- END UPDATE ---
+
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
     }
@@ -58,8 +66,6 @@ const updateCustomer = async (req, res) => {
   try {
     const updateData = { ...req.body };
     
-    // --- THIS IS THE FIX: Handle empty email strings on update ---
-    // If the email is sent as an empty string, set it to null to avoid unique index errors
     if (updateData.email === '') {
       updateData.email = null;
     }
@@ -71,7 +77,13 @@ const updateCustomer = async (req, res) => {
     }
     
     logAction(req.user, 'UPDATE_CUSTOMER', `Updated customer: '${customer.name}'`, { entityType: 'Customer', entityId: customer._id });
-    res.json(customer);
+    
+    // --- ALSO UPDATING THIS response to be consistent ---
+    const populatedCustomer = await Customer.findById(customer._id)
+      .populate('motorcycles', 'make model plateNumber');
+    // --- END UPDATE ---
+
+    res.json(populatedCustomer);
   } catch (error) {
     res.status(400).json({ message: 'Error updating customer', error: error.message });
   }
