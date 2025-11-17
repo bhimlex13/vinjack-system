@@ -101,18 +101,18 @@ const ConsignmentPayoutsPage = () => {
   const columns = [
     {
       field: 'saleDate', headerName: 'Date Sold', flex: 1, minWidth: 180,
-      // --- FIX: Changed (params) to (value, row) ---
+      // --- FIX: Use (value, row) signature ---
       valueGetter: (value, row) => new Date(row.sale?.createdAt || row.createdAt),
       renderCell: (params) => formatDateTime(params.value),
     },
     { 
       field: 'supplier', headerName: 'Supplier', flex: 1.5, minWidth: 200,
-      // --- FIX: Changed (params) to (value, row) ---
+      // --- FIX: Use (value, row) signature ---
       valueGetter: (value, row) => row.supplier?.name || 'N/A'
     },
     { 
       field: 'product', headerName: 'Product', flex: 1.5, minWidth: 220,
-      // --- FIX: Changed (params) to (value, row) ---
+      // --- FIX: Use (value, row) signature ---
       valueGetter: (value, row) => `${row.product?.name} (${row.product?.itemCode})`
     },
     { 
