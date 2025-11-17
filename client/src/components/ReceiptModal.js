@@ -5,16 +5,17 @@ import React, { useRef } from 'react';
 import {
   Dialog, DialogContent, DialogActions, Button, Box, Typography, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
-  Link as MuiLink // Keep MuiLink for styling
+  Link as MuiLink
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
-import ImageIcon from '@mui/icons-material/Image'; // For link icon
+import ImageIcon from '@mui/icons-material/Image';
 
-// --- MODIFIED: Added onViewImage prop ---
-const ReceiptModal = ({ saleData, onClose, onViewImage }) => {
+// --- MODIFIED: Added 'open' prop ---
+const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
   const receiptRef = useRef();
 
   const handlePrint = () => {
+    // (Print logic remains unchanged)
     const printContents = receiptRef.current.innerHTML;
     const styles = `
       <style>
@@ -43,19 +44,19 @@ const ReceiptModal = ({ saleData, onClose, onViewImage }) => {
 
   const hasItems = saleData?.items && saleData.items.length > 0;
   const hasServices = saleData?.services && saleData.services.length > 0;
-  const imageUrlPath = saleData?.customerReceiptImage; // Get only the path
+  const imageUrlPath = saleData?.customerReceiptImage;
 
-  // --- NEW: Handle click on the image link ---
   const handleImageViewClick = (e) => {
-    e.preventDefault(); // Prevent default link behavior
+    e.preventDefault();
     if (onViewImage && imageUrlPath) {
-      onViewImage(imageUrlPath); // Call the handler passed from TransactionsPage
+      onViewImage(imageUrlPath);
     }
   };
-  // --- END NEW ---
 
   return (
-    <Dialog open={true} onClose={onClose} maxWidth="xs" fullWidth>
+    // --- THIS IS THE FIX: Use the 'open' prop instead of 'open={true}' ---
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    {/* --- END FIX --- */}
       <DialogContent sx={{ p: 0 }}>
         <Box ref={receiptRef} sx={{ p: 3, fontFamily: '"Courier New", Courier, monospace', color: '#333' }}>
           {/* Receipt Header */}
@@ -121,23 +122,18 @@ const ReceiptModal = ({ saleData, onClose, onViewImage }) => {
             </Table>
           </TableContainer>
 
-          {/* --- MODIFIED: Changed link to use onClick handler --- */}
-          {/* Added className="receipt-link" to hide during print */}
           {imageUrlPath && (
             <Box className="receipt-link" sx={{ mt: 2, fontSize: '0.9rem' }}>
               <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Attached Receipt:</Typography>
-              {/* Use MuiLink for styling, but handle click with function */}
               <MuiLink
-                href="#" // Keep href for link appearance, but prevent navigation
-                onClick={handleImageViewClick} // Use the click handler
+                href="#" 
+                onClick={handleImageViewClick} 
                 sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
               >
                  <ImageIcon fontSize="small" /> View Uploaded Image
               </MuiLink>
             </Box>
           )}
-          {/* --- END MODIFICATION --- */}
-
 
           {/* Total Amount and Footer */}
           <Divider sx={{ borderStyle: 'dashed', my: 2 }} />
@@ -161,7 +157,8 @@ const ReceiptModal = ({ saleData, onClose, onViewImage }) => {
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        {/* This button correctly calls the onClose from props */}
+        <Button onClick={onClose}>Close</Button> 
         <Button
           variant="contained"
           startIcon={<PrintIcon />}
