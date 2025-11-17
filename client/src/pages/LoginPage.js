@@ -2,6 +2,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
+import { isEmail } from 'validator';
 
 // MUI Imports
 import {
@@ -13,12 +14,17 @@ import {
   CircularProgress,
   FormControlLabel,
   Checkbox,
-  InputAdornment
+  InputAdornment,
+  Grid,
+  Alert,
+  Link,
+  IconButton,
+  Icon
 } from '@mui/material';
 
 // Icon Imports
-import PersonIcon from '@mui/icons-material/Person';
-import LockIcon from '@mui/icons-material/Lock';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -29,15 +35,33 @@ const LoginPage = () => {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  // Client-Side Validation (preserved)
+  const validateForm = () => {
+    if (!username) {
+      setError('Username or Email is required.');
+      return false;
+    }
+    if (!password) {
+      setError('Password is required.');
+      return false;
+    }
+    if (username.includes('@') && !isEmail(username)) {
+      setError('Please enter a valid email address.');
+      return false;
+    }
+    setError('');
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) {
+      return;
+    }
     setError('');
     setIsLoading(true);
-
     const result = await login(username, password);
-
     setIsLoading(false);
-
     if (result.success) {
       navigate('/dashboard');
     } else {
@@ -53,148 +77,221 @@ const LoginPage = () => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#0080ffff',
-        backgroundImage: 'url(/assets/motorcycle-bg.jpg)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
+        // --- Dark blue background to match the image's vibe ---
+        backgroundColor: '#ffffffff', // Changed from #192A4C
         p: 2,
       }}
     >
       <Paper
-        elevation={6}
+        elevation={12}
         sx={{
-          p: 4,
-          maxWidth: 650,
+          maxWidth: '1200px', // Increased max width
           width: '100%',
+          maxHeight: { xs: '95vh', md: '750px' },
+          height: { xs: 'auto', md: '100%' },
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          backgroundColor: 'rgba(24, 34, 92, 0.35)', 
-          backdropFilter: 'blur(10px)',
-          borderRadius: '15px',
-          color: 'white',
-          border: '1px solid rgba(8, 1, 51, 0.18)',
+          borderRadius: '16px',
+          overflow: 'hidden',
         }}
       >
-        {/* --- ADDED: Logo and System Name --- */}
-        <Box
-          component="img"
-          sx={{
-            height: 80,
-            mb: 1,
-          }}
-          alt="VinJack Motorworks Logo"
-          src="/assets/vinjack_logo.png" 
-        />
-        <Typography component="h1" variant="h5" sx={{ fontWeight: 'bold' }}>
-          VinJack Motorworks
-        </Typography>
-        <Typography component="p" variant="subtitle1" gutterBottom>
-          Sales & Inventory System
-        </Typography>
+        <Grid container sx={{ height: '100%' }}>
+          
+          {/* --- Left Column: The Form (like the image) --- */}
+          <Grid item size={{ xs: 12, md: 5 }}>
+            <Box
+              sx={{
+                p: { xs: 3, sm: 6 },
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                height: '100%',
+                backgroundColor: '#ffffff',
+              }}
+            >
+              {/* --- MODIFIED: Logo and Title are now in a column --- */}
+              <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <Box
+                  component="img"
+                  sx={{ 
+                    height: 160, 
+                    mb: 2 // Added margin bottom to separate from text
+                  }}
+                  alt="VinJack Motorworks Logo"
+                  src="/assets/vinjack_logo.png" 
+                />
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  VinJack System
+                </Typography>
+              </Box>
+              {/* --- END MODIFICATION --- */}
 
-        <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 2, width: '100%' }}>
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="username"
-            label="Username"
-            name="username"
-            autoComplete="username"
-            autoFocus
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+
+              <Box component="form" noValidate onSubmit={handleSubmit} sx={{ width: '100%' }}>
+                <Grid container spacing={2}>
+                  
+                  {/* --- Username / Email Field --- */}
+                  <Grid item size={{ xs: 12 }}>
+                    <TextField
+                      required
+                      fullWidth
+                      id="username"
+                      placeholder="Username"
+                      name="username"
+                      autoComplete="username"
+                      autoFocus
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      error={!!(error && (error.includes('Username') || error.includes('email') || error.includes('required')))}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonOutlinedIcon color="action" />
+                          </InputAdornment>
+                        ),
+                        sx: { borderRadius: '8px' } // Rounded corners
+                      }}
+                    />
+                  </Grid>
+                  
+                  {/* --- Password Field --- */}
+                  <Grid item size={{ xs: 12 }}>
+                    <TextField
+                      required
+                      fullWidth
+                      name="password"
+                      placeholder="Password"
+                      type="password"
+                      id="password"
+                      autoComplete="current-password"
+                      value={password}
+                      // --- *** THIS IS THE FIX *** ---
+                      onChange={(e) => setPassword(e.target.value)}
+                      // --- *** END FIX *** ---
+                      error={!!(error && (error.includes('Password') || error.includes('password') || error.includes('required')))}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LockOutlinedIcon color="action" />
+                          </InputAdornment>
+                        ),
+                        sx: { borderRadius: '8px' } // Rounded corners
+                      }}
+                    />
+                  </Grid>
+
+                  {/* --- Remember Me & Forgot Password --- */}
+                  <Grid item size={{ xs: 12 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            value="remember"
+                            color="primary"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                          />
+                        }
+                        label={<Typography variant="body2">Remember me</Typography>}
+                      />
+                    </Box>
+                  </Grid>
+
+                  {/* --- Error Alert --- */}
+                  {error && (
+                    // --- MODIFIED: Added mb={1} for spacing ---
+                    <Grid item size={{ xs: 12 }} sx={{ mb: 1 }}> 
+                      <Alert severity="error" variant="outlined">{error}</Alert>
+                    </Grid>
+                  )}
+
+                  {/* --- Sign In Button --- */}
+                  <Grid item size={{ xs: 12 }}>
+                    <Button
+                      type="submit"
+                      fullWidth
+                      variant="contained"
+                      disabled={isLoading}
+                      sx={{
+                        // --- MODIFIED: Removed mt: 2 to rely on Alert's margin-bottom ---
+                        py: 1.5,
+                        fontSize: '1rem',
+                        fontWeight: 'bold',
+                        borderRadius: '8px', // Rounded corners
+                      }}
+                    >
+                      {isLoading ? <CircularProgress size={26} color="inherit" /> : 'LOGIN'}
+                    </Button>
+                  </Grid>
+                  
+                </Grid>
+              </Box>
+            </Box>
+          </Grid>
+
+          {/* --- Right Column: The Video (like the image) --- */}
+          <Grid 
+            item 
+            size={{ xs: false, md: 7 }}
             sx={{
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.5)' },
-                '&:hover fieldset': { borderColor: 'white' },
-                '&.Mui-focused fieldset': { borderColor: 'white' },
-              },
-              '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.7)' },
-              '& .MuiInputLabel-root.Mui-focused': { color: 'white' },
-              '& .MuiInputBase-input': { color: 'white' },
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <PersonIcon sx={{ color: 'white' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            name="password"
-            label="Password"
-            type="password"
-            id="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.5)' },
-                '&:hover fieldset': { borderColor: 'white' },
-                '&.Mui-focused fieldset': { borderColor: 'white' },
-              },
-              '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.7)' },
-              '& .MuiInputLabel-root.Mui-focused': { color: 'white' },
-              '& .MuiInputBase-input': { color: 'white' },
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <LockIcon sx={{ color: 'white' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
-          {/* --- REMOVED: "Forgot Password?" link and simplified "Remember Me" --- */}
-          <FormControlLabel
-            control={
-              <Checkbox
-                value="remember"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                sx={{ color: 'rgba(255, 255, 255, 0.7)', '&.Mui-checked': { color: 'white' } }}
-              />
-            }
-            label={<Typography variant="body2">Remember Me</Typography>}
-          />
-          {error && (
-            <Typography color="error" variant="body2" align="center" sx={{ mt: 1, mb: 1 }}>
-              {error}
-            </Typography>
-          )}
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            disabled={isLoading}
-            sx={{
-              mt: 3,
-              mb: 2,
-              py: 1.5,
-              fontSize: '1rem',
-              backgroundColor: 'white',
-              color: '#2c3e50',
-              '&:hover': {
-                backgroundColor: 'rgba(255, 255, 255, 0.85)',
-              },
+              display: { xs: 'none', md: 'block' },
+              position: 'relative', // For text overlay
+              backgroundColor: '#000', // Fallback color
             }}
           >
-            {isLoading ? <CircularProgress size={24} sx={{ color: '#2c3e50' }} /> : 'Sign In'}
-          </Button>
-
-          {/* --- REMOVED: "Register" link section --- */}
-          
-        </Box>
+            {/* --- The Video Element --- */}
+            <Box
+              component="video"
+              autoPlay
+              loop
+              muted
+              playsInline // Important for mobile browsers
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover', // Fills the container
+                zIndex: 1,
+              }}
+            >
+              {/* !!!! IMPORTANT !!!!
+                Replace this 'src' with the path to your own video file.
+                You can put a video (e.g., 'login-bg.mp4') in your /public/assets/ folder
+                and then use the path src="/assets/login-bg.mp4"
+              */}
+              <source 
+                src="https://cms-public-artifacts.motionarray.com/content/motion-array/1055081/PRD-1055081-VxhMLuZpI5dg5p9N-original_playlist_1708607705.m3u8" 
+                type="video/mp4" 
+              />
+              Your browser does not support the video tag.
+            </Box>
+            
+            {/* --- Welcome Text Overlay --- */}
+            <Box
+              sx={{
+                position: 'relative',
+                zIndex: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                height: '100%',
+                p: 6,
+                color: '#ffffff',
+                // Add a subtle gradient overlay to make text more readable
+                background: 'linear-gradient(45deg, rgba(0, 0, 0, 0.1), rgba(0,0,0,0.5))',
+              }}
+            >
+              <Typography variant="h2" sx={{ fontWeight: 'bold' }}>
+                Welcome.
+              </Typography>
+              <Typography variant="h6" sx={{ color: 'rgba(236, 249, 250, 0.7)', mt: 1, maxWidth: '400px' }}>
+                Log in to access the VinJack Sales and Inventory Management System.
+              </Typography>
+            </Box>
+            
+          </Grid>
+        </Grid>
       </Paper>
     </Box>
   );

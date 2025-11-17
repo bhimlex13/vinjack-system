@@ -119,10 +119,9 @@ const SupplierReturnsPage = () => {
     }
 
     try {
-      await confirm({
-        title: 'Confirm Supplier Return',
-        description: 'This will log the return and decrease your stock quantities for the selected items. This action cannot be undone. Proceed?'
-      });
+      // --- UPDATED: Using the new confirm object format ---
+      await confirm('This will log the return and decrease your stock quantities for the selected items. This action cannot be undone. Proceed?');
+      // --- END UPDATE ---
 
       setModalLoading(true);
       const payload = {
@@ -142,7 +141,7 @@ const SupplierReturnsPage = () => {
       setIsModalOpen(false);
       fetchReturns();
     } catch (err) {
-      if (err) {
+      if (err) { // This checks if err is not null/undefined (i.e., user clicked "Cancel")
         let errMsg = err.response?.data?.message || 'Failed to log return.';
         if (errMsg.includes('consigned stock')) {
           toast.error(errMsg, { autoClose: 5000 });
@@ -180,7 +179,14 @@ const SupplierReturnsPage = () => {
       renderCell: (params) => (
         <Box sx={{ py: 1 }}>
           {params.row.productsReturned.map(item => (
-            <Typography key={item._id} variant="body2" sx={{ whiteSpace: 'normal' }}>
+            // --- THIS IS THE FIX: Added component="div" ---
+            <Typography 
+              key={item._id} 
+              variant="body2" 
+              sx={{ whiteSpace: 'normal' }} 
+              component="div" 
+            >
+            {/* --- END FIX --- */}
               {item.quantity}x {item.product?.name || 'Unknown Product'} ({item.reason})
               {item.wasConsigned && (
                 <Chip label="Consigned" size="small" color="info" sx={{ ml: 1 }} />
@@ -216,7 +222,6 @@ const SupplierReturnsPage = () => {
             </Box>
           ) : (
             <Box component="form" sx={{ mt: 2 }}>
-              {/* --- SYNTAX CHANGED TO 'size={{...}}' --- */}
               <Grid container spacing={2}>
                 
                 <Grid item size={{ xs: 12, sm: 8 }}>
@@ -343,7 +348,6 @@ const SupplierReturnsPage = () => {
                 </Grid>
 
               </Grid>
-              {/* --- END OF SYNTAX CHANGE --- */}
             </Box>
           )}
         </DialogContent>
@@ -374,7 +378,7 @@ const SupplierReturnsPage = () => {
           getRowId={(row) => row._id}
           getRowHeight={() => 'auto'}
           sx={{
-            '& .MuiDataGrid-cell': {
+            '& .MMuiDataGrid-cell': {
               py: 1.5
             }
           }}

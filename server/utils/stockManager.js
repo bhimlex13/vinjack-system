@@ -38,20 +38,12 @@ const checkStockLevelAndNotify = async (product, io) => {
 
   // Only proceed if the status has actually changed.
   if (newStatus === oldStatus) {
-    return product; // <-- MODIFIED: Return the product
+    return product; 
   }
 
   // Status has changed, so update it on the product document.
   product.stockStatus = newStatus;
   await product.save();
-
-  // Prepare payload for notifications and socket events
-  const warningPayload = {
-    productName: product.name,
-    remainingQuantity: product.quantity,
-    image: product.image,
-    link: '/inventory',
-  };
 
   let message = '';
   let type = '';
@@ -63,45 +55,55 @@ const checkStockLevelAndNotify = async (product, io) => {
       type = 'OUT_OF_STOCK';
       break;
     case 'Critical':
-      message = `${product.name} is CRITICAL (${product.quantity} remaining, ${Math.floor((product.quantity / product.maxStock) * 100)}%).`;
+      message = `${product.name} is CRITICAL (${product.quantity} remaining).`;
       type = 'CRITICAL_STOCK';
       break;
     case 'Low':
-      message = `${product.name} is low on stock (${product.quantity} remaining, ${Math.floor((product.quantity / product.maxStock) * 100)}%).`;
+      message = `${product.name} is low on stock (${product.quantity} remaining).`;
       type = 'LOW_STOCK';
       break;
     default:
       // No notification needed if it changed to 'Healthy'
-      return product; // <-- MODIFIED: Return the product
+      return product;
   }
 
-  // 1. Create database notification for Owners/Admins
+  // --- THIS IS THE FIX ---
+
+  // 1. Create database notification for Super Admins AND Admins
   try {
-    const newNotifications = await createNotification({
-      recipientRole: 'Owner', // Or 'Admin', adjust as needed
+    const notificationPayload = {
       message: message,
       type: type,
       link: '/inventory',
-      // --- NEW: Pass the product image to the notification ---
       image: product.image
-    });
+    };
+
+    // Create notifications for both roles
+    const [superAdminNotifications, adminNotifications] = await Promise.all([
+      createNotification({ ...notificationPayload, recipientRole: 'Super Admin' }),
+      createNotification({ ...notificationPayload, recipientRole: 'Admin' })
+    ]);
+
+    const allNewNotifications = [...superAdminNotifications, ...adminNotifications];
     
-    // 2. Emit real-time notification to specific users
-    if (newNotifications && newNotifications.length) {
-      newNotifications.forEach(notification => {
-        // --- MODIFIED: Ensure the full notification object (with image) is emitted ---
+    // 2. Emit the single, correct 'new_notification' event to all recipients
+    if (allNewNotifications && allNewNotifications.length > 0) {
+      allNewNotifications.forEach(notification => {
+        // This emit is now received by AuthContext.js and triggers ALL alerts
+        // (navbar, toast, and modal)
         io.to(notification.user.toString()).emit('new_notification', notification);
       });
     }
 
-    // 3. Emit a general warning for any subscribed client (e.g., dashboard)
-    io.emit('stock_level_warning', { ...warningPayload, type, message });
+    // 3. REMOVED the redundant 'stock_level_warning' emit.
+    // io.emit('stock_level_warning', { ...warningPayload, type, message }); // <-- THIS IS GONE
 
   } catch (error) {
     console.error('Error sending stock notification:', error);
   }
+  // --- END OF FIX ---
 
-  return product; // <-- MODIFIED: Return the product
+  return product; 
 };
 
 module.exports = { checkStockLevelAndNotify, getStockStatus };

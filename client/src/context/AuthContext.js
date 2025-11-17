@@ -68,6 +68,7 @@ const authReducer = (state, action) => {
     case 'SET_NOTIFICATIONS':
       return { ...state, notifications: action.payload };
     case 'ADD_NOTIFICATION':
+      // Prevent duplicate notifications from multiple socket events
       if (state.notifications.some(n => n._id === action.payload._id)) {
         return state;
       }
@@ -129,6 +130,8 @@ export const AuthProvider = ({ children }) => {
         const dataPromises = [];
         
         if (canViewStock) {
+          // NOTE: This low-stock endpoint is for a different feature (e.g., Dashboard list)
+          // It is not related to the real-time notifications.
           dataPromises.push(api.get('/products/low-stock'));
         } else {
           dataPromises.push(Promise.resolve({ data: [] })); 
@@ -163,12 +166,8 @@ export const AuthProvider = ({ children }) => {
     let socket;
     if (state.user && state.token) { 
       
-      // --- THIS IS THE FIX ---
-      // Use the explicit server URL.
-      // Make sure this matches your server's port (5000).
       const SERVER_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       socket = io(SERVER_URL, {
-      // --- END OF FIX ---
           auth: { token: state.token } 
       });
 
@@ -176,8 +175,11 @@ export const AuthProvider = ({ children }) => {
 
       socket.on('new_notification', (notification) => {
         console.log('Real-time notification received:', notification);
+        
+        // 1. Add notification to state (for navbar badge)
         dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
 
+        // 2. Show toast
         switch (notification.type) {
           case 'LOW_STOCK':
             toast.warn(notification.message); 
@@ -194,12 +196,26 @@ export const AuthProvider = ({ children }) => {
             toast.info(notification.message);
             break;
         }
+
+        // --- THIS IS THE FIX ---
+        // 3. If it's a stock warning, ALSO trigger the modal
+        if (
+          notification.type === 'LOW_STOCK' || 
+          notification.type === 'CRITICAL_STOCK' || 
+          notification.type === 'OUT_OF_STOCK'
+        ) {
+          console.log('Triggering stock warning modal.');
+          showWarning(notification); // This will show the pop-up modal
+        }
+        // --- END OF FIX ---
       });
 
-      socket.on('stock_level_warning', (warningData) => {
-        console.log('Stock level warning received:', warningData);
-        showWarning(warningData);
-      });
+      // --- REMOVED: This listener is now redundant ---
+      // socket.on('stock_level_warning', (warningData) => {
+      //   console.log('Stock level warning received:', warningData);
+      //   showWarning(warningData);
+      // });
+      // --- END REMOVAL ---
 
       socket.on('connect_error', (err) => {
           console.error('Socket connection error:', err.message);
@@ -218,7 +234,7 @@ export const AuthProvider = ({ children }) => {
             socket.disconnect();
         }
     };
-  }, [state.user, state.token, showWarning, logout]);
+  }, [state.user, state.token, showWarning, logout]); // `showWarning` and `logout` are dependencies
 
   const login = async (username, password) => {
     try {

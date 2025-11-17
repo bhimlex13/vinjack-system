@@ -26,6 +26,17 @@ const userSchema = new mongoose.Schema({
     default: false,
   },
 
+  // --- NEW: Fields for login attempt tracking ---
+  failed_attempts: {
+    type: Number,
+    default: 0
+  },
+  last_failed_attempt: {
+    type: Date,
+    default: null
+  },
+  // --- END NEW ---
+
   emailSettings: {
     notificationsEnabled: { type: Boolean, default: true },
     notificationTime: { type: String, default: '08:00' },
