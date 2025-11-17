@@ -29,37 +29,33 @@ import {
   DialogTitle,
   Divider,
   CircularProgress,
-  InputAdornment, // Keep this if used elsewhere, though we remove it from backup
+  InputAdornment,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
   FormHelperText,
   IconButton,
-  Stack // Keep Stack if used
+  Stack
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import EmailIcon from '@mui/icons-material/Email';
 import BadgeIcon from '@mui/icons-material/Badge';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-// import SaveIcon from '@mui/icons-material/Save'; // No longer used
-import AccessTimeIcon from '@mui/icons-material/AccessTime'; // No longer used for backup time
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RestoreIcon from '@mui/icons-material/Restore';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsBackupRestoreIcon from '@mui/icons-material/SettingsBackupRestore';
 import SecurityIcon from '@mui/icons-material/Security';
-
-// --- REMOVED Time Conversion Helpers ---
-// const formatTo12Hour = ...
-// const formatTo24Hour = ...
+import AssessmentIcon from '@mui/icons-material/Assessment';
 
 
 const SettingsPage = () => {
   const { user, logout } = useContext(AuthContext);
-  // Profile state remains unchanged
+  // Profile state
   const [profile, setProfile] = useState({ fullName: '', username: '', email: '' });
   const [originalProfile, setOriginalProfile] = useState({});
   const [pendingChanges, setPendingChanges] = useState(null);
@@ -76,19 +72,22 @@ const SettingsPage = () => {
   const timerId = useRef(null);
 
   // Notification state
-  const [personalSettings, setPersonalSettings] = useState({ notificationsEnabled: true, notificationTime: '08:00' });
+  const [personalSettings, setPersonalSettings] = useState({
+    notificationsEnabled: true,
+    notificationTime: '08:00',
+    dailySalesReportEnabled: false,
+    dailySalesReportTime: '08:30'
+  });
   const [originalPersonalSettings, setOriginalPersonalSettings] = useState({});
   const [isNotificationSaving, setIsNotificationSaving] = useState(false);
 
-  // --- MODIFIED: Automated Backup Settings State ---
+  // Backup Settings State
   const [backupSettings, setBackupSettings] = useState({ enabled: false, time: '02:00' });
-  // --- NEW: Store original backup settings ---
   const [originalBackupSettings, setOriginalBackupSettings] = useState({});
-  // --- REMOVED: backupTimeInput, originalBackupTimeInput, backupTimeError ---
   const [isBackupLoading, setIsBackupLoading] = useState(false);
   const [isBackupSaving, setIsBackupSaving] = useState(false);
 
-  // GCS Backup & Restore State (unchanged)
+  // GCS Backup & Restore State
   const [isBackingUpToGCS, setIsBackingUpToGCS] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [gcsBackups, setGcsBackups] = useState([]);
@@ -112,13 +111,10 @@ const SettingsPage = () => {
          }
          const responses = await Promise.all(apiCalls);
 
-         // Process personal settings (unchanged)
          if (responses[0]?.data) {
            setPersonalSettings(responses[0].data);
            setOriginalPersonalSettings(responses[0].data);
          }
-
-         // Process user profile (unchanged)
          if (responses[1]?.data) {
            const userProfile = {
              fullName: responses[1].data.fullName || '',
@@ -131,15 +127,10 @@ const SettingsPage = () => {
              setPendingChanges(responses[1].data.pendingChanges);
            }
          }
-
-         // --- MODIFIED: Process backup config ---
          if (user.role === 'Super Admin' && responses[2]?.data) {
            setBackupSettings(responses[2].data);
-           // --- Store original state ---
            setOriginalBackupSettings(responses[2].data);
-           // --- REMOVED: setBackupTimeInput, setOriginalBackupTimeInput, setBackupTimeError ---
          }
-
        } catch (error) {
          console.error("Failed to fetch settings data", error);
          toast.error("Failed to load some settings.");
@@ -150,17 +141,17 @@ const SettingsPage = () => {
     fetchData();
   }, [user]);
 
-  // Check for restore flag (unchanged)
-  useEffect(() => { /* ... unchanged ... */
+  // Check for restore flag
+  useEffect(() => {
     const restoreFlag = localStorage.getItem('restoreCompleted');
     if (restoreFlag) {
         toast.success("Database restore completed successfully. Please log in again.", { autoClose: 7000 });
-        localStorage.removeItem('restoreCompleted'); // Remove the flag after showing message
+        localStorage.removeItem('restoreCompleted');
     }
   }, []);
 
-  // Timer logic (unchanged)
-   useEffect(() => { /* ... unchanged ... */
+  // Timer logic
+   useEffect(() => {
      if (requiresVerification && timer > 0) {
        timerId.current = setInterval(() => setTimer(prev => prev - 1), 1000);
      } else {
@@ -172,12 +163,10 @@ const SettingsPage = () => {
      return () => clearInterval(timerId.current);
    }, [requiresVerification, timer]);
 
-   // --- MODIFIED: formatTime (only used for profile update timer) ---
    const formatTime = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-   // --- END MODIFICATION ---
 
-  // Fetch GCS Backup List (unchanged)
-  useEffect(() => { /* ... unchanged ... */
+  // Fetch GCS Backup List
+  useEffect(() => {
     if (user?.role === 'Super Admin') {
         const fetchBackupList = async () => {
             setIsLoadingBackups(true);
@@ -195,140 +184,118 @@ const SettingsPage = () => {
     }
   }, [user]);
 
-  // Handle Notification Switch Toggle (unchanged)
-  const handleNotificationToggle = async (event) => {
-    const isEnabled = event.target.checked;
+  // Generic save function for personal settings
+  const savePersonalSetting = async (settingKey, value, successMessage) => {
     setIsNotificationSaving(true);
-    const newSettings = { ...personalSettings, notificationsEnabled: isEnabled };
-    setPersonalSettings(newSettings);
+    const newSettings = { ...personalSettings, [settingKey]: value };
+    setPersonalSettings(newSettings); // Optimistic UI update
+
     try {
-        await api.put('/settings', newSettings);
-        toast.success(`Email alerts ${isEnabled ? 'enabled' : 'disabled'}.`);
-        setOriginalPersonalSettings(newSettings);
+        await api.put('/settings', newSettings); // Send the whole object
+        toast.success(successMessage);
+        setOriginalPersonalSettings(newSettings); // Set new baseline
     }
     catch (err){
-        toast.error(err.response?.data?.message || 'Failed to update notification setting.');
-        setPersonalSettings(originalPersonalSettings);
+        toast.error(err.response?.data?.message || 'Failed to update setting.');
+        setPersonalSettings(originalPersonalSettings); // Revert on error
         console.error(err);
     } finally {
         setIsNotificationSaving(false);
     }
   };
 
-  // Handle Notification Time Save on Blur (unchanged)
-  const handleNotificationTimeBlur = async () => {
-    if (personalSettings.notificationTime === originalPersonalSettings.notificationTime) {
-      return;
-    }
-    if (!personalSettings.notificationsEnabled) {
-      return;
-    }
+  // Handle Low Stock Notification Toggle
+  const handleNotificationToggle = (event) => {
+    const isEnabled = event.target.checked;
+    savePersonalSetting('notificationsEnabled', isEnabled, `Low stock alerts ${isEnabled ? 'enabled' : 'disabled'}.`);
+  };
+
+  // Handle Low Stock Notification Time Save on Blur
+  const handleNotificationTimeBlur = () => {
+    if (personalSettings.notificationTime === originalPersonalSettings.notificationTime) return;
+    if (!personalSettings.notificationsEnabled) return;
     if (!/^\d{2}:\d{2}$/.test(personalSettings.notificationTime)) {
         toast.error("Invalid time format. Please use HH:MM.");
         setPersonalSettings(originalPersonalSettings);
         return;
     }
-
-    setIsNotificationSaving(true);
-    try {
-        await api.put('/settings', personalSettings); // Send the whole object
-        toast.success('Notification time updated.');
-        setOriginalPersonalSettings(personalSettings);
-    } catch (err) {
-        toast.error(err.response?.data?.message || 'Failed to update notification time.');
-        setPersonalSettings(originalPersonalSettings);
-        console.error(err);
-    } finally {
-        setIsNotificationSaving(false);
-    }
+    savePersonalSetting('notificationTime', personalSettings.notificationTime, 'Low stock alert time updated.');
   };
 
-  // --- REMOVED: handleBackupTimeInputChange function ---
+  // Handle Daily Report Toggle
+  const handleDailyReportToggle = (event) => {
+    const isEnabled = event.target.checked;
+    savePersonalSetting('dailySalesReportEnabled', isEnabled, `Daily sales report ${isEnabled ? 'enabled' : 'disabled'}.`);
+  };
 
-  // --- NEW: Handle Backup Time Input Change ---
+  // Handle Daily Report Time Save on Blur
+  const handleDailyReportTimeBlur = () => {
+    if (personalSettings.dailySalesReportTime === originalPersonalSettings.dailySalesReportTime) return;
+    if (!personalSettings.dailySalesReportEnabled) return;
+    if (!/^\d{2}:\d{2}$/.test(personalSettings.dailySalesReportTime)) {
+        toast.error("Invalid time format. Please use HH:MM.");
+        setPersonalSettings(originalPersonalSettings);
+        return;
+    }
+    savePersonalSetting('dailySalesReportTime', personalSettings.dailySalesReportTime, 'Daily sales report time updated.');
+  };
+
+  // Backup Settings Logic
   const handleBackupTimeChange = (e) => {
     setBackupSettings(prev => ({ ...prev, time: e.target.value }));
   };
-  // --- END NEW ---
-
-  // --- MODIFIED: Handle Automated Backup Switch Toggle (simplified) ---
   const handleBackupToggle = async (event) => {
       const isEnabled = event.target.checked;
       setIsBackupSaving(true);
-      
-      // Settings to save are the current settings, just with the new 'enabled' state
       const settingsToSave = { ...backupSettings, enabled: isEnabled };
-
-      // No more 12/24h validation needed here
       if (isEnabled && !/^\d{2}:\d{2}$/.test(settingsToSave.time)) {
           toast.error('Invalid time format. Cannot enable schedule.');
           setIsBackupSaving(false);
-          return; // Stop saving
+          return;
       }
-
-      // Optimistic UI update for the switch
       setBackupSettings(settingsToSave); 
-
       try {
           await api.put('/settings/backup/config', settingsToSave);
-          // Update the original state on successful save
           setOriginalBackupSettings(settingsToSave);
           toast.success(`Automated backup schedule ${isEnabled ? 'enabled' : 'disabled'}.`);
       } catch (err) {
           toast.error(err.response?.data?.message || 'Failed to update backup schedule setting.');
-          // Revert UI state on error
-          setBackupSettings(originalBackupSettings); // Revert to last saved state
+          setBackupSettings(originalBackupSettings);
           console.error(err);
       } finally {
           setIsBackupSaving(false);
       }
   };
-  // --- END MODIFICATION ---
-
-  // --- MODIFIED: Handle Backup Time Save on Blur (simplified) ---
   const handleBackupTimeBlur = async () => {
-    // Don't save if the schedule is disabled
-    if (!backupSettings.enabled) {
-      return;
-    }
-    // Don't save if the time hasn't changed
-    if (backupSettings.time === originalBackupSettings.time) {
-      return;
-    }
-    // Basic validation
+    if (!backupSettings.enabled) return;
+    if (backupSettings.time === originalBackupSettings.time) return;
     if (!/^\d{2}:\d{2}$/.test(backupSettings.time)) {
         toast.error('Invalid backup time format.');
-        setBackupSettings(originalBackupSettings); // Revert
+        setBackupSettings(originalBackupSettings);
         return;
     }
-    
-    // settingsToSave is just the current state
     const settingsToSave = backupSettings;
-    
     setIsBackupSaving(true);
     try {
       await api.put('/settings/backup/config', settingsToSave);
-      setOriginalBackupSettings(settingsToSave); // Update original state
+      setOriginalBackupSettings(settingsToSave);
       toast.success('Backup time updated successfully!');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save backup time.');
-      setBackupSettings(originalBackupSettings); // Revert
-      console.error(err);
+      setBackupSettings(originalBackupSettings);
     } finally {
       setIsBackupSaving(false);
     }
   };
-  // --- END MODIFICATION ---
 
 
-  // GCS Backup & Restore Logic (remains unchanged)
-  const handleTriggerBackupToGCS = async () => { /* ... unchanged ... */
+  // GCS Backup & Restore Logic
+  const handleTriggerBackupToGCS = async () => {
     setIsBackingUpToGCS(true);
     toast.info('Starting manual backup to Google Cloud Storage...');
     try {
-      const response = await triggerManualBackupToGCS(); // Calls POST endpoint
+      const response = await triggerManualBackupToGCS();
       toast.success(response.message || 'Manual backup to GCS completed!');
-      // Refresh the backup list
       const backups = await listGCSBackups();
       setGcsBackups(backups);
     } catch (err) {
@@ -338,36 +305,30 @@ const SettingsPage = () => {
       setIsBackingUpToGCS(false);
     }
   };
-  const handleRestoreFileSelectChange = (event) => { /* ... unchanged ... */
+  const handleRestoreFileSelectChange = (event) => {
     setSelectedRestoreFile(event.target.value);
   };
-  const handleRestoreSubmit = () => { /* ... unchanged ... */
+  const handleRestoreSubmit = () => {
     if (!selectedRestoreFile) {
       toast.error('Please select a backup file from the list to restore.');
       return;
     }
     setShowRestoreConfirm(true);
   };
-  const confirmRestore = async () => { /* ... unchanged ... */
+  const confirmRestore = async () => {
     if (!selectedRestoreFile) return;
-
     setShowRestoreConfirm(false);
     setIsRestoring(true);
     toast.info('Restoring database from GCS... Please do not close this page. You will be logged out upon completion.', { autoClose: false });
-
     try {
-      const response = await restoreBackup(selectedRestoreFile); // Pass filename
-
+      const response = await restoreBackup(selectedRestoreFile);
       toast.dismiss();
       toast.success(response.message || 'Restore successful! Logging out...');
-      setSelectedRestoreFile(''); // Clear selection
-
-      localStorage.setItem('restoreCompleted', 'true'); // Set flag
-
+      setSelectedRestoreFile('');
+      localStorage.setItem('restoreCompleted', 'true');
       setTimeout(() => {
         logout();
       }, 3000);
-
     } catch (err) {
       toast.dismiss();
       console.error('Restore error:', err);
@@ -376,8 +337,8 @@ const SettingsPage = () => {
     }
   };
 
-  // Profile Update Logic (remains unchanged)
-  const openUpdateModal = () => { /* ... unchanged ... */
+  // Profile Update Logic
+  const openUpdateModal = () => {
     setUpdateFormData({
       fullName: profile.fullName, username: profile.username, email: profile.email,
       oldPassword: '', newPassword: '', confirmPassword: ''
@@ -385,7 +346,7 @@ const SettingsPage = () => {
     setUpdateError('');
     setShowUpdateModal(true);
   };
-  const closeUpdateModal = () => { /* ... unchanged ... */
+  const closeUpdateModal = () => {
     setShowUpdateModal(false);
     setUpdateError('');
     setUpdateMessage('');
@@ -394,7 +355,7 @@ const SettingsPage = () => {
     setTimer(180);
     clearInterval(timerId.current);
   };
-  const openConfirmModal = (e) => { /* ... unchanged ... */
+  const openConfirmModal = (e) => {
     e.preventDefault();
     setUpdateError('');
     const changes = [];
@@ -411,9 +372,9 @@ const SettingsPage = () => {
     setChangesSummary(changes);
     setShowConfirmModal(true);
   };
-  const confirmProfileUpdate = async () => { /* ... unchanged ... */
+  const confirmProfileUpdate = async () => {
     setUpdateError(''); setUpdateMessage('');
-    setIsBackupSaving(true); // Reuse saving state
+    setIsBackupSaving(true);
     try {
       const response = await requestProfileUpdate(updateFormData);
       setShowConfirmModal(false);
@@ -435,9 +396,9 @@ const SettingsPage = () => {
         setIsBackupSaving(false);
     }
   };
-  const handleVerificationSubmit = async (e) => { /* ... unchanged ... */
+  const handleVerificationSubmit = async (e) => {
     e.preventDefault(); setUpdateError('');
-    setIsBackupSaving(true); // Reuse saving state
+    setIsBackupSaving(true);
     try {
       const response = await verifyOwnerUpdate(verificationCode);
       setUpdateMessage(response.data.message);
@@ -456,9 +417,9 @@ const SettingsPage = () => {
         setIsBackupSaving(false);
     }
    };
-   const handleCloseSuccessModal = () => { /* ... unchanged ... */
+   const handleCloseSuccessModal = () => {
        setShowSuccessModal(false);
-       closeUpdateModal(); // Close the main modal too
+       closeUpdateModal();
    };
 
   return (
@@ -469,9 +430,8 @@ const SettingsPage = () => {
 
       <Grid container spacing={3}>
 
-        {/* Profile Section (unchanged) */}
+        {/* --- SYNTAX FIX: Reverted to size={{...}} --- */}
         <Grid item size={{ xs: 12 }} >
-            {/* ... unchanged Profile JSX ... */}
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                     <AccountCircleIcon color="action" sx={{ mr: 1 }} />
@@ -492,48 +452,93 @@ const SettingsPage = () => {
             </Paper>
         </Grid>
 
-        {/* Notification Settings Section (unchanged) */}
+        {/* --- SYNTAX FIX: Reverted to size={{...}} --- */}
         <Grid item size={{ xs: 12 }}>
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                     <NotificationsIcon color="action" sx={{ mr: 1 }} />
-                    <Typography variant="h6" component="h3">Notification Settings</Typography>
+                    <Typography variant="h6" component="h3">Email Notification Settings</Typography>
                 </Box>
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={personalSettings.notificationsEnabled}
-                          onChange={handleNotificationToggle}
-                          name="notificationsEnabled"
-                          disabled={isNotificationSaving}
+                    {/* Low Stock Alert */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={personalSettings.notificationsEnabled}
+                              onChange={handleNotificationToggle}
+                              name="notificationsEnabled"
+                              disabled={isNotificationSaving}
+                            />
+                          }
+                          label={
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <WarningAmberIcon sx={{ mr: 1, fontSize: '1.25rem', color: 'text.secondary' }} />
+                              Enable Low Stock Email Alerts
+                              {isNotificationSaving && personalSettings.notificationsEnabled !== originalPersonalSettings.notificationsEnabled && <CircularProgress size={16} sx={{ ml: 1 }} />}
+                            </Box>
+                          }
+                          sx={{ mr: 'auto' }}
                         />
-                      }
-                      label={
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          Enable Low Stock Email Alerts
-                          {isNotificationSaving && <CircularProgress size={16} sx={{ ml: 1 }} />}
-                        </Box>
-                      }
-                    />
-                    <TextField
-                        label="Notification Time (Manila Time)"
-                        type="time"
-                        fullWidth
-                        value={personalSettings.notificationTime}
-                        onChange={(e) => setPersonalSettings(p => ({ ...p, notificationTime: e.target.value }))}
-                        onBlur={handleNotificationTimeBlur}
-                        disabled={!personalSettings.notificationsEnabled || isNotificationSaving}
-                        InputLabelProps={{ shrink: true }}
-                        inputProps={{ step: 300 }} // 5 min step
-                        helperText="Emails will be sent daily around this time. Time saves automatically when you click away."
-                        sx={{ mt: 2 }}
-                    />
+                        <TextField
+                            label="Low Stock Alert Time"
+                            type="time"
+                            value={personalSettings.notificationTime}
+                            onChange={(e) => setPersonalSettings(p => ({ ...p, notificationTime: e.target.value }))}
+                            onBlur={handleNotificationTimeBlur}
+                            disabled={!personalSettings.notificationsEnabled || isNotificationSaving}
+                            InputLabelProps={{ shrink: true }}
+                            inputProps={{ step: 300 }}
+                            helperText="Saves on blur."
+                            sx={{ mt: { xs: 1, sm: 0 }, width: '100%', maxWidth: { xs: '100%', sm: '200px' } }}
+                            size="small"
+                        />
+                    </Box>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    {/* NEW: Daily Sales Report */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={personalSettings.dailySalesReportEnabled}
+                              onChange={handleDailyReportToggle} // New handler
+                              name="dailySalesReportEnabled"
+                              disabled={isNotificationSaving}
+                            />
+                          }
+                          label={
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <AssessmentIcon sx={{ mr: 1, fontSize: '1.25rem', color: 'text.secondary' }} />
+                              Enable Daily Sales Report Email
+                              {isNotificationSaving && personalSettings.dailySalesReportEnabled !== originalPersonalSettings.dailySalesReportEnabled && <CircularProgress size={16} sx={{ ml: 1 }} />}
+                            </Box>
+                          }
+                          sx={{ mr: 'auto' }}
+                        />
+                        <TextField
+                            label="Daily Report Time"
+                            type="time"
+                            value={personalSettings.dailySalesReportTime}
+                            onChange={(e) => setPersonalSettings(p => ({ ...p, dailySalesReportTime: e.target.value }))}
+                            onBlur={handleDailyReportTimeBlur} // New handler
+                            disabled={!personalSettings.dailySalesReportEnabled || isNotificationSaving}
+                            InputLabelProps={{ shrink: true }}
+                            inputProps={{ step: 300 }} // 5 min step
+                            helperText="Saves on blur."
+                            sx={{ mt: { xs: 1, sm: 0 }, width: '100%', maxWidth: { xs: '100%', sm: '200px' } }}
+                            size="small"
+                        />
+                    </Box>
+                    {/* END NEW */}
+
                 </Box>
                  <Box sx={{ mt: 'auto', pt: 2, flexShrink: 0, height: '40px' }}></Box>
             </Paper>
         </Grid>
         
+        {/* --- SYNTAX FIX: Reverted to size={{...}} --- */}
         {user?.role === 'Super Admin' && (
           <Grid item size={{ xs: 12 }}>
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -563,49 +568,42 @@ const SettingsPage = () => {
                         }
                         sx={{ mr: 2, mb: { xs: 2, sm: 0 }, width: '100%' }}
                       />
-                      {/* --- MODIFIED TextField --- */}
                       <TextField
                         label="Scheduled Backup Time (Manila Time)"
-                        type="time" // Changed
+                        type="time"
                         fullWidth
-                        value={backupSettings.time} // Changed
-                        onChange={handleBackupTimeChange} // Changed
-                        onBlur={handleBackupTimeBlur} // Changed
+                        value={backupSettings.time}
+                        onChange={handleBackupTimeChange}
+                        onBlur={handleBackupTimeBlur}
                         name="timeInput"
                         disabled={!backupSettings.enabled || isBackupLoading || isBackupSaving}
-                        helperText="Saves automatically when you click away." // Changed
+                        helperText="Saves automatically when you click away."
                         InputLabelProps={{ shrink: true }}
-                        inputProps={{ step: 300 }} // Added
-                        // --- REMOVED: error, placeholder, InputProps ---
+                        inputProps={{ step: 300 }}
                         sx={{ 
                           mt: { xs: 2, sm: 2 }, 
                           width: '100%' , 
-                          minWidth: '220px' // Kept minWidth for alignment
+                          minWidth: '220px'
                         }} 
                       />
                     </Box>
                   )}
               </Box>
               <Box sx={{ mt: 'auto', pt: 2, flexShrink: 0, height: '40px' }}>
-                 {/* This box is empty but maintains the card's minimum height */}
               </Box>
             </Paper>
           </Grid>
         )}
-        {/* --- END MODIFICATION --- */}
 
-
-        {/* Manual Backup & Restore Section (unchanged) */}
+        {/* --- SYNTAX FIX: Reverted to size={{...}} --- */}
         {user?.role === 'Super Admin' && (
           <Grid item size={{ xs: 12 }}>
-             {/* ... unchanged GCS Backup/Restore JSX ... */}
              <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                  <SecurityIcon color="action" sx={{ mr: 1 }} />
                  <Typography variant="h6" component="h3">Manual Backup & Restore (GCS)</Typography>
               </Box>
               <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  {/* Backup to GCS Button Section */}
                   <Box>
                     <Typography variant="body2" gutterBottom>
                       Manually trigger a database backup to Google Cloud Storage. The backup file (.gz) can be used for restoring later.
@@ -620,17 +618,12 @@ const SettingsPage = () => {
                       {isBackingUpToGCS ? 'Backing Up...' : 'Backup Now to GCS'}
                     </Button>
                   </Box>
-
                   <Divider sx={{ my: 1 }} />
-
-                  {/* Restore Section */}
                   <Box>
                     <Typography variant="body2" color="error" gutterBottom sx={{ fontWeight: 'bold' }}>
                       <WarningAmberIcon sx={{ fontSize: '1rem', verticalAlign: 'middle', mr: 0.5 }} />
                       WARNING: Restoring will overwrite ALL current data. Choose a backup file from Google Cloud Storage.
                     </Typography>
-
-                    {/* Select Dropdown for GCS Backups */}
                     <FormControl fullWidth margin="normal" disabled={isLoadingBackups || isRestoring || isBackingUpToGCS}>
                         <InputLabel id="gcs-backup-select-label">Select Backup to Restore from GCS</InputLabel>
                         <Select
@@ -654,8 +647,6 @@ const SettingsPage = () => {
                         </Select>
                         {!isLoadingBackups && gcsBackups.length > 0 && <FormHelperText>Backups are listed newest first.</FormHelperText>}
                     </FormControl>
-
-                    {/* Restore Button */}
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
                       <Button
                         variant="contained" color="error"
@@ -673,10 +664,8 @@ const SettingsPage = () => {
         )}
       </Grid>
 
-      {/* Dialogs remain unchanged */}
-      {/* Update Profile Dialog */}
+      {/* Dialogs (all unchanged) */}
       <Dialog open={showUpdateModal} onClose={closeUpdateModal} fullWidth maxWidth="sm">
-        {/* ... unchanged ... */}
          <DialogTitle>{requiresVerification ? 'Enter Verification Code' : 'Update My Profile'}</DialogTitle>
         {requiresVerification ? (
           <Box component="form" onSubmit={handleVerificationSubmit}>
@@ -714,9 +703,7 @@ const SettingsPage = () => {
           </Box>
         )}
       </Dialog>
-      {/* Confirm Changes Dialog */}
       <Dialog open={showConfirmModal} onClose={() => setShowConfirmModal(false)}>
-        {/* ... unchanged ... */}
         <DialogTitle>Confirm Profile Update</DialogTitle>
         <DialogContent>
           <DialogContentText>Please review the changes:</DialogContentText>
@@ -736,9 +723,7 @@ const SettingsPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      {/* Success Dialog */}
       <Dialog open={showSuccessModal} onClose={handleCloseSuccessModal}>
-        {/* ... unchanged ... */}
         <DialogContent sx={{ textAlign: 'center', p: 4 }}>
           <CheckCircleOutlineIcon color="success" sx={{ fontSize: 60, mb: 2 }} />
           <Typography variant="h5" gutterBottom>Success!</Typography>
@@ -748,9 +733,7 @@ const SettingsPage = () => {
           <Button onClick={handleCloseSuccessModal} variant="contained">OK</Button>
         </DialogActions>
       </Dialog>
-      {/* Restore Confirmation Dialog */}
       <Dialog open={showRestoreConfirm} onClose={() => !isRestoring && setShowRestoreConfirm(false)} >
-        {/* ... unchanged ... */}
         <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
           <WarningAmberIcon color="error" sx={{ mr: 1 }} />
           Confirm Database Restore from GCS

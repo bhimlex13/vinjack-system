@@ -1,7 +1,6 @@
 // server/models/purchaseOrderModel.js
 const mongoose = require('mongoose');
 
-// --- (historySchema and purchaseOrderItemSchema remain the same) ---
 const historySchema = new mongoose.Schema({
   status: { type: String, required: true },
   notes: { type: String },
@@ -16,7 +15,6 @@ const purchaseOrderItemSchema = new mongoose.Schema({
   total: { type: Number, required: true },
   supplierUpdatedCost: { type: Number },
   isAvailable: { type: Boolean, default: true },
-  // --- ADDED: To track how many items have been received ---
   quantityReceived: { type: Number, default: 0 }
 }, { _id: false });
 
@@ -26,10 +24,31 @@ const purchaseOrderSchema = new mongoose.mongoose.Schema({
   supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
   items: [purchaseOrderItemSchema],
   totalAmount: { type: Number, required: true, min: 0 },
+  
+  // --- NEW ---
+  // This is the main toggle for the new feature
+  poType: {
+    type: String,
+    enum: ['Purchase', 'Consignment'],
+    default: 'Purchase',
+    required: true
+  },
+  // --- END NEW ---
+
   status: {
     type: String,
     required: true,
-    enum: ['Pending', 'Awaiting Approval', 'Approved', 'Partially Received', 'Completed', 'Cancelled'],
+    enum: [
+      'Pending', 
+      'Awaiting Approval', 
+      'Approved', 
+      'Partially Received', 
+      'Completed', 
+      'Cancelled',
+      // --- NEW STATUS ---
+      'Agreement Uploaded - Awaiting Delivery' // New status for the PDF flow
+      // --- END NEW STATUS ---
+    ],
     default: 'Pending'
   },
   orderDate: { type: Date, default: Date.now },
@@ -37,8 +56,20 @@ const purchaseOrderSchema = new mongoose.mongoose.Schema({
   supplierResponseToken: { type: String, unique: true, sparse: true },
   supplierNotes: { type: String, trim: true },
   history: [historySchema],
-  // --- ADDED: Field to store the path of the uploaded receipt ---
-  receiptImageUrl: { type: String }
+  
+  // --- UPDATED ---
+  // Renamed this field for clarity, to distinguish from the agreement
+  deliveryReceiptUrl: { type: String },
+  // --- END UPDATED ---
+
+  // --- NEW ---
+  // This will store the path to the signed PDF agreement
+  signedAgreementUrl: { 
+    type: String, 
+    trim: true 
+  }
+  // --- END NEW ---
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('PurchaseOrder', purchaseOrderSchema);

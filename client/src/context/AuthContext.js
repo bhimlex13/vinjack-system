@@ -1,6 +1,6 @@
 // client/src/context/AuthContext.js
 import React, { createContext, useReducer, useEffect, useCallback } from 'react';
-import api from '../api/axios'; // Ensure api is imported
+import api from '../api/axios';
 import { io } from 'socket.io-client';
 import { useWarning } from './WarningContext';
 import { toast } from 'react-toastify';
@@ -32,10 +32,7 @@ const authReducer = (state, action) => {
         ...state,
         user: action.payload,
         token: action.payload ? action.payload.token : null,
-        // --- THIS IS THE FIX ---
-        // Use optional chaining and default to [] if 'permissions' is missing
         permissions: action.payload?.permissions || [], 
-        // --- END FIX ---
       };
     case 'FINISH_INITIALIZING':
       return {
@@ -108,11 +105,25 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // --- LOGOUT DEFINITION ---
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/users/logout');
+      console.log("Server logout successful");
+    } catch (error) {
+      console.error("Server logout failed, proceeding with client-side logout:", error.response?.data?.message || error.message);
+    } finally {
+      localStorage.removeItem('user');
+      delete api.defaults.headers.common['Authorization'];
+      dispatch({ type: 'LOGOUT' });
+    }
+  }, []);
+
+  // --- FETCH INITIAL DATA DEFINITION ---
   const fetchInitialData = useCallback(async () => {
     if (state.token) {
       try {
         const perms = state.permissions;
-        // --- THIS CHECK IS NOW SAFE ---
         const canViewStock = perms.includes('SUPER_ADMIN_ALL') || perms.includes('canViewInventory');
         
         const dataPromises = [];
@@ -134,52 +145,30 @@ export const AuthProvider = ({ children }) => {
         console.error("Could not fetch initial data.", error);
         if (error.response && error.response.status === 401) {
             console.log("Token expired or invalid. Logging out.");
-            logout(); // <-- Make sure logout is defined before this
+            logout(); // Call logout
         }
       }
     }
-  }, [state.token, state.permissions]); 
+  }, [state.token, state.permissions, logout]); // Added logout to dependency array
 
-  // --- LOGOUT DEFINITION MOVED UP ---
-  // Moved logout definition before fetchInitialData to avoid race conditions on error
-  const logout = useCallback(async () => {
-    try {
-      // We call useCallback(async () => ...) and assign to a const
-      // but logout() is called from fetchInitialData, which is in a different scope.
-      // This needs to be available to fetchInitialData.
-      // We will define logout *before* fetchInitialData.
-      // ... Re-arranging logic ...
-      
-      // Let's assume the original order is fine, but the error handling needs to be robust.
-      // The error is in fetchInitialData, but logout() is defined later.
-      // We can wrap logout in useCallback and pass it to fetchInitialData's dependency array.
-      
-      await api.post('/users/logout');
-      console.log("Server logout successful");
-    } catch (error) {
-      console.error("Server logout failed, proceeding with client-side logout:", error.response?.data?.message || error.message);
-    } finally {
-      localStorage.removeItem('user');
-      delete api.defaults.headers.common['Authorization'];
-      dispatch({ type: 'LOGOUT' });
-    }
-  }, []); // <-- Added useCallback wrapper
-
-  // --- RE-ORDERED LOGIC ---
-  // 1. Define logout
-  // 2. Define fetchInitialData (which can now safely call logout)
-  // 3. Call fetchInitialData in useEffect
-
+  // --- USE EFFECT FOR FETCHING DATA ---
   useEffect(() => {
     if (!state.isInitializing && state.user) {
       fetchInitialData();
     }
   }, [state.isInitializing, state.user, fetchInitialData]);
 
+  // --- USE EFFECT FOR SOCKET.IO ---
   useEffect(() => {
     let socket;
     if (state.user && state.token) { 
-      socket = io(process.env.REACT_APP_API_URL, {
+      
+      // --- THIS IS THE FIX ---
+      // Use the explicit server URL.
+      // Make sure this matches your server's port (5000).
+      const SERVER_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      socket = io(SERVER_URL, {
+      // --- END OF FIX ---
           auth: { token: state.token } 
       });
 
@@ -229,7 +218,7 @@ export const AuthProvider = ({ children }) => {
             socket.disconnect();
         }
     };
-  }, [state.user, state.token, showWarning, logout]); // <-- Added logout dependency
+  }, [state.user, state.token, showWarning, logout]);
 
   const login = async (username, password) => {
     try {
@@ -258,7 +247,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const hasPermission = useCallback((permissionKey) => {
-    // --- THIS CHECK IS NOW SAFE ---
     if (state.permissions.includes('SUPER_ADMIN_ALL')) {
       return true;
     }

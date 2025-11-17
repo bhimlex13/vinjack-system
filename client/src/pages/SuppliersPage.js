@@ -13,12 +13,11 @@ import {
   Dialog,
   DialogTitle,
   Container,
-  Chip // <-- NEW
+  Chip 
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 
-// --- NEW: Status Chip Component ---
 const StatusChip = ({ status }) => {
   const statusConfig = {
     'Pending': { label: 'Pending', color: 'warning' },
@@ -28,7 +27,6 @@ const StatusChip = ({ status }) => {
   const config = statusConfig[status] || { label: status, color: 'default' };
   return <Chip label={config.label} color={config.color} size="small" sx={{ textTransform: 'capitalize' }} />;
 };
-// --- END NEW ---
 
 const SuppliersPage = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -78,7 +76,7 @@ const SuppliersPage = () => {
     }
   };
 
-  // --- UPDATED: Added 'status' and 'paymentTerms' columns ---
+  // --- UPDATED: Changed 'paymentTerms' to 'defaultPaymentTerms' ---
   const columns = [
     { field: 'name', headerName: 'Supplier Name', flex: 1 },
     {
@@ -88,8 +86,8 @@ const SuppliersPage = () => {
       renderCell: (params) => <StatusChip status={params.row.status} />
     },
     {
-      field: 'paymentTerms',
-      headerName: 'Payment Terms',
+      field: 'defaultPaymentTerms', // Use correct field name
+      headerName: 'Default Terms', // Updated header
       width: 150,
     },
     { 

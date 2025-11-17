@@ -14,10 +14,13 @@ export const getPurchaseOrderById = async (id) => {
 };
 
 // Create a new purchase order
+// --- UPDATED: This now sends the full purchaseOrderData object ---
 export const createPurchaseOrder = async (purchaseOrderData) => {
+  // purchaseOrderData now includes poType
   const response = await api.post('/purchase-orders', purchaseOrderData);
   return response.data;
 };
+// --- END UPDATED ---
 
 // Update a purchase order
 export const updatePurchaseOrder = async (id, purchaseOrderData) => {
@@ -25,16 +28,12 @@ export const updatePurchaseOrder = async (id, purchaseOrderData) => {
   return response.data;
 };
 
-// --- MODIFIED: This function is rewritten to send JSON ---
-// It now accepts the items and the Base64 receipt string.
-export const receivePurchaseOrder = async (id, items, receiptImageString) => {
-  // Create the JSON payload
+// --- MODIFIED: Renamed to deliveryReceiptUrl for clarity ---
+export const receivePurchaseOrder = async (id, items, deliveryReceiptUrl) => {
   const payload = {
-    items: items, // The array of items
-    receiptImageString: receiptImageString // The Base64 string (or null)
+    items: items,
+    deliveryReceiptUrl: deliveryReceiptUrl // The Base64 string (or null)
   };
-
-  // Send as standard application/json
   const response = await api.post(`/purchase-orders/${id}/receive`, payload);
   return response.data;
 };
@@ -51,9 +50,6 @@ export const getSuppliers = async () => {
     const response = await api.get('/suppliers');
     return response.data;
 };
-
-
-// --- NEW FUNCTIONS FOR SUPPLIER REVIEW FLOW ---
 
 // Fetch a PO using the public supplier token
 export const getPurchaseOrderByToken = async (token) => {
@@ -72,3 +68,11 @@ export const approveSupplierChanges = async (id) => {
   const response = await api.post(`/purchase-orders/${id}/approve`);
   return response.data;
 };
+
+// --- NEW: Function to upload the signed agreement ---
+export const uploadSignedAgreement = async (id, signedAgreementUrl) => {
+  const payload = { signedAgreementUrl }; // URL or Base64 string
+  const response = await api.post(`/purchase-orders/${id}/upload-agreement`, payload);
+  return response.data;
+};
+// --- END NEW ---

@@ -22,7 +22,9 @@ import SuppliersPage from './pages/SuppliersPage';
 import ReportsPage from './pages/ReportsPage';
 import AuditLogPage from './pages/AuditLogPage';
 import SettingsPage from './pages/SettingsPage';
+// --- UPDATED: Corrected file path ---
 import UserManagementPage from './pages/UserManagementPage';
+// --- END UPDATED ---
 import DataManagementPage from './pages/DataManagementPage';
 import TransactionsPage from './pages/TransactionsPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
@@ -32,8 +34,11 @@ import DeliveriesPage from './pages/DeliveriesPage';
 import CustomersPage from './pages/CustomersPage';
 import ReturnsPage from './pages/ReturnsPage';
 import SupplierPOReviewPage from './pages/SupplierPOReviewPage';
-// --- 1. NEW: Import the new page ---
 import SupplierReturnsPage from './pages/SupplierReturnsPage';
+
+// --- NEW: Import the Consignment Payouts page ---
+import ConsignmentPayoutsPage from './pages/ConsignmentPayoutsPage';
+// --- END NEW ---
 
 
 const InnerApp = () => {
@@ -96,9 +101,9 @@ const InnerApp = () => {
             <Route path="/data-management" element={<DataManagementPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/returns" element={<ReturnsPage />} />
-            
-            {/* --- 2. NEW: Add the route for supplier returns --- */}
             <Route path="/supplier-returns" element={<SupplierReturnsPage />} />
+            <Route path="/consignment-payouts" element={<ConsignmentPayoutsPage />} />
+
 
             <Route path="/" element={<Navigate to="/dashboard" />} />
           </Route>

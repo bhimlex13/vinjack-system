@@ -30,8 +30,11 @@ const createSupplierReturn = async (req, res) => {
       if (item.quantity <= 0) {
         throw new Error('Return quantity must be a positive number.');
       }
-
-      const product = await Product.findById(item.product).session(session);
+      
+      // --- UPDATED: Also select consignedStock ---
+      const product = await Product.findById(item.product).select('name quantity consignedStock').session(session);
+      // --- END UPDATED ---
+      
       if (!product) {
         throw new Error(`Product with ID ${item.product} not found.`);
       }
@@ -40,26 +43,35 @@ const createSupplierReturn = async (req, res) => {
       }
 
       const stockBefore = product.quantity;
-      product.quantity -= item.quantity; // Decrease stock
+      product.quantity -= item.quantity; // Decrease total stock
       
-      // Save product and log movement within the transaction
+      // --- NEW: Check if the returned item was from consignment stock ---
+      if (item.wasConsigned) {
+        const consignedStock = Number(product.consignedStock) || 0;
+        if (consignedStock < item.quantity) {
+          throw new Error(`Cannot return ${item.quantity} consigned units of ${product.name}. Only ${consignedStock} in consigned stock.`);
+        }
+        product.consignedStock = consignedStock - item.quantity;
+      }
+      // --- END NEW ---
+      
       await product.save({ session });
       
       await logMovement({
         product: product._id,
-        type: 'SUPPLIER_RETURN',
+        // --- NEW: Differentiate movement type ---
+        type: item.wasConsigned ? 'RETURN (CONSIGN)' : 'SUPPLIER_RETURN',
+        // --- END NEW ---
         quantityChange: -item.quantity,
         stockBefore,
         notes: `Reason: ${item.reason}`,
         recordedBy: req.user.id
       }, { session });
-
-      // We'll check stock and notify *after* the transaction commits
     }
 
     const newReturn = new SupplierReturn({
       supplier,
-      productsReturned,
+      productsReturned, // This now includes the 'wasConsigned' flag from req.body
       notes,
       returnDate: returnDate || new Date(),
       recordedBy: req.user.id,
@@ -67,10 +79,8 @@ const createSupplierReturn = async (req, res) => {
 
     const savedReturn = await newReturn.save({ session });
 
-    await session.commitTransaction(); // Commit the transaction
+    await session.commitTransaction();
 
-    // --- Notify after commit ---
-    // Go back through the products, fetch them (outside session), and notify
     try {
         for (const item of productsReturned) {
             const product = await Product.findById(item.product);
@@ -82,7 +92,6 @@ const createSupplierReturn = async (req, res) => {
         console.error("Failed to send stock notifications after supplier return:", notificationError);
     }
     
-    // --- Log action after commit ---
     logAction(
       req.user,
       'SUPPLIER_RETURN',
@@ -90,7 +99,6 @@ const createSupplierReturn = async (req, res) => {
       { entityType: 'SupplierReturn', entityId: savedReturn._id }
     );
     
-    // Populate for response
     const populatedReturn = await SupplierReturn.findById(savedReturn._id)
                                     .populate('supplier', 'name')
                                     .populate('recordedBy', 'fullName')

@@ -245,45 +245,73 @@ const getDashboardSummary = async (req, res) => {
 };
 
 
-// --- getSalesReport --- (Populate costOfGoodsSold instead of product cost)
+// --- UPDATED: getSalesReport function ---
 const getSalesReport = async (req, res) => {
   try {
-    const { startDate, endDate, customerId, userId } = req.query;
+    const { 
+      startDate, endDate, customerId, userId, 
+      productId, supplierId 
+    } = req.query;
+    
     const filter = {};
+
+    // 1. Date Filter
     if (startDate && endDate) {
-        // Ensure correct date range filtering including the end date
         const startOfDay = new Date(startDate);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(endDate);
         endOfDay.setHours(23, 59, 59, 999);
         filter.createdAt = { $gte: startOfDay, $lte: endOfDay };
     }
-    if (customerId) filter.customer = customerId;
-    if (userId) filter.recordedBy = userId;
+
+    // 2. Top-level Filters
+    if (customerId && mongoose.Types.ObjectId.isValid(customerId)) {
+      filter.customer = new mongoose.Types.ObjectId(customerId);
+    }
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      filter.recordedBy = new mongoose.Types.ObjectId(userId);
+    }
+
+    // 3. Product Filter
+    if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+      filter['items.product'] = new mongoose.Types.ObjectId(productId);
+    } 
+    
+    // 4. Supplier Filter (Requires pre-query)
+    else if (supplierId && mongoose.Types.ObjectId.isValid(supplierId)) {
+      // Find all products associated with this supplier
+      const productsFromSupplier = await Product.find({ 
+        'supplierCosts.supplier': new mongoose.Types.ObjectId(supplierId) 
+      }).select('_id');
+      
+      const productIds = productsFromSupplier.map(p => p._id);
+      
+      if (productIds.length > 0) {
+        // Find sales that contain any of these product IDs
+        filter['items.product'] = { $in: productIds };
+      } else {
+        // Supplier has no products, so no sales will match
+        return res.json([]);
+      }
+    }
+
+    // --- End of new filter logic ---
 
     const sales = await Sale.find(filter)
       .sort({ createdAt: -1 })
       .populate('recordedBy', 'fullName')
-      // --- Populate product name, but cost comes from costOfGoodsSold ---
-      .populate('items.product', 'name itemCode') // Removed cost population here
+      .populate('items.product', 'name itemCode') // We need product name
       .populate('services.service', 'name')
       .populate('customer', 'name');
 
-    // --- Optionally format the response if needed, but the data is there ---
-    // const formattedSales = sales.map(sale => ({
-    //   ...sale.toObject(), // Convert mongoose doc to plain object
-    //   items: sale.items.map(item => ({
-    //     ...item.toObject(),
-    //     cost: item.costOfGoodsSold // Make it explicit if frontend expects 'cost'
-    //   }))
-    // }));
-
-    res.json(sales); // Send sales with costOfGoodsSold included in items
+    res.json(sales);
   } catch (error) {
     console.error("Error fetching sales report:", error);
     res.status(500).json({ message: 'Server Error fetching sales report.', error: error.message });
   }
 };
+// --- END OF UPDATE ---
+
 
 // --- getLowStockProducts --- (Unchanged)
 const getLowStockProducts = async (req, res) => {

@@ -23,8 +23,16 @@ const supplierReturnSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true,
-        enum: ['Defective', 'Wrong Item', 'Overstock', 'Other'], // Example reasons
+        enum: ['Defective', 'Wrong Item', 'Overstock', 'Other'], // This covers "items w/ defect"
       },
+      // --- NEW ---
+      // We need to know if the item being returned was from consignment stock
+      wasConsigned: {
+        type: Boolean,
+        default: false,
+        required: true
+      }
+      // --- END NEW ---
     }
   ],
   returnDate: {
