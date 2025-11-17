@@ -6,8 +6,9 @@ const crypto = require('crypto');
 const { sendVerificationEmail } = require('../utils/emailService');
 const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
-// --- NEW: Import the RolePermission model ---
 const { RolePermission } = require('../models/permissionModel');
+// --- NEW: Import date-fns for cooldown logic ---
+const { differenceInMinutes } = require('date-fns');
 
 // @desc    Create a new user (by a Super Admin)
 // @route   POST /api/users
@@ -62,50 +63,104 @@ const createUserByAdmin = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username });
-    if (user) {
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (isMatch) {
-        if (user.status !== 'active') {
-          logAction(user, 'LOGIN_FAILED', `Login attempt failed: Account inactive for user '${username}'.`);
-          return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
-        }
-        logAction(user, 'LOGIN', `User '${username}' logged in successfully.`, { entityType: 'User', entityId: user._id });
+    
+    // --- 1. Re-Check for Empty Fields (Server-Side) ---
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Please provide both username and password.' });
+    }
 
-        // --- NEW: Fetch permissions based on role ---
-        let permissions = [];
-        if (user.role === 'Super Admin') {
-          // Super Admin gets all permissions. We use a special key.
-          permissions = ['SUPER_ADMIN_ALL'];
-        } else if (user.role === 'Admin' || user.role === 'Salesperson') {
-          // Fetch the specific permissions for Admin or Salesperson
-          const rolePerms = await RolePermission.findOne({ role: user.role }).lean();
-          if (rolePerms) {
-            permissions = rolePerms.allowedPermissions;
-          }
-          // If no permissions are set, they get an empty array (no access)
-        }
-        // --- END NEW ---
+    // --- 2. Find User (by username OR email) ---
+    const isEmail = username.includes('@');
+    const query = isEmail ? { email: username.toLowerCase() } : { username: username };
+    const user = await User.findOne(query);
 
-        res.json({
-          _id: user._id,
-          fullName: user.fullName,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          token: generateToken(user._id),
-          mustChangePassword: user.mustChangePassword || false,
-          dashboardPreferences: user.dashboardPreferences,
-          permissions: permissions // <-- ADDED: Send permissions to the client
-        });
-      } else {
-        logAction(user, 'LOGIN_FAILED', `Login attempt failed: Invalid password for user '${username}'.`, { entityType: 'User', entityId: user._id });
-        res.status(401).json({ message: 'Invalid username or password.' });
-      }
-    } else {
+    // --- 3. Handle User Not Found ---
+    // Send vague error. Do not reveal if user exists.
+    if (!user) {
       logAction(null, 'LOGIN_FAILED', `Login attempt failed: User '${username}' not found.`);
+      return res.status(401).json({ message: 'Invalid username or password.' });
+    }
+
+    // --- 4. Implement Cooldown Logic ---
+    const LOCKOUT_DURATION_MINUTES = 15;
+    const MAX_FAILED_ATTEMPTS = 3;
+
+    if (user.failed_attempts >= MAX_FAILED_ATTEMPTS) {
+      if (user.last_failed_attempt) {
+        const minutesSinceLastAttempt = differenceInMinutes(new Date(), new Date(user.last_failed_attempt));
+        
+        if (minutesSinceLastAttempt < LOCKOUT_DURATION_MINUTES) {
+          logAction(user, 'LOGIN_LOCKED', `Login attempt failed: Account locked for user '${username}'.`);
+          const minutesRemaining = LOCKOUT_DURATION_MINUTES - minutesSinceLastAttempt;
+          return res.status(403).json({ message: `Your account is temporarily locked. Please try again in ${minutesRemaining} ${minutesRemaining > 1 ? 'minutes' : 'minute'}.` });
+        } else {
+          // If 15+ minutes have passed, reset the counter and let them try again.
+          user.failed_attempts = 0;
+          user.last_failed_attempt = null;
+          await user.save(); // Save the reset state before proceeding
+        }
+      }
+    }
+
+    // --- 5. Check Account Status ---
+    if (user.status !== 'active') {
+      logAction(user, 'LOGIN_FAILED', `Login attempt failed: Account inactive for user '${username}'.`);
+      return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
+    }
+
+    // --- 6. Hash & Compare Password ---
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (isMatch) {
+      // --- 7. On Successful Login ---
+      // Reset failed attempts
+      user.failed_attempts = 0;
+      user.last_failed_attempt = null;
+      await user.save();
+
+      logAction(user, 'LOGIN', `User '${username}' logged in successfully.`, { entityType: 'User', entityId: user._id });
+
+      // Fetch permissions based on role
+      let permissions = [];
+      if (user.role === 'Super Admin') {
+        permissions = ['SUPER_ADMIN_ALL'];
+      } else if (user.role === 'Admin' || user.role === 'Salesperson') {
+        const rolePerms = await RolePermission.findOne({ role: user.role }).lean();
+        if (rolePerms) {
+          permissions = rolePerms.allowedPermissions;
+        }
+      }
+
+      res.json({
+        _id: user._id,
+        fullName: user.fullName,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        token: generateToken(user._id),
+        mustChangePassword: user.mustChangePassword || false,
+        dashboardPreferences: user.dashboardPreferences,
+        permissions: permissions
+      });
+
+    } else {
+      // --- 8. On Failed Password ---
+      // Track failure
+      user.failed_attempts += 1;
+      user.last_failed_attempt = new Date();
+      await user.save();
+
+      logAction(user, 'LOGIN_FAILED', `Login attempt failed: Invalid password for user '${username}'.`, { entityType: 'User', entityId: user._id });
+      
+      if (user.failed_attempts >= MAX_FAILED_ATTEMPTS) {
+        // If this was the 3rd failed attempt, send the lockout message *now*
+        return res.status(403).json({ message: `Your account is temporarily locked. Please try again in ${LOCKOUT_DURATION_MINUTES} minutes.` });
+      }
+
+      // Send Vague Error for attempts 1 and 2
       res.status(401).json({ message: 'Invalid username or password.' });
     }
+
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -329,7 +384,7 @@ const updateUser = async (req, res) => {
     const user = await User.findById(req.params.id);
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(4404).json({ message: 'User not found' });
     }
 
     if (user.role === 'Super Admin' && user._id.toString() !== req.user.id) {
@@ -382,7 +437,7 @@ const deleteUser = async (req, res) => {
       logAction(req.user, 'DELETE_USER', `Deleted user: '${deletedUserName}'`, { entityType: 'User', entityId: deletedUserId });
       res.json({ message: 'User removed' });
     } else {
-      res.status(4404).json({ message: 'User not found' });
+      res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
     console.error("Error in deleteUser:", error);

@@ -1,23 +1,26 @@
 // client/src/pages/SuppliersPage.js
-import React, { useState, useEffect } from 'react';
-import api from '../api/axios';
-import SupplierForm from '../components/SupplierForm';
+import React, { useState, useEffect, useContext } from 'react';
+import { getSuppliers, deleteSupplier } from '../api/supplierApi'; // Use new API file
+import SupplierEditModal from '../components/SupplierEditModal'; // Use new Modal
+import ConfirmationContext from '../context/ConfirmationContext'; // For delete confirm
 
 // MUI Imports
 import {
-  Box,
-  Button,
-  Typography,
-  Paper,
-  Stack,
-  Dialog,
-  DialogTitle,
-  Container,
-  Chip 
+  Box, Button, Typography, Paper, Stack, Container, Chip,
+  // --- NEW: Added Imports ---
+  IconButton,
+  Tooltip
+  // --- END NEW ---
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
+// --- NEW: Added Imports ---
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+// --- END NEW ---
+import { toast } from 'react-toastify';
 
+// StatusChip component (no changes)
 const StatusChip = ({ status }) => {
   const statusConfig = {
     'Pending': { label: 'Pending', color: 'warning' },
@@ -33,6 +36,7 @@ const SuppliersPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
+  const { confirm } = useContext(ConfirmationContext); // Use confirmation context
 
   useEffect(() => {
     fetchSuppliers();
@@ -41,10 +45,11 @@ const SuppliersPage = () => {
   const fetchSuppliers = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get('/suppliers');
-      setSuppliers(response.data);
+      const response = await getSuppliers(); // Use new API
+      setSuppliers(response);
     } catch (err) {
       console.error("Failed to fetch suppliers", err);
+      toast.error(err.response?.data?.message || "Failed to fetch suppliers");
     } finally {
       setIsLoading(false);
     }
@@ -52,6 +57,7 @@ const SuppliersPage = () => {
 
   const handleFormSubmit = () => {
     fetchSuppliers();
+    // No need to close modal here, modal can close itself on success
   };
 
   const openSupplierModalForAdd = () => {
@@ -64,19 +70,20 @@ const SuppliersPage = () => {
     setIsSupplierModalOpen(true);
   };
 
-  const handleDelete = async (supplierId) => {
-    // We should use the confirmation context here, but keeping old syntax for now
-    if (window.confirm('Are you sure you want to delete this supplier?')) {
-      try {
-        await api.delete(`/suppliers/${supplierId}`);
-        fetchSuppliers();
-      } catch (err) {
-        console.error('Failed to delete supplier', err);
+  const handleDelete = async (supplier) => {
+    // Use confirmation context
+    try {
+      await confirm(`Delete ${supplier.name}? This action cannot be undone.`);
+      await deleteSupplier(supplier._id); // Use new API
+      toast.success(`Supplier '${supplier.name}' deleted.`);
+      fetchSuppliers();
+    } catch (err) {
+      if (err) { // Only show error if it's not a "cancel"
+        toast.error(err.response?.data?.message || 'Failed to delete supplier.');
       }
     }
   };
 
-  // --- UPDATED: Changed 'paymentTerms' to 'defaultPaymentTerms' ---
   const columns = [
     { field: 'name', headerName: 'Supplier Name', flex: 1 },
     {
@@ -86,8 +93,8 @@ const SuppliersPage = () => {
       renderCell: (params) => <StatusChip status={params.row.status} />
     },
     {
-      field: 'defaultPaymentTerms', // Use correct field name
-      headerName: 'Default Terms', // Updated header
+      field: 'defaultPaymentTerms',
+      headerName: 'Default Terms',
       width: 150,
     },
     { 
@@ -105,33 +112,38 @@ const SuppliersPage = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 200,
+      width: 120, // --- MODIFIED: Reduced width ---
       sortable: false,
+      align: 'center',
+      headerAlign: 'center',
+      // --- MODIFIED: Replaced Buttons with IconButtons ---
       renderCell: (params) => (
-        <Stack direction="row" spacing={1}>
-          <Button variant="outlined" size="small" onClick={() => openSupplierModalForEdit(params.row)}>Edit</Button>
-          <Button variant="outlined" size="small" color="error" onClick={() => handleDelete(params.row._id)}>Delete</Button>
+        <Stack direction="row" spacing={0.5}>
+          <Tooltip title="Edit Info / Products">
+            <IconButton size="small" onClick={() => openSupplierModalForEdit(params.row)}>
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Supplier">
+            <IconButton size="small" color="error" onClick={() => handleDelete(params.row)}>
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
         </Stack>
       )
+      // --- END MODIFICATION ---
     }
   ];
-  // --- END UPDATE ---
 
   return (
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
-      <Dialog 
+      {/* --- Renders the new "smart" modal --- */}
+      <SupplierEditModal
         open={isSupplierModalOpen} 
         onClose={() => setIsSupplierModalOpen(false)} 
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</DialogTitle>
-        <SupplierForm
-          onFormSubmit={handleFormSubmit}
-          supplierToEdit={editingSupplier}
-          onClose={() => setIsSupplierModalOpen(false)}
-        />
-      </Dialog>
+        onFormSubmit={handleFormSubmit}
+        supplierToEdit={editingSupplier}
+      />
 
       <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>

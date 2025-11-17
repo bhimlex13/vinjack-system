@@ -3,15 +3,14 @@ const Sale = require('../models/saleModel');
 const Product = require('../models/productModel');
 const Service = require('../models/serviceModel');
 const Customer = require('../models/customerModel');
-// --- NEW: Import the model to track money owed ---
 const ConsignmentPayable = require('../models/consignmentPayableModel');
-// --- END NEW ---
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
 const { checkStockLevelAndNotify } = require('../utils/stockManager');
-const mongoose = require('mongoose'); // --- NEW: Import for session ---
+const mongoose = require('mongoose');
 
 const createSale = async (req, res) => {
+  // --- Get the io object from the app ---
   const io = req.app.get('socketio');
   const { items, services, customerId, motorcycleId } = req.body;
 
@@ -19,11 +18,9 @@ const createSale = async (req, res) => {
     return res.status(400).json({ message: 'Sale must include at least one item or service.' });
   }
 
-  // --- NEW: Start a session for transaction ---
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
-    // --- END NEW ---
 
     if (customerId) {
         const customerExists = await Customer.findById(customerId).session(session);
@@ -37,13 +34,10 @@ const createSale = async (req, res) => {
     const processedServices = [];
     const movementsToLog = [];
     const productsToUpdate = [];
-    // --- NEW: Array to hold payables to be created ---
     const payablesToCreate = [];
-    // --- END NEW ---
 
     if (items && items.length > 0) {
         for (const item of items) {
-          // --- UPDATED: Populate supplier info to find the consignment supplier ---
           const product = await Product.findById(item.product)
             .select('name quantity price defaultCost maxStock stockStatus consignedStock supplierCosts')
             .populate({
@@ -52,7 +46,6 @@ const createSale = async (req, res) => {
               select: 'defaultPaymentTerms'
             })
             .session(session);
-          // --- END UPDATED ---
 
           if (!product) throw new Error(`Product with ID ${item.product} not found.`);
           if (product.quantity < item.quantity) throw new Error(`Insufficient stock for ${product.name}. Only ${product.quantity} left.`);
@@ -63,24 +56,20 @@ const createSale = async (req, res) => {
           let itemCostOfGoodsSold = product.defaultCost || 0;
           const salePrice = product.price;
 
-          // --- NEW: Consignment Logic ---
-          // Check how much of this sale can be fulfilled by consigned stock
           const quantityToTakeFromConsigned = Math.min(product.consignedStock || 0, item.quantity);
           
           if (quantityToTakeFromConsigned > 0) {
             product.consignedStock -= quantityToTakeFromConsigned;
             
-            // Find the supplier to pay
             const consignSupplierInfo = product.supplierCosts.find(sc => 
               sc.supplier && sc.supplier.defaultPaymentTerms === 'Consignment'
             );
             
             if (consignSupplierInfo) {
-              itemCostOfGoodsSold = consignSupplierInfo.cost; // Use consignment cost as CoGS
+              itemCostOfGoodsSold = consignSupplierInfo.cost;
               
-              // Create a payable record
               payablesToCreate.push({
-                sale: null, // Will be set after sale is created
+                sale: null,
                 product: product._id,
                 supplier: consignSupplierInfo.supplier._id,
                 quantitySold: quantityToTakeFromConsigned,
@@ -89,14 +78,12 @@ const createSale = async (req, res) => {
                 recordedBy: req.user.id
               });
             } else {
-              // This case *shouldn't* happen if stock was received correctly
-              // But as a fallback, use default cost
               console.warn(`Product ${product.name} has consigned stock but no consignment supplier info found.`);
               itemCostOfGoodsSold = product.defaultCost || 0;
             }
           }
-          // --- END NEW ---
           
+          // --- Add product to list to be updated ---
           productsToUpdate.push(product);
 
           movementsToLog.push({
@@ -110,7 +97,7 @@ const createSale = async (req, res) => {
             product: item.product,
             quantity: item.quantity,
             priceAtTime: salePrice,
-            costOfGoodsSold: itemCostOfGoodsSold // Use the determined CoGS
+            costOfGoodsSold: itemCostOfGoodsSold
           });
         }
     }
@@ -124,12 +111,10 @@ const createSale = async (req, res) => {
       }
     }
 
-    // --- UPDATED: Save products within the session ---
+    // --- Save all updated products in the transaction ---
     for (const prod of productsToUpdate) {
         await prod.save({ session });
-        // We will notify *after* the transaction commits
     }
-    // --- END UPDATED ---
 
     const sale = new Sale({
       items: processedItems,
@@ -139,42 +124,39 @@ const createSale = async (req, res) => {
       customer: customerId || undefined,
       motorcycle: motorcycleId || undefined,
     });
-    // --- UPDATED: Save sale within the session ---
+    
     const createdSale = await sale.save({ session });
-    // --- END UPDATED ---
 
-    // --- UPDATED: Log movements within the session ---
     for (const movement of movementsToLog) {
         movement.referenceId = createdSale._id;
         await logMovement(movement, { session });
     }
-    // --- END UPDATED ---
     
-    // --- NEW: Create consignment payable records within the session ---
     for (const payable of payablesToCreate) {
       payable.sale = createdSale._id;
-      // We must create this as a new document, not using session.create
       const newPayable = new ConsignmentPayable(payable);
       await newPayable.save({ session });
     }
-    // --- END NEW ---
 
-    // --- NEW: Commit transaction ---
+    // --- Commit all database changes ---
     await session.commitTransaction();
     session.endSession();
-    // --- END NEW ---
 
-    // --- NEW: Notify stock levels *after* transaction commits ---
+    // --- THIS IS THE FIX ---
+    // After the transaction is successful, send real-time notifications
     try {
       for (const prod of productsToUpdate) {
-          // Re-fetch product outside session to be safe
+          // Re-fetch product to get the most current state
           const freshProduct = await Product.findById(prod._id);
-          if (freshProduct) await checkStockLevelAndNotify(freshProduct, io);
+          if (freshProduct) {
+            // Pass the `io` object to the notification utility
+            await checkStockLevelAndNotify(freshProduct, io);
+          }
       }
     } catch (notifyError) {
       console.error("Failed to send stock notifications after sale:", notifyError);
     }
-    // --- END NEW ---
+    // --- END OF FIX ---
 
     logAction(req.user, 'PROCESS_SALE', `Processed sale #${createdSale._id} with a total of ₱${calculatedTotal.toFixed(2)}.`, { entityType: 'Sale', entityId: createdSale._id });
 
@@ -188,10 +170,8 @@ const createSale = async (req, res) => {
     res.status(201).json(populatedSale);
 
   } catch (error) {
-    // --- NEW: Abort transaction on error ---
     await session.abortTransaction();
     session.endSession();
-    // --- END NEW ---
     console.error("Error creating sale:", error);
     res.status(400).json({ message: error.message || "An unexpected error occurred while processing the sale." });
   }
@@ -222,7 +202,7 @@ const getSaleById = async (req, res) => {
             .populate('customer', 'name')
             .populate('motorcycle', 'make model plateNumber');
 
-        if (!sale) return res.status(440).json({ message: 'Sale not found.' });
+        if (!sale) return res.status(404).json({ message: 'Sale not found.' });
         res.json(sale);
     } catch (error) {
         console.error("Error fetching sale by ID:", error);
@@ -252,7 +232,6 @@ const searchSales = async (req, res) => {
   }
 };
 
-// --- saveReceiptString remains unchanged, it's fine as-is ---
 const saveReceiptString = async (req, res) => {
   try {
     const { receiptImageString } = req.body; 
@@ -297,8 +276,6 @@ const saveReceiptString = async (req, res) => {
     res.status(500).json({ message: 'Server error during receipt save.', error: error.message });
   }
 };
-// --- END ---
-
 
 module.exports = {
   createSale,

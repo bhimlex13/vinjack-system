@@ -9,15 +9,11 @@ const productSchema = new mongoose.Schema({
   price: { type: Number, required: true, min: 0 }, // Selling price
   quantity: { type: Number, required: true, default: 0, min: 0 }, // This is the TOTAL physical stock
   
-  // --- NEW ---
-  // This tracks the portion of the total 'quantity' that is on consignment.
-  // The stock you own = (quantity - consignedStock)
   consignedStock: { 
     type: Number, 
     default: 0, 
     min: 0 
   },
-  // --- END NEW ---
 
   maxStock: {
     type: Number,
@@ -41,6 +37,9 @@ const productSchema = new mongoose.Schema({
     _id: false,
     supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
     cost: { type: Number, required: true, min: 0 },
+    // --- THIS IS THE NEW FIELD ---
+    note: { type: String, default: '' } 
+    // --- END NEW FIELD ---
   }],
   defaultCost: { type: Number, min: 0, default: 0 },
 

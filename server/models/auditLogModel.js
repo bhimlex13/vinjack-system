@@ -12,8 +12,8 @@ const auditLogSchema = new mongoose.Schema({
     required: true,
     enum: [
       // Product Actions
-      'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT', // Note: DELETE_PRODUCT might become unused
-      'ARCHIVE_PRODUCT', // Added previously
+      'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT',
+      'ARCHIVE_PRODUCT',
       'SYNC_STOCK_STATUS',
 
       // Sale & Return Actions
@@ -22,7 +22,7 @@ const auditLogSchema = new mongoose.Schema({
 
       // Supplier & PO Actions
       'CREATE_SUPPLIER', 'UPDATE_SUPPLIER', 'DELETE_SUPPLIER',
-      'RECORD_DELIVERY', // Maybe rename? This is Direct Delivery
+      'RECORD_DELIVERY',
       'CREATE_PO', 'UPDATE_PO', 'CANCEL_PO', 'APPROVE_PO', 'RECEIVE_PO_STOCK',
 
       // Customer & Motorcycle Actions
@@ -35,24 +35,25 @@ const auditLogSchema = new mongoose.Schema({
       // User & Auth Actions
       'CREATE_USER', 'UPDATE_USER', 'DELETE_USER',
       'LOGIN', 'LOGOUT', 'LOGIN_FAILED',
-      'USER_PASSWORD_CHANGE', // User changes own password
-      'ADMIN_RESET_PASSWORD', // Admin resets user password
-      'FORCE_PASSWORD_CHANGE', // For profile updates needing verification
-      'REJECT_PROFILE_UPDATE', // Owner rejects pending update
+      'LOGIN_LOCKED', // <--- *** ADDED THIS LINE TO FIX THE ERROR ***
+      'USER_PASSWORD_CHANGE',
+      'ADMIN_RESET_PASSWORD',
+      'FORCE_PASSWORD_CHANGE',
+      'REJECT_PROFILE_UPDATE',
 
       // Category & Brand Actions
       'CREATE_CATEGORY', 'UPDATE_CATEGORY', 'DELETE_CATEGORY',
       'CREATE_BRAND', 'UPDATE_BRAND', 'DELETE_BRAND',
 
       // System & Settings Actions
-      'UPDATE_APP_SETTINGS', // Includes backup schedule, global settings
-      'DATA_CLEANUP', // If you have a cleanup function
+      'UPDATE_APP_SETTINGS',
+      'DATA_CLEANUP',
 
       // Backup & Restore Actions
-      'DATA_EXPORT', // Manual JSON download (if still used)
-      'DATA_RESTORE_INITIATED', // Logged before restore starts
-      'DATA_RESTORE_FAILED', // Logged if restore fails
-      'DATA_BACKUP_GCS_MANUAL', // *** ADDED THIS LINE ***
+      'DATA_EXPORT',
+      'DATA_RESTORE_INITIATED',
+      'DATA_RESTORE_FAILED',
+      'DATA_BACKUP_GCS_MANUAL',
       'STOCK_ADJUSTMENT',
 
     ]
