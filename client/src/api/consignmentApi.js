@@ -29,3 +29,19 @@ export const markPayableAsPaid = async (payableId) => {
     throw error.response?.data || new Error('Failed to mark payable as paid');
   }
 };
+
+// --- NEW FUNCTION ---
+/**
+ * Fetches all consignment payables with a status of 'Paid'.
+ * @returns {Promise<Array>} A promise that resolves to an array of paid payable objects.
+ */
+export const getPayoutHistory = async () => {
+  try {
+    const response = await api.get('/consignment/history');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching consignment payout history:', error);
+    throw error.response?.data || new Error('Failed to fetch payout history');
+  }
+};
+// --- END NEW FUNCTION ---
