@@ -9,7 +9,7 @@ import {
   Typography, CircularProgress, Alert
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+// Removed: import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
   const [file, setFile] = useState(null);
@@ -21,12 +21,12 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
     if (selectedFile) {
-      // --- UPDATED: Allow PDF ---
-      if (!selectedFile.type.startsWith('image/') && selectedFile.type !== 'application/pdf') {
-        setError('Invalid file type. Please upload an image (PNG, JPG) or PDF.');
+      // --- MODIFIED: Allow ONLY Images (JPG/PNG) ---
+      if (!selectedFile.type.startsWith('image/')) {
+        setError('Invalid file type. Please upload a scanned image (JPG or PNG).');
         return;
       }
-      // --- END UPDATED ---
+      // --- END MODIFIED ---
 
       if (selectedFile.size > 5 * 1024 * 1024) { // 5MB Limit
         setError('File is too large. Please upload a file under 5MB.');
@@ -36,7 +36,7 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
       setError('');
       setFile(selectedFile);
       
-      // Create preview URL (works for images and PDF blobs)
+      // Create preview URL (works for images blobs)
       const previewUrl = URL.createObjectURL(selectedFile);
       setFilePreview(previewUrl);
 
@@ -97,7 +97,7 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
-      <DialogTitle>Upload Signed Agreement</DialogTitle>
+      <DialogTitle>Upload Signed Agreement (Image Only)</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         
@@ -108,11 +108,11 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
             startIcon={<FileUploadIcon />}
             disabled={isLoading}
           >
-            {file ? 'Change File' : 'Select File (Image or PDF)'}
+            {file ? 'Change File' : 'Select Scanned Image'}
             <input
               type="file"
               hidden
-              accept="image/*,application/pdf" // --- UPDATED ---
+              accept="image/*" // --- MODIFIED: Only accept images ---
               onChange={handleFileChange}
             />
           </Button>
@@ -127,22 +127,13 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
           <Box sx={{ mt: 2, textAlign: 'center' }}>
             <Typography variant="subtitle2" gutterBottom>Preview:</Typography>
             
-            {/* --- UPDATED: Handle PDF Preview differently --- */}
-            {file && file.type === 'application/pdf' ? (
-               <Box sx={{ p: 3, border: '1px solid #ddd', borderRadius: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', bgcolor: '#f9f9f9' }}>
-                  <PictureAsPdfIcon color="error" sx={{ fontSize: 60, mb: 1 }} />
-                  <Typography variant="body2" color="text.secondary">
-                    PDF Document Ready to Upload
-                  </Typography>
-               </Box>
-            ) : (
-              <img 
-                src={filePreview} 
-                alt="Agreement Preview" 
-                style={{ maxWidth: '100%', maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }} 
-              />
-            )}
-            {/* --- END UPDATED --- */}
+            {/* --- MODIFIED: Removed PDF check, always show image preview --- */}
+            <img 
+              src={filePreview} 
+              alt="Agreement Preview" 
+              style={{ maxWidth: '100%', maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }} 
+            />
+            {/* --- END MODIFIED --- */}
 
           </Box>
         )}
