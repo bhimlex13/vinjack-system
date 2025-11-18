@@ -79,9 +79,7 @@ const CreatePurchaseOrderPage = () => {
       try {
         const productsData = await getProductsBySupplier(newValue._id);
         setSupplierProducts(productsData);
-      // --- FIX: Removed the underscore ---
       } catch (err) {
-      // --- END FIX ---
         toast.error(`Failed to load products for ${newValue.name}.`);
         console.error(err);
       } finally {
@@ -114,6 +112,11 @@ const CreatePurchaseOrderPage = () => {
 
   const handleRemoveItem = (productId) => {
     setItems(items.filter(item => item.product._id !== productId));
+  };
+  
+  // Focus handler to auto-select text
+  const handleFocus = (event) => {
+    event.target.select();
   };
 
   const grandTotal = useMemo(() => {
@@ -216,12 +219,18 @@ const CreatePurchaseOrderPage = () => {
                       getOptionLabel={(option) => `${option.name} (${option.itemCode})`}
                       isOptionEqualToValue={(option, value) => option._id === value._id}
                       value={selectedProduct}
+                      // --- FIX START: Use the cost directly from the backend response ---
                       onChange={(event, newValue) => {
                         setSelectedProduct(newValue);
-                        const supplierCost = newValue?.supplierCosts?.find(c => c.supplier === supplier._id);
-                        setCost(supplierCost?.cost ?? newValue?.defaultCost ?? 0);
+                        if (newValue) {
+                          // The backend sends the pre-calculated cost in the 'cost' field
+                          setCost(newValue.cost !== undefined ? newValue.cost : 0);
+                        } else {
+                          setCost(0);
+                        }
                         setQuantity(1);
                       }}
+                      // --- FIX END ---
                       loading={isProductLoading}
                       renderInput={(params) => (
                         <TextField
@@ -241,10 +250,29 @@ const CreatePurchaseOrderPage = () => {
                     />
                   </Grid>
                   <Grid item size={{ xs: 6, sm: 3, md: 2 }}>
-                    <TextField label="Quantity" type="number" value={quantity} onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10)) || 1)} fullWidth inputProps={{ min: 1 }} />
+                    <TextField 
+                      label="Quantity" 
+                      type="number" 
+                      value={quantity} 
+                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10)) || 1)} 
+                      fullWidth 
+                      inputProps={{ min: 1 }}
+                      onFocus={handleFocus} 
+                    />
                   </Grid>
                   <Grid item size={{ xs: 6, sm: 3, md: 3 }}>
-                    <TextField label="Unit Cost (₱)" type="number" value={cost} onChange={(e) => setCost(Math.max(0, parseFloat(e.target.value)) || 0)} fullWidth inputProps={{ step: "0.01", min: 0 }} />
+                    <TextField 
+                      label="Unit Cost (₱)" 
+                      type="number" 
+                      value={cost} 
+                      onFocus={handleFocus}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCost(val === '' ? '' : Math.max(0, parseFloat(val)));
+                      }} 
+                      fullWidth 
+                      inputProps={{ step: "0.01", min: 0 }} 
+                    />
                   </Grid>
                   <Grid item size={{ xs: 12, sm: 12, md: 2 }}>
                     <Button
@@ -279,7 +307,7 @@ const CreatePurchaseOrderPage = () => {
                         <TableRow key={item.product._id}>
                           <TableCell>{item.product.name} ({item.product.itemCode})</TableCell>
                           <TableCell align="right">{item.quantity}</TableCell>
-                          <TableCell align="right">₱{item.cost.toFixed(2)}</TableCell>
+                          <TableCell align="right">₱{Number(item.cost).toFixed(2)}</TableCell>
                           <TableCell align="right">₱{(item.quantity * item.cost).toFixed(2)}</TableCell>
                           <TableCell align="center">
                             <IconButton onClick={() => handleRemoveItem(item.product._id)} color="error" size="small">
