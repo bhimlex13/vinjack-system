@@ -29,11 +29,14 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SaveIcon from '@mui/icons-material/Save';
 
+// --- NEW IMPORT: Loading Spinner ---
+import LoadingSpinner from '../components/LoadingSpinner';
 
 Chart.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, ChartTooltip, Legend);
 
-// --- HELPER FUNCTION for number shortening ---
+// --- HELPER FUNCTION for number shortening (remains the same) ---
 const formatStatValue = (value) => {
+// ... (formatStatValue function content remains the same) ...
   let prefix = '';
   let numberStr = String(value);
 
@@ -74,7 +77,7 @@ const formatStatValue = (value) => {
   return { display, tooltip };
 };
 
-// --- StatCard component with Tooltip ---
+// --- StatCard component with Tooltip (remains the same) ---
 const StatCard = ({ title, value, icon, color }) => {
 
   const { display, tooltip } = formatStatValue(value);
@@ -127,7 +130,7 @@ const DashboardPage = () => {
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
 
-  // Load user preferences on mount
+  // Load user preferences on mount (remains the same)
   useEffect(() => {
     // --- UPDATED: Use 'Super Admin' role ---
     if (user?.role === 'Super Admin' || user?.role === 'Admin') {
@@ -156,7 +159,7 @@ const DashboardPage = () => {
     }
   }, [user]); // Runs when user is available
 
-  // useEffect to load filter dropdown data
+  // useEffect to load filter dropdown data (remains the same)
   useEffect(() => {
     // --- UPDATED: Use 'Super Admin' role ---
     if (user?.role === 'Super Admin' || user?.role === 'Admin') {
@@ -179,7 +182,7 @@ const DashboardPage = () => {
     }
   }, [user]);
 
-  // Main data fetching effect
+  // Main data fetching effect (remains the same)
   useEffect(() => {
     if (!user) return;
 
@@ -213,14 +216,14 @@ const DashboardPage = () => {
     fetchData();
   }, [timeRange, selectedCategory, selectedSupplier, user]);
 
-  // handleTimeRangeChange
+  // handleTimeRangeChange (remains the same)
   const handleTimeRangeChange = (event, newTimeRange) => {
     if (newTimeRange !== null) {
       setTimeRange(newTimeRange);
     }
   };
 
-  // Filter change handlers
+  // Filter change handlers (remain the same)
   const handleCategoryChange = (event) => {
       setSelectedCategory(event.target.value);
   };
@@ -229,7 +232,7 @@ const DashboardPage = () => {
       setSelectedSupplier(event.target.value);
   };
 
-  // Save user preferences
+  // Save user preferences (remains the same)
   const handleSavePreferences = async () => {
     setIsSavingPrefs(true);
     try {
@@ -248,7 +251,7 @@ const DashboardPage = () => {
   };
 
 
-  // Chart functions (getTrendChartTitle, formatTrendChartLabels, barChartData, barChartOptions, lineChartData, lineChartOptions)
+  // Chart functions (remains the same)
   const getTrendChartTitle = () => {
     switch (timeRange) {
       case 'today': return 'Revenue Trend (Today)';
@@ -314,11 +317,13 @@ const DashboardPage = () => {
 
 
   if (isLoading || (user?.role === 'Super Admin' && isFilterDataLoading)) {
+    // --- MODIFIED: Use LoadingSpinner Component ---
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
+        <LoadingSpinner text="Fetching dashboard data..." />
       </Box>
     );
+    // --- END MODIFIED ---
   }
 
   if (!user) {
@@ -650,7 +655,7 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
         {/* Pending Purchase Orders */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
+        <Grid item size={{  md: 12 }} sx={{ height: '420px' }}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <AssignmentIcon color="secondary" sx={{ mr: 1 }} />
