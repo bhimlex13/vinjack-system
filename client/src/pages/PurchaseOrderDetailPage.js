@@ -17,7 +17,7 @@ import {
   Container, Typography, Box, Paper, Grid, Button, CircularProgress, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
   Dialog, DialogContent, DialogActions, Chip, Link as MuiLink, IconButton,
-  Tooltip, Card, CardContent, CardActions
+  Tooltip, Card, CardContent, CardActions, Collapse
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
@@ -30,6 +30,78 @@ import ImageIcon from '@mui/icons-material/Image';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+
+// --- Row Component for Collapsible Functionality (Kept unchanged) ---
+const Row = ({ item, poStatus, formatCurrency }) => {
+  const [open, setOpen] = useState(false);
+  const hasSerials = item.serialNumbers && item.serialNumbers.length > 0; 
+
+  const isChanged = poStatus === 'Awaiting Approval' && typeof item.supplierUpdatedCost === 'number' && item.supplierUpdatedCost !== item.cost;
+  const isUnavailable = poStatus === 'Awaiting Approval' && !item.isAvailable;
+
+  return (
+    <React.Fragment>
+      <TableRow sx={{ '& > *': { borderBottom: 'unset' }, ...(isUnavailable ? { textDecoration: 'line-through', color: 'text.disabled' } : {}) }}>
+        <TableCell>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {hasSerials && (
+              <IconButton aria-label="expand row" size="small" onClick={() => setOpen(!open)}>
+                {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+              </IconButton>
+            )}
+            <Box sx={{ ml: hasSerials ? 1 : 5 }}>
+                {item.product?.name || 'Product not found'}
+                {hasSerials && <Chip label="Serialized" size="small" color="info" sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} />}
+            </Box>
+          </Box>
+        </TableCell>
+        <TableCell align="right">{item.quantity}</TableCell>
+        <TableCell align="right" sx={{ fontWeight: 'bold' }}>{item.quantityReceived || 0}</TableCell>
+        <TableCell align="right">
+          {isChanged ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+              <Typography variant="body2" sx={{ textDecoration: 'line-through' }}>
+                {formatCurrency(item.cost)}
+              </Typography>
+              <ArrowForwardIcon fontSize="small" color="action" />
+              <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                {formatCurrency(item.supplierUpdatedCost)}
+              </Typography>
+            </Box>
+          ) : (
+            formatCurrency(item.cost)
+          )}
+        </TableCell>
+        <TableCell align="right">{formatCurrency(item.total)}</TableCell>
+      </TableRow>
+      
+      {/* Collapsible Serial Numbers Area */}
+      <TableRow>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+          <Collapse in={open} timeout="auto" unmountOnExit>
+            <Box sx={{ margin: 1, p: 2, bgcolor: '#f9f9f9', borderRadius: 1 }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+                 <QrCodeScannerIcon fontSize="small" />
+                 Recorded Serial Numbers / IDs
+              </Typography>
+              <Grid container spacing={1}>
+                 {item.serialNumbers && item.serialNumbers.map((sn, index) => (
+                     <Grid item key={index}>
+                         <Chip label={sn} size="small" variant="outlined" />
+                     </Grid>
+                 ))}
+              </Grid>
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </React.Fragment>
+  );
+};
+// --- End Row Component ---
 
 const PurchaseOrderDetailPage = () => {
   const { id } = useParams();
@@ -67,11 +139,18 @@ const PurchaseOrderDetailPage = () => {
 
   const handleApprove = async () => {
     const isConsignment = po.poType === 'Consignment';
-    const title = isConsignment ? 'Approve Consignment Order?' : 'Approve Supplier Changes?';
-    const message = isConsignment
+    const isAgreementMissing = isConsignment && !po.signedAgreementUrl;
+    
+    let title = 'Approve Supplier Changes?';
+    let message = isConsignment
       ? 'This will lock in the items and costs, and set the status to "Awaiting Agreement Upload". This action cannot be undone.'
       : 'This will finalize the item costs and quantities. Unavailable items will be removed. This action cannot be undone.';
-    
+      
+    if (isAgreementMissing) {
+        title = 'WARNING: Agreement Missing!';
+        message = 'The signed agreement document has NOT been uploaded. Are you absolutely sure you want to approve this consignment and proceed to receiving stock?';
+    }
+
     const isConfirmed = await confirm(title, message);
     
     if (isConfirmed) {
@@ -94,21 +173,18 @@ const PurchaseOrderDetailPage = () => {
     window.location.reload();
   };
 
-  // --- Generate Consignment Agreement PDF ---
   const handleDownloadAgreement = () => {
     if (!po) return;
-
+    // ... (jsPDF logic remains unchanged) ...
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     
-    // Helper to center text
     const centerText = (text, y) => {
       const textWidth = doc.getStringUnitWidth(text) * doc.internal.getFontSize() / doc.internal.scaleFactor;
       const x = (pageWidth - textWidth) / 2;
       doc.text(text, x, y);
     };
 
-    // Header
     doc.setFont("times", "bold");
     doc.setFontSize(18);
     centerText("CONSIGNMENT AGREEMENT", 20);
@@ -118,11 +194,9 @@ const PurchaseOrderDetailPage = () => {
     centerText(`Reference PO#: ${po.poNumber}`, 28);
     centerText(`Date: ${new Date().toLocaleDateString()}`, 34);
 
-    // Line separator
     doc.setLineWidth(0.5);
     doc.line(20, 40, pageWidth - 20, 40);
 
-    // Parties
     let yPos = 55;
     doc.setFont("times", "bold");
     doc.text("CONSIGNOR (Supplier):", 20, yPos);
@@ -132,18 +206,15 @@ const PurchaseOrderDetailPage = () => {
     doc.setFont("times", "normal");
     doc.setFontSize(11);
     
-    // Consignor Details
     doc.text(po.supplier?.name || '', 20, yPos);
     doc.text(po.supplier?.contactPerson || '', 20, yPos + 5);
     doc.text(po.supplier?.email || '', 20, yPos + 10);
     doc.text(po.supplier?.contactNumber || '', 20, yPos + 15);
 
-    // Consignee Details
     doc.text("VinJack Motorworks", 110, yPos);
     doc.text("Ms. Jackielou M. Manlapaz", 110, yPos + 5);
     doc.text("Nangka, Marikina City", 110, yPos + 10);
 
-    // Terms
     yPos += 30;
     doc.setFont("times", "bold");
     doc.text("TERMS AND CONDITIONS:", 20, yPos);
@@ -151,7 +222,6 @@ const PurchaseOrderDetailPage = () => {
     yPos += 6;
     doc.setFont("times", "normal");
     
-    // --- UPDATED TERMS ---
     const terms = [
       "1. The Consignor agrees to place the items listed below with the Consignee for sale on a consignment basis.",
       "2. Ownership of the items remains with the Consignor until they are sold to a customer.",
@@ -167,7 +237,6 @@ const PurchaseOrderDetailPage = () => {
       yPos += (splitText.length * 5) + 2;
     });
 
-    // Items Table
     yPos += 5;
     const tableColumn = ["Item Code", "Product Name", "Qty", "Unit Cost", "Total Value"];
     const tableRows = po.items.map(item => [
@@ -187,17 +256,14 @@ const PurchaseOrderDetailPage = () => {
       styles: { font: "times", fontSize: 10, textColor: 0 },
     });
 
-    // Totals
     const finalY = doc.lastAutoTable.finalY + 10;
     doc.setFont("times", "bold");
     doc.text(`TOTAL CONSIGNMENT VALUE:  P ${po.totalAmount.toFixed(2)}`, pageWidth - 20, finalY, { align: "right" });
 
-    // Signatures
     const signY = finalY + 40;
-    
     doc.setLineWidth(0.2);
-    doc.line(30, signY, 90, signY); // Line for Supplier
-    doc.line(120, signY, 180, signY); // Line for Owner
+    doc.line(30, signY, 90, signY); 
+    doc.line(120, signY, 180, signY); 
 
     doc.setFontSize(10);
     doc.text(po.supplier?.name || "Supplier", 60, signY + 5, { align: "center" });
@@ -206,7 +272,6 @@ const PurchaseOrderDetailPage = () => {
     doc.text("Ms. Jackielou M. Manlapaz", 150, signY + 5, { align: "center" });
     doc.text("CONSIGNEE", 150, signY + 10, { align: "center" });
 
-    // Open PDF
     doc.output('dataurlnewwindow');
   };
 
@@ -232,16 +297,25 @@ const PurchaseOrderDetailPage = () => {
     }
   };
 
+  // --- MODIFIED: New Logic for Image/PDF Viewing (Base64 Fix) ---
   const handleOpenImageView = (imageUrl) => {
     if (!imageUrl) return;
-    if (imageUrl.startsWith('data:image')) {
-      setImageViewUrl(imageUrl);
+    
+    // Check if the URL string is a Base64 Data URI
+    const isDataUri = imageUrl.startsWith('data:');
+    
+    if (isDataUri) {
+        // FIX: Use window.location.href to open Base64 Data URI. 
+        // This avoids the security/length limit error from window.open and top frame navigation block.
+        window.location.href = imageUrl;
     } else {
-      const imageBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      setImageViewUrl(`${imageBaseUrl}${imageUrl}`);
+        // If it's a regular URL (e.g., from Google Cloud Storage or local backend path), open in the modal
+        const imageBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        setImageViewUrl(`${imageBaseUrl}${imageUrl}`);
+        setIsImageViewOpen(true);
     }
-    setIsImageViewOpen(true);
   };
+  // --- END MODIFIED ---
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
   if (error) return <Alert severity="error">{error}</Alert>;
@@ -265,9 +339,7 @@ const PurchaseOrderDetailPage = () => {
   const receiptImageUrl = po?.deliveryReceiptUrl;
   const signedAgreementUrl = po?.signedAgreementUrl;
   
-  const canReceiveStock = po.poType === 'Consignment'
-    ? po.status === 'Agreement Uploaded - Awaiting Delivery'
-    : (po.status === 'Approved' || po.status === 'Partially Received');
+  const isReceivingAllowed = ['Approved', 'Partially Received', 'Agreement Uploaded - Awaiting Delivery'].includes(po.status);
   
   const cannotReceiveReason = po.poType === 'Consignment' && po.status !== 'Agreement Uploaded - Awaiting Delivery'
     ? 'Must upload signed agreement before receiving stock.'
@@ -299,7 +371,7 @@ const PurchaseOrderDetailPage = () => {
         <DialogContent><PurchaseOrderPrintout poData={po} ref={printoutRef} /></DialogContent>
         <DialogActions>
           <Button onClick={() => setIsPrintModalOpen(false)}>Close</Button>
-          <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>Print / Download PDF</Button>
+          <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>Print / Download PO</Button>
         </DialogActions>
       </Dialog>
 
@@ -435,36 +507,14 @@ const PurchaseOrderDetailPage = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {po.items.map((item, index) => {
-                const isChanged = po.status === 'Awaiting Approval' && typeof item.supplierUpdatedCost === 'number' && item.supplierUpdatedCost !== item.cost;
-                const isUnavailable = po.status === 'Awaiting Approval' && !item.isAvailable;
-
-                return (
-                  <TableRow
-                    key={index}
-                    sx={isUnavailable ? { textDecoration: 'line-through', color: 'text.disabled', '& .MuiTableCell-root': { color: 'inherit' } } : {}}
-                  ><TableCell>{item.product?.name || 'Product not found'}</TableCell>
-                    <TableCell align="right">{item.quantity}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>{item.quantityReceived || 0}</TableCell>
-                    <TableCell align="right">
-                      {isChanged ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-                          <Typography variant="body2" sx={{ textDecoration: 'line-through' }}>
-                            {formatCurrency(item.cost)}
-                          </Typography>
-                          <ArrowForwardIcon fontSize="small" color="action" />
-                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                            {formatCurrency(item.supplierUpdatedCost)}
-                          </Typography>
-                        </Box>
-                      ) : (
-                        formatCurrency(item.cost)
-                      )}
-                    </TableCell>
-                    <TableCell align="right">{formatCurrency(item.total)}</TableCell>
-                  </TableRow>
-                );
-              })}
+              {po.items.map((item, index) => (
+                <Row 
+                    key={index} 
+                    item={item} 
+                    poStatus={po.status} 
+                    formatCurrency={formatCurrency} 
+                />
+              ))}
             </TableBody>
           </Table>
         </TableContainer>
@@ -474,28 +524,59 @@ const PurchaseOrderDetailPage = () => {
                 {po.status === 'Awaiting Approval' && (
                     <>
                         <Typography>This PO is awaiting your approval.</Typography>
-                        <Button variant="contained" color="primary" startIcon={<ThumbUpIcon />} onClick={handleApprove}>
+                        <Button 
+                            variant="contained" 
+                            color="primary" 
+                            startIcon={<ThumbUpIcon />} 
+                            onClick={handleApprove}
+                            sx={{
+                                // Add pulsing effect if agreement is missing
+                                animation: po.poType === 'Consignment' && !po.signedAgreementUrl 
+                                    ? 'pulse 1.5s infinite' 
+                                    : 'none',
+                                '@keyframes pulse': {
+                                    '0%': { boxShadow: '0 0 0 0 rgba(255, 152, 0, 0.7)' },
+                                    '70%': { boxShadow: '0 0 0 10px rgba(255, 152, 0, 0)' },
+                                    '100%': { boxShadow: '0 0 0 0 rgba(255, 152, 0, 0)' },
+                                },
+                                // Change color for warning visual cue
+                                bgcolor: po.poType === 'Consignment' && !po.signedAgreementUrl ? 'warning.main' : 'primary.main',
+                                '&:hover': {
+                                     bgcolor: po.poType === 'Consignment' && !po.signedAgreementUrl ? 'warning.dark' : 'primary.dark',
+                                }
+                            }}
+                        >
                             Approve Supplier Changes
                         </Button>
                     </>
                 )}
                 
-                {po.status !== 'Completed' && po.status !== 'Cancelled' && po.status !== 'Awaiting Approval' && (
-                  <Tooltip title={!canReceiveStock ? cannotReceiveReason : ''}>
-                    <span>
-                      <Button 
-                        variant="contained" 
-                        color="success" 
-                        startIcon={<InventoryIcon />} 
-                        onClick={() => setIsReceiveModalOpen(true)}
-                        disabled={!canReceiveStock}
-                      >
-                        Receive Stock
-                      </Button>
-                    </span>
-                  </Tooltip>
+                {isReceivingAllowed ? (
+                  <Button 
+                    variant="contained" 
+                    color="success" 
+                    startIcon={<InventoryIcon />} 
+                    onClick={() => setIsReceiveModalOpen(true)}
+                  >
+                    Receive Stock
+                  </Button>
+                ) : (
+                  po.status !== 'Completed' && po.status !== 'Cancelled' && (
+                    <Tooltip title={cannotReceiveReason}>
+                      <span>
+                        <Button 
+                          variant="contained" 
+                          color="success" 
+                          startIcon={<InventoryIcon />} 
+                          disabled
+                        >
+                          Receive Stock
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )
                 )}
-
+                
                 {po.status === 'Completed' && (
                     <Typography variant="h6" color="success.main">This order is complete.</Typography>
                 )}

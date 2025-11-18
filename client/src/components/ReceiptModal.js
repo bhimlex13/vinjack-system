@@ -13,14 +13,11 @@ import ImageIcon from '@mui/icons-material/Image';
 
 const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
 
-  // --- NEW: Generate Receipt PDF using jsPDF ---
   const handlePrint = () => {
-    // Create PDF with 80mm width (standard thermal receipt) and variable height
-    // We use 'pt' for easier small-scale adjustments
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [80, 200] // 80mm width, 200mm height (adjustable)
+      format: [80, 200] 
     });
 
     const pageWidth = 80;
@@ -68,7 +65,6 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
     if (saleData?.items) {
       saleData.items.forEach(item => {
         const name = item.product?.name || 'Item';
-        // Simple text wrap for name if too long
         const nameLines = doc.splitTextToSize(name, 40);
         doc.text(nameLines, 5, yPos);
         
@@ -76,7 +72,20 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
         const lineTotal = (item.quantity * (item.priceAtTime || 0)).toFixed(2);
         doc.text(lineTotal, 75, yPos, { align: "right" });
         
-        yPos += (nameLines.length * 4) + 2;
+        yPos += (nameLines.length * 4);
+
+        // --- NEW: Print Serials on Receipt ---
+        if (item.serialNumbers && item.serialNumbers.length > 0) {
+            doc.setFontSize(7);
+            const serials = `SN: ${item.serialNumbers.join(', ')}`;
+            const serialLines = doc.splitTextToSize(serials, 40);
+            doc.text(serialLines, 5, yPos);
+            yPos += (serialLines.length * 3) + 2; // Add spacing
+            doc.setFontSize(8);
+        } else {
+            yPos += 2;
+        }
+        // --- END NEW ---
       });
     }
 
@@ -89,7 +98,6 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
         doc.text("1", 45, yPos, { align: "right" });
         const lineTotal = (service.priceAtTime || 0).toFixed(2);
         doc.text(lineTotal, 75, yPos, { align: "right" });
-        
         yPos += (nameLines.length * 4) + 2;
       });
     }
@@ -104,15 +112,12 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
     doc.text(`P ${saleData?.totalAmount?.toFixed(2)}`, 75, yPos, { align: "right" });
     yPos += 10;
 
-    // Footer
     doc.setFont("courier", "italic");
     doc.setFontSize(8);
     doc.text("Thank you for your purchase!", pageWidth / 2, yPos, { align: "center" });
 
-    // Open in new window/tab for printing
     doc.output('dataurlnewwindow');
   };
-  // --- END NEW ---
 
   const hasItems = saleData?.items && saleData.items.length > 0;
   const hasServices = saleData?.services && saleData.services.length > 0;
@@ -129,14 +134,12 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogContent sx={{ p: 0 }}>
         <Box sx={{ p: 3, fontFamily: '"Courier New", Courier, monospace', color: '#333' }}>
-          {/* Receipt Header */}
           <Box className="header-text" sx={{ textAlign: 'center', mb: 2 }}>
             <Typography variant="h5" component="h2">VinJack System</Typography>
             <Typography variant="body2">Official Receipt</Typography>
           </Box>
           <Divider sx={{ borderStyle: 'dashed', mb: 2 }} />
 
-          {/* Sale Details */}
           <Box className="details-text" sx={{ mb: 2, fontSize: '0.9rem' }}>
             <Typography variant="body2"><strong>Sale ID:</strong> {saleData?._id?.slice(-8) || 'N/A'}</Typography>
             <Typography variant="body2"><strong>Date:</strong> {saleData?.createdAt ? new Date(saleData.createdAt).toLocaleString() : 'N/A'}</Typography>
@@ -145,7 +148,6 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
             {saleData?.motorcycle && (<Typography variant="body2"><strong>Vehicle:</strong> {`${saleData.motorcycle.make} ${saleData.motorcycle.model}`}</Typography>)}
           </Box>
 
-          {/* Items and Services Table */}
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -160,6 +162,13 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
                   <TableRow key={`prod-${item.product?._id || item._id}`}>
                     <TableCell sx={{ p: '4px 0', border: 'none' }}>
                       {item.product?.name || 'N/A'}
+                      {/* --- NEW: Show Serial Numbers on Screen --- */}
+                      {item.serialNumbers && item.serialNumbers.length > 0 && (
+                        <Typography variant="caption" display="block" color="text.secondary">
+                            SN: {item.serialNumbers.join(', ')}
+                        </Typography>
+                      )}
+                      {/* --- END NEW --- */}
                     </TableCell>
                     <TableCell align="center" sx={{ p: '4px 0', border: 'none' }}>{item.quantity || 0}</TableCell>
                     <TableCell align="right" sx={{ p: '4px 0', border: 'none' }}>
@@ -179,7 +188,6 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
                     </TableCell>
                   </TableRow>
                 ))}
-
               </TableBody>
             </Table>
           </TableContainer>
@@ -197,7 +205,6 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
             </Box>
           )}
 
-          {/* Total Amount and Footer */}
           <Divider sx={{ borderStyle: 'dashed', my: 2 }} />
           <Box
             className="total-section"

@@ -166,10 +166,8 @@ const approveSupplierChanges = async (req, res) => {
     po.items = availableItems;
     po.totalAmount = finalTotalAmount;
     // --- UPDATED: Set correct status based on poType ---
-    // If it's a purchase, it's 'Approved'. 
-    // If it's consignment, it's ready for agreement upload (or receiving if no upload required)
     if (po.poType === 'Consignment') {
-      po.status = 'Agreement Uploaded - Awaiting Delivery'; // Or 'Approved' if you skip upload
+      po.status = 'Agreement Uploaded - Awaiting Delivery'; 
     } else {
       po.status = 'Approved';
     }
@@ -291,7 +289,9 @@ const receivePurchaseOrder = async (req, res) => {
       throw new Error(`Cannot receive stock for a PO with status '${po.status}'.`);
     }
 
+    // --- UPDATED: Extract serialNumbers from payload ---
     const { items: receivedItems, deliveryReceiptUrl } = req.body;
+    // --- END UPDATED ---
 
     let itemsActuallyReceived = false;
     
@@ -304,9 +304,18 @@ const receivePurchaseOrder = async (req, res) => {
       if (poItem) {
         const qtyToReceive = Number(receivedItem.quantityReceived);
         const maxReceivable = poItem.quantity - (poItem.quantityReceived || 0);
+        
+        // --- NEW: Get serials and check if quantity matches count ---
+        const receivedSerials = receivedItem.serialNumbers || [];
+        if (receivedSerials.length > 0 && receivedSerials.length !== qtyToReceive) {
+             throw new Error(`Quantity to receive (${qtyToReceive}) must match the number of serial numbers provided (${receivedSerials.length}) for product ID ${receivedItem.productId}.`);
+        }
+        // --- END NEW ---
 
         if (qtyToReceive > 0 && qtyToReceive <= maxReceivable) {
             itemsActuallyReceived = true;
+            
+            // --- UPDATED: Fetch product again to ensure we get the latest serializedItems ---
             const product = await Product.findById(receivedItem.productId).session(session);
             if (!product) {
                 console.warn(`Product ID ${receivedItem.productId} not found during PO receive for ${po.poNumber}`);
@@ -316,15 +325,38 @@ const receivePurchaseOrder = async (req, res) => {
             const stockBefore = product.quantity;
             product.quantity = Number(product.quantity) + qtyToReceive;
 
-            // --- NEW: Check poType and update consignedStock if needed ---
             if (po.poType === 'Consignment') {
               product.consignedStock = (Number(product.consignedStock) || 0) + qtyToReceive;
+            }
+
+            // --- NEW: Serialized Item Logic - Save to Product inventory ---
+            if (product.isSerialized && receivedSerials.length > 0) {
+              const poReference = po._id;
+              
+              receivedSerials.forEach(sn => {
+                // Check if serial already exists globally (simple check to prevent accidental duplication)
+                const exists = product.serializedItems.some(s => s.serialNumber === sn);
+                if (exists) {
+                   throw new Error(`Serial Number ${sn} for ${product.name} already exists in inventory.`);
+                }
+                
+                // Save serial to the Product's live inventory list
+                product.serializedItems.push({
+                  serialNumber: sn,
+                  status: 'Available',
+                  purchaseOrder: poReference,
+                  dateReceived: new Date(),
+                });
+              });
+              
+              // Save serials to the PO item for history (PO model updated previously)
+              poItem.serialNumbers = [...(poItem.serialNumbers || []), ...receivedSerials];
+
             }
             // --- END NEW ---
 
             await product.save({ session });
-            // We will notify *after* the transaction commits
-
+            
             poItem.quantityReceived = (poItem.quantityReceived || 0) + qtyToReceive;
 
             await logMovement({

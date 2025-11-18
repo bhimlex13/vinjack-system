@@ -15,25 +15,27 @@ const purchaseOrderItemSchema = new mongoose.Schema({
   total: { type: Number, required: true },
   supplierUpdatedCost: { type: Number },
   isAvailable: { type: Boolean, default: true },
-  quantityReceived: { type: Number, default: 0 }
+  quantityReceived: { type: Number, default: 0 },
+  
+  // --- NEW: Store Serial Numbers for this specific batch ---
+  serialNumbers: [{ type: String }] 
+  // --- END NEW ---
+
 }, { _id: false });
 
 
-const purchaseOrderSchema = new mongoose.mongoose.Schema({
+const purchaseOrderSchema = new mongoose.Schema({
   poNumber: { type: String, required: true, unique: true },
   supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
   items: [purchaseOrderItemSchema],
   totalAmount: { type: Number, required: true, min: 0 },
   
-  // --- NEW ---
-  // This is the main toggle for the new feature
   poType: {
     type: String,
     enum: ['Purchase', 'Consignment'],
     default: 'Purchase',
     required: true
   },
-  // --- END NEW ---
 
   status: {
     type: String,
@@ -45,9 +47,7 @@ const purchaseOrderSchema = new mongoose.mongoose.Schema({
       'Partially Received', 
       'Completed', 
       'Cancelled',
-      // --- NEW STATUS ---
-      'Agreement Uploaded - Awaiting Delivery' // New status for the PDF flow
-      // --- END NEW STATUS ---
+      'Agreement Uploaded - Awaiting Delivery' 
     ],
     default: 'Pending'
   },
@@ -57,18 +57,12 @@ const purchaseOrderSchema = new mongoose.mongoose.Schema({
   supplierNotes: { type: String, trim: true },
   history: [historySchema],
   
-  // --- UPDATED ---
-  // Renamed this field for clarity, to distinguish from the agreement
   deliveryReceiptUrl: { type: String },
-  // --- END UPDATED ---
 
-  // --- NEW ---
-  // This will store the path to the signed PDF agreement
   signedAgreementUrl: { 
     type: String, 
     trim: true 
   }
-  // --- END NEW ---
 
 }, { timestamps: true });
 

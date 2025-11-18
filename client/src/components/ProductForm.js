@@ -20,7 +20,9 @@ import {
   Chip, 
   List, 
   ListItem, 
-  Divider
+  Divider,
+  FormControlLabel, // --- NEW IMPORT ---
+  Checkbox // --- NEW IMPORT ---
 } from '@mui/material';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -30,10 +32,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import StarIcon from '@mui/icons-material/Star'; 
 import StarBorderIcon from '@mui/icons-material/StarBorder'; 
-// --- NEW: Import Archive/Unarchive Icons ---
 import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
-// --- END NEW ---
 
 // Add Supplier Dialog Component (remains the same)
 const AddSupplierDialog = ({ open, onClose, allSuppliers, assignedSupplierIds, onAddSuppliers }) => {
@@ -68,7 +68,6 @@ const AddSupplierDialog = ({ open, onClose, allSuppliers, assignedSupplierIds, o
 };
 
 
-// --- MODIFIED: Renamed prop 'onProductDelete' to 'onProductArchive' ---
 const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive }) => {
   const { confirm } = useContext(ConfirmationContext); 
   const { user } = useContext(AuthContext);
@@ -77,7 +76,8 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
     price: '', quantity: '', maxStock: '', image: '',
     defaultCost: 0, 
     supplierCosts: [],
-    status: 'active' // --- NEW: Add status to form data ---
+    status: 'active',
+    isSerialized: false // --- ADD DEFAULT VALUE HERE ---
   });
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -127,8 +127,9 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
       maxStock: productToEdit.maxStock || '', image: productToEdit.image || '',
       defaultCost: productToEdit.defaultCost || 0,
       supplierCosts: Array.isArray(productToEdit.supplierCosts) ? productToEdit.supplierCosts.map(sc => ({ supplier: sc.supplier?._id || sc.supplier, cost: sc.cost || 0 })).filter(sc => sc.supplier) : [],
-      status: productToEdit.status || 'active' // --- NEW: Set status from productToEdit ---
-    } : { itemCode: '', name: '', category: '', brand: '', price: '', quantity: '', maxStock: '', image: '', defaultCost: 0, supplierCosts: [], status: 'active' };
+      status: productToEdit.status || 'active',
+      isSerialized: productToEdit.isSerialized || false // --- SET INITIAL VALUE FROM PROP ---
+    } : { itemCode: '', name: '', category: '', brand: '', price: '', quantity: '', maxStock: '', image: '', defaultCost: 0, supplierCosts: [], status: 'active', isSerialized: false }; // --- SET INITIAL DEFAULT ---
     
     console.log("Setting initial formData:", initialData);
     setFormData(initialData); setUploadedFileName('');
@@ -140,6 +141,12 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
    };
+   
+   // --- NEW: Handle Checkbox Change ---
+   const handleCheckboxChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.checked });
+   };
+   // --- END NEW ---
 
   const handleSupplierCostChange = (supplierId, newCost) => {
       setFormData(prevData => ({ ...prevData, supplierCosts: prevData.supplierCosts.map(sc => sc.supplier === supplierId ? { ...sc, cost: newCost === '' ? '' : Number(newCost) } : sc ) }));
@@ -206,11 +213,19 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // --- NEW: Pre-submission validation for serialization ---
+    if (productToEdit && formData.isSerialized === true && productToEdit.quantity > 0) {
+        setError(`Cannot enable serialization when current stock is ${productToEdit.quantity}. Set quantity to 0 first.`);
+        toast.error(`Cannot enable serialization when current stock is > 0.`);
+        return;
+    }
+    // --- END NEW ---
+    
     const invalidCostEntry = formData.supplierCosts.find(sc => sc.cost === '' || isNaN(sc.cost) || Number(sc.cost) < 0);
     if (invalidCostEntry) { setError(`Please enter a valid, non-negative cost for all assigned suppliers.`); toast.warn(`Please enter a valid cost for all suppliers.`); return; }
     if (!productToEdit && (!formData.supplierCosts || formData.supplierCosts.length === 0)) { setError('Please assign at least one supplier and set their cost.'); toast.warn('Please assign at least one supplier and set their cost.'); return; }
     
-    // --- Send status field with data ---
     const dataToSend = { ...formData }; 
     if (productToEdit) { delete dataToSend.quantity; }
     
@@ -233,9 +248,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
     }
    };
 
-  // --- MODIFIED: Renamed to handleArchive ---
   const handleArchive = async () => {
-     // --- Change confirmation text ---
      const isConfirmed = await confirm(
         `Archive this product?`, 
         `Are you sure you want to archive "${productToEdit.name}"? It will be hidden from the sales page but can be reactivated later.`
@@ -243,7 +256,6 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
       
     if (isConfirmed) {
       try { 
-        // --- Call the onProductArchive prop (which is handleArchive in InventoryPage) ---
         await onProductArchive(productToEdit._id);
         toast.success('Product archived successfully!'); 
         onClose(); 
@@ -304,6 +316,32 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
                 </Select>
               </FormControl>
             </Grid>
+            
+            {/* --- NEW: Is Serialized Checkbox --- */}
+             <Grid item size={{ xs: 12 }}>
+                <FormControlLabel
+                    control={
+                        <Checkbox
+                            checked={formData.isSerialized}
+                            onChange={handleCheckboxChange}
+                            name="isSerialized"
+                            disabled={!!productToEdit && productToEdit.quantity > 0} 
+                        />
+                    }
+                    label={
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            Track Specific Serial Numbers/Tags
+                            <Tooltip title="Enabling serialization means each unit must have a unique ID upon receipt and sale. If editing, this can only be enabled if current stock is 0.">
+                                <InfoOutlinedIcon sx={{ ml: 0.5 }} fontSize="small" color="action" />
+                            </Tooltip>
+                        </Box>
+                    }
+                />
+                {productToEdit && productToEdit.quantity > 0 && formData.isSerialized === false && (
+                    <FormHelperText error>Cannot enable serialization while current stock is {productToEdit.quantity}. Set quantity to 0 first.</FormHelperText>
+                )}
+            </Grid>
+            {/* --- END NEW --- */}
 
             {/* Supplier Display Area */}
             <Grid item size={{ xs: 12 }}>
@@ -365,7 +403,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
              <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="quantity" label="Current Qty" value={formData.quantity} onChange={handleChange} inputProps={{ min: 0 }} disabled={!!productToEdit} InputProps={productToEdit ? { endAdornment: ( <InputAdornment position="end"> <Tooltip title="Use 'Adjust Stock' button in the inventory list to change quantity."> <InfoOutlinedIcon color="action" /> </Tooltip> </InputAdornment> ) }: {}} /> {!!productToEdit && <FormHelperText>Quantity is managed via transactions. Use Adjust Stock for corrections.</FormHelperText>} </Grid>
              <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="maxStock" label="Max Stock" value={formData.maxStock} onChange={handleChange} inputProps={{ min: 1 }} /> </Grid>
              
-             {/* --- UPDATED: Status Dropdown (Super Admin or Admin only, Edit mode only) --- */}
+             {/* Status Dropdown (Super Admin or Admin only, Edit mode only) */}
              {productToEdit && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
                 <Grid item size={{ xs: 6 }}>
                     <FormControl fullWidth required>
@@ -385,7 +423,6 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
                     </FormControl>
                 </Grid>
              )}
-             {/* --- END UPDATED --- */}
 
 
             {/* Helper Text for Thresholds */}
@@ -411,12 +448,10 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
           {/* Buttons */}
           <Stack 
             direction="row" 
-            // --- UPDATED: Check for Super Admin or Admin ---
             justifyContent={productToEdit && (user.role === 'Super Admin' || user.role === 'Admin') ? "space-between" : "flex-end"} 
             alignItems="center" 
             sx={{ mt: 3 }}
           >
-            {/* --- UPDATED: Archive Button --- */}
             {productToEdit && (user.role === 'Super Admin' || user.role === 'Admin') && formData.status === 'active' && (
               <Button 
                 color="warning" 
@@ -426,7 +461,6 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
                 Archive Product
               </Button>
             )}
-            {/* --- END UPDATED --- */}
             
             <Stack direction="row" spacing={2}> 
               <Button onClick={onClose}>Cancel</Button> 

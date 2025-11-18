@@ -18,7 +18,7 @@ import {
   Box, Grid, Paper, TextField, InputAdornment, Typography, Card, CardActionArea,
   CardMedia, CardContent, ToggleButtonGroup, ToggleButton, List, ListItem,
   ListItemText, IconButton, Divider, Button, Tooltip, Autocomplete, Stack,
-  Dialog, DialogTitle, CircularProgress
+  Dialog, DialogTitle, CircularProgress, Checkbox, DialogContent, DialogActions, FormControlLabel
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -49,7 +49,6 @@ const getInitialCartState = () => {
   return { items: [], customer: null, motorcycle: null };
 };
 
-
 const SalesPage = () => {
   const [initialCart] = useState(getInitialCartState);
   const [cartItems, setCartItems] = useState(initialCart.items);
@@ -76,6 +75,12 @@ const SalesPage = () => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [lastSaleData, setLastSaleData] = useState(null);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+
+  // --- NEW: State for Serial Selection ---
+  const [isSerialModalOpen, setIsSerialModalOpen] = useState(false);
+  const [currentSerializedProduct, setCurrentSerializedProduct] = useState(null);
+  const [selectedSerials, setSelectedSerials] = useState([]); // Array of SN strings
+  // --- END NEW ---
 
   useEffect(() => {
     const socket = io(process.env.REACT_APP_API_URL);
@@ -164,7 +169,6 @@ const SalesPage = () => {
         }
         
         setProducts(activeProductsData);
-        
         setCategories(categoriesRes.data);
         setBrands(brandsRes.data);
         setServices(servicesRes);
@@ -185,7 +189,7 @@ const SalesPage = () => {
     };
     fetchInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+  }, []);
 
   const handleNewCustomerSubmit = async (newCustomerData) => {
     try {
@@ -216,25 +220,63 @@ const SalesPage = () => {
     const productInState = products.find(p => p._id === product._id);
     if (!productInState || productInState.quantity <= 0) return;
 
+    // --- NEW: Check for serialization ---
+    if (product.isSerialized) {
+      setCurrentSerializedProduct(product);
+      setSelectedSerials([]);
+      setIsSerialModalOpen(true);
+      return; 
+    }
+    // --- END NEW ---
+
+    addToCartLogic(product, 1);
+  };
+
+  // Extracted logic for re-use
+  const addToCartLogic = (product, qty, serials = []) => {
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item.type === 'product' && item._id === product._id);
+      
       if (existingItem) {
-        if (existingItem.cartQuantity < existingItem.stock) { 
+        // If serialized, we merge the new serials
+        const updatedSerials = existingItem.serialNumbers 
+            ? [...existingItem.serialNumbers, ...serials] 
+            : serials;
+
+        if (existingItem.cartQuantity + qty <= existingItem.stock) { 
           return prevCart.map(item =>
-            item._id === product._id ? { ...item, cartQuantity: item.cartQuantity + 1 } : item
+            item._id === product._id ? { 
+                ...item, 
+                cartQuantity: item.cartQuantity + qty,
+                serialNumbers: updatedSerials 
+            } : item
           );
         }
         return prevCart; 
       } else {
-        return [...prevCart, { ...product, cartQuantity: 1, stock: productInState.quantity, type: 'product' }];
+        return [...prevCart, { 
+            ...product, 
+            cartQuantity: qty, 
+            stock: product.quantity, // Snapshot of stock
+            type: 'product',
+            serialNumbers: serials // Store serials
+        }];
       }
     });
 
     setProducts(prevProducts =>
       prevProducts.map(p =>
-        p._id === product._id ? { ...p, quantity: p.quantity - 1 } : p
+        p._id === product._id ? { ...p, quantity: p.quantity - qty } : p
       )
     );
+  };
+
+  const handleSerialSubmit = () => {
+    if (selectedSerials.length === 0) return;
+    addToCartLogic(currentSerializedProduct, selectedSerials.length, selectedSerials);
+    setIsSerialModalOpen(false);
+    setCurrentSerializedProduct(null);
+    setSelectedSerials([]);
   };
 
   const addServiceToCart = (service) => {
@@ -256,6 +298,9 @@ const SalesPage = () => {
 
 
   const updateQuantity = (product, amount) => {
+    // --- Block manual quantity updates for serialized items (must use remove/add) ---
+    if (product.isSerialized) return;
+
     setCartItems(prevCart => {
       const existingItemIndex = prevCart.findIndex(item => item.type === 'product' && item._id === product._id);
       if (existingItemIndex === -1) return prevCart;
@@ -291,6 +336,17 @@ const SalesPage = () => {
       return prevCart;
     });
   };
+
+  // --- NEW: Remove serialized item (removes specific serials) ---
+  const removeSerializedItem = (product) => {
+     setProducts(prevProducts =>
+          prevProducts.map(p =>
+            p._id === product._id ? { ...p, quantity: p.quantity + product.cartQuantity } : p
+          )
+     );
+     setCartItems(prevCart => prevCart.filter(item => item._id !== product._id));
+  };
+  // --- END NEW ---
 
   const calculateTotal = useMemo(() => {
     return cartItems.reduce((total, item) => {
@@ -339,7 +395,12 @@ const SalesPage = () => {
 
     if (isConfirmed) {
       const saleData = {
-        items: cartItems.filter(item => item.type === 'product').map(item => ({ product: item._id, quantity: item.cartQuantity, priceAtTime: item.price })),
+        items: cartItems.filter(item => item.type === 'product').map(item => ({ 
+            product: item._id, 
+            quantity: item.cartQuantity, 
+            priceAtTime: item.price,
+            serialNumbers: item.serialNumbers || [] // Pass serials to backend
+        })),
         services: cartItems.filter(item => item.type === 'service').map(item => ({ service: item._id, priceAtTime: item.charge })),
         recordedBy: user._id, customerId: selectedCustomer ? selectedCustomer._id : undefined, motorcycleId: selectedMotorcycle ? selectedMotorcycle._id : undefined,
       };
@@ -359,7 +420,6 @@ const SalesPage = () => {
 
       } catch (error) {
         alert(`Sale failed: ${error.response?.data?.message || error.message}`);
-        
         const productsResponse = await api.get('/products');
         setProducts(productsResponse.data.filter(p => p.status === 'active'));
       }
@@ -392,8 +452,7 @@ const SalesPage = () => {
       gap: 2, 
       height: 'calc(100vh - 112px)', 
     }}>
-      
-      {/* --- Left Column: Product Grid --- */}
+      {/* Left Column: Product Grid */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <TextField
@@ -404,9 +463,7 @@ const SalesPage = () => {
             <ToggleButtonGroup value={selectedCategory} exclusive onChange={handleFilterChange(setSelectedCategory)} size="small" fullWidth sx={{ display: 'flex' }}>
               <ToggleButton value={null} sx={{ flex: 1, ...activeToggleButtonSx }}>All</ToggleButton>
               {categories.map(cat => (
-                <ToggleButton key={cat._id} value={cat._id} sx={{ flex: 1, ...activeToggleButtonSx }}>
-                  {cat.name}
-                </ToggleButton>
+                <ToggleButton key={cat._id} value={cat._id} sx={{ flex: 1, ...activeToggleButtonSx }}>{cat.name}</ToggleButton>
               ))}
             </ToggleButtonGroup>
           </Box>
@@ -414,9 +471,7 @@ const SalesPage = () => {
             <ToggleButtonGroup value={selectedBrand} exclusive onChange={handleFilterChange(setSelectedBrand)} size="small" fullWidth sx={{ display: 'flex' }}>
                 <ToggleButton value={null} sx={{ flex: 1, ...activeToggleButtonSx }}>All</ToggleButton>
                 {brands.map(brand => (
-                  <ToggleButton key={brand._id} value={brand._id} sx={{ flex: 1, ...activeToggleButtonSx }}>
-                    {brand.name}
-                  </ToggleButton>
+                  <ToggleButton key={brand._id} value={brand._id} sx={{ flex: 1, ...activeToggleButtonSx }}>{brand.name}</ToggleButton>
                 ))}
             </ToggleButtonGroup>
           </Box>
@@ -445,13 +500,8 @@ const SalesPage = () => {
         </Paper>
       </Box>
 
-      {/* --- Right Column: "Sticky" Cart --- */}
-      <Box sx={{ 
-        width: '380px', 
-        height: '100%', 
-        position: 'sticky', 
-        top: '88px', 
-      }}>
+      {/* Right Column: Cart */}
+      <Box sx={{ width: '380px', height: '100%', position: 'sticky', top: '88px' }}>
         <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box sx={{ mb: 2 }}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><FaUserTag style={{ marginRight: '8px' }} /> Customer Details</Typography>
@@ -480,27 +530,12 @@ const SalesPage = () => {
             <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
               <ShoppingCartIcon sx={{ mr: 1 }}/> Current Sale
             </Typography>
-            
             <Stack direction="row" spacing={0.5}>
               <Tooltip title="Clear Cart">
-                <span>
-                  <IconButton
-                    color="error" 
-                    onClick={handleClearCart}
-                    disabled={cartItems.length === 0}
-                  >
-                    <DeleteSweepIcon />
-                  </IconButton>
-                </span>
+                <span><IconButton color="error" onClick={handleClearCart} disabled={cartItems.length === 0}><DeleteSweepIcon /></IconButton></span>
               </Tooltip>
-              
               <Tooltip title="Add Service">
-                <IconButton 
-                  color="primary"
-                  onClick={() => setIsServiceModalOpen(true)}
-                >
-                  <DesignServicesIcon />
-                </IconButton>
+                <IconButton color="primary" onClick={() => setIsServiceModalOpen(true)}><DesignServicesIcon /></IconButton>
               </Tooltip>
             </Stack>
           </Box>
@@ -513,39 +548,37 @@ const SalesPage = () => {
                     {item.type === 'product' ? (
                         <>
                             <ListItemText 
-                                primary={item.name} 
+                                primary={
+                                    <React.Fragment>
+                                        {item.name}
+                                        {item.serialNumbers && item.serialNumbers.length > 0 && (
+                                            <Typography variant="caption" display="block" color="text.secondary">
+                                                SNs: {item.serialNumbers.join(', ')}
+                                            </Typography>
+                                        )}
+                                    </React.Fragment>
+                                } 
                                 secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`}
                             />
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <IconButton size="small" onClick={() => updateQuantity(item, -1)}>
-                                    <RemoveIcon fontSize="small"/>
-                                </IconButton>
-                                <Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography>
-                                <IconButton 
-                                    size="small" 
-                                    onClick={() => updateQuantity(item, 1)} 
-                                    disabled={item.cartQuantity >= item.stock}
-                                >
-                                    <AddIcon fontSize="small"/>
-                                </IconButton>
+                                {/* If serialized, remove entirely instead of decrementing quantity */}
+                                {item.isSerialized ? (
+                                     <IconButton size="small" edge="end" aria-label="delete" onClick={() => removeSerializedItem(item)}>
+                                        <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                ) : (
+                                    <>
+                                        <IconButton size="small" onClick={() => updateQuantity(item, -1)}><RemoveIcon fontSize="small"/></IconButton>
+                                        <Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography>
+                                        <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton>
+                                    </>
+                                )}
                             </Box>
                         </>
                     ) : (
                         <>
-                            <ListItemText 
-                                primary={item.name} 
-                                secondary={`₱${(item.charge).toFixed(2)}`}
-                            />
-                            <Tooltip title="Remove Service">
-                                <IconButton 
-                                    size="small" 
-                                    edge="end" 
-                                    aria-label="delete" 
-                                    onClick={() => removeServiceFromCart(item._id)}
-                                >
-                                    <DeleteIcon />
-                                </IconButton>
-                            </Tooltip>
+                            <ListItemText primary={item.name} secondary={`₱${(item.charge).toFixed(2)}`}/>
+                            <Tooltip title="Remove Service"><IconButton size="small" edge="end" aria-label="delete" onClick={() => removeServiceFromCart(item._id)}><DeleteIcon /></IconButton></Tooltip>
                         </>
                     )}
                   </ListItem>
@@ -559,59 +592,67 @@ const SalesPage = () => {
                 <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Total</Typography>
                 <Typography variant="h5" sx={{ fontWeight: 'bold' }}>₱{calculateTotal.toFixed(2)}</Typography>
             </Box>
-            <Button 
-                variant="contained" 
-                color="success" 
-                fullWidth size="large" 
-                startIcon={<PointOfSaleIcon />} 
-                onClick={handleCompleteSale} 
-                disabled={cartItems.length === 0}
-            >
+            <Button variant="contained" color="success" fullWidth size="large" startIcon={<PointOfSaleIcon />} onClick={handleCompleteSale} disabled={cartItems.length === 0}>
                 Complete Sale
             </Button>
           </Box>
         </Paper>
       </Box>
 
-      {/* Modals are unchanged */}
+      {/* --- NEW: Serial Selection Modal --- */}
+      <Dialog open={isSerialModalOpen} onClose={() => setIsSerialModalOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Select Specific Items: {currentSerializedProduct?.name}</DialogTitle>
+          <DialogContent>
+              {currentSerializedProduct?.serializedItems && currentSerializedProduct.serializedItems.filter(s => s.status === 'Available').length > 0 ? (
+                  <Grid container spacing={1}>
+                    {currentSerializedProduct.serializedItems
+                        .filter(s => s.status === 'Available')
+                        // Filter out already selected serials in the cart!
+                        .filter(s => {
+                             const inCart = cartItems.find(c => c._id === currentSerializedProduct._id);
+                             return !inCart || !inCart.serialNumbers.includes(s.serialNumber);
+                        })
+                        .map((serial, index) => (
+                        <Grid item size={{ xs: 12, sm: 6 }} key={index}>
+                           <FormControlLabel
+                              control={
+                                <Checkbox 
+                                    checked={selectedSerials.includes(serial.serialNumber)}
+                                    onChange={(e) => {
+                                        if (e.target.checked) setSelectedSerials([...selectedSerials, serial.serialNumber]);
+                                        else setSelectedSerials(selectedSerials.filter(sn => sn !== serial.serialNumber));
+                                    }}
+                                />
+                              }
+                              label={serial.serialNumber}
+                           />
+                        </Grid>
+                    ))}
+                  </Grid>
+              ) : (
+                  <Typography color="error">No available serial numbers found for this product.</Typography>
+              )}
+          </DialogContent>
+          <DialogActions>
+              <Button onClick={() => setIsSerialModalOpen(false)}>Cancel</Button>
+              <Button variant="contained" onClick={handleSerialSubmit} disabled={selectedSerials.length === 0}>Confirm Selection ({selectedSerials.length})</Button>
+          </DialogActions>
+      </Dialog>
+      {/* --- END NEW --- */}
+
+      {/* Existing Modals */}
       {selectedCustomer && (
         <Dialog open={isMotorcycleModalOpen} onClose={() => setIsMotorcycleModalOpen(false)} maxWidth="sm" fullWidth>
             <DialogTitle>Add New Motorcycle for {selectedCustomer.name}</DialogTitle>
-            <MotorcycleForm 
-                customer={selectedCustomer} 
-                onFormSubmit={handleNewMotorcycleSubmit} 
-                onClose={() => setIsMotorcycleModalOpen(false)}
-            />
+            <MotorcycleForm customer={selectedCustomer} onFormSubmit={handleNewMotorcycleSubmit} onClose={() => setIsMotorcycleModalOpen(false)}/>
         </Dialog>
       )}
       <Dialog open={isCustomerModalOpen} onClose={() => setIsCustomerModalOpen(false)} maxWidth="sm" fullWidth>
           <DialogTitle>Add New Customer</DialogTitle>
-          <CustomerForm 
-              onClose={() => setIsCustomerModalOpen(false)} 
-              onFormSubmit={handleNewCustomerSubmit}
-          />
+          <CustomerForm onClose={() => setIsCustomerModalOpen(false)} onFormSubmit={handleNewCustomerSubmit}/>
       </Dialog>
-      
-      {/* --- THIS IS THE FIX --- */}
-      {/* Always render the ReceiptModal if there is data, 
-        but pass the 'showReceiptModal' state to its 'open' prop.
-      */}
-      {lastSaleData && (
-          <ReceiptModal 
-              open={showReceiptModal} 
-              saleData={lastSaleData} 
-              onClose={() => setShowReceiptModal(false)} 
-          />
-      )}
-      {/* --- END FIX --- */}
-      
-      <AddServiceModal 
-          open={isServiceModalOpen} 
-          onClose={() => setIsServiceModalOpen(false)} 
-          services={services} 
-          onAddService={addServiceToCart} 
-          cartItems={cartItems}
-      />
+      {lastSaleData && <ReceiptModal open={showReceiptModal} saleData={lastSaleData} onClose={() => setShowReceiptModal(false)} />}
+      <AddServiceModal open={isServiceModalOpen} onClose={() => setIsServiceModalOpen(false)} services={services} onAddService={addServiceToCart} cartItems={cartItems}/>
     </Box>
   );
 };

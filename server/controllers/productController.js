@@ -1,20 +1,25 @@
 // server/controllers/productController.js
-const mongoose = require('mongoose'); // <-- Import mongoose
+const mongoose = require('mongoose');
 const Product = require('../models/productModel');
 const logAction = require('../utils/logger');
 const logMovement = require('../utils/movementLogger');
 const { checkStockLevelAndNotify, getStockStatus } = require('../utils/stockManager');
 const { createNotification } = require('../utils/notificationManager');
 
-// getProducts - Populate supplier from supplierCosts
+// getProducts - Include serializedItems for sales logic
 const getProducts = async (req, res) => {
   try {
     const products = await Product.find({})
-      .select('itemCode name category brand price quantity image maxStock stockStatus supplierCosts defaultCost status') // <-- Added 'status'
+      // --- UPDATED: Added 'isSerialized' and 'serializedItems' to selection ---
+      .select('itemCode name category brand price quantity image maxStock stockStatus supplierCosts defaultCost status isSerialized serializedItems') 
+      // --- END UPDATED ---
       .populate('category', 'name')
       .populate('brand', 'name')
       .populate('supplierCosts.supplier', 'name');
 
+    // Optional: Filter serializedItems to only send 'Available' ones to reduce payload size?
+    // For now, we send all so Admin can see history if needed, or you can filter in frontend.
+    
     res.status(200).json(products);
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
@@ -25,13 +30,13 @@ const getProducts = async (req, res) => {
 const createProduct = async (req, res) => {
   const io = req.app.get('socketio');
   try {
-    // --- Include defaultCost in destructuring ---
-    const { name, itemCode, category, brand, price, quantity, unit, image, supplierCosts, maxStock, defaultCost } = req.body;
+    const { name, itemCode, category, brand, price, quantity, unit, image, supplierCosts, maxStock, defaultCost, isSerialized } = req.body;
 
     const newProduct = new Product({
       name, itemCode, category, brand, price, quantity, unit, image, supplierCosts, maxStock,
-      defaultCost: defaultCost || 0, // Use provided defaultCost or fallback to 0
-      status: 'active' // --- Explicitly set new products to 'active' ---
+      defaultCost: defaultCost || 0,
+      status: 'active',
+      isSerialized: isSerialized || false
     });
 
     const initialStatus = getStockStatus(newProduct.quantity, newProduct.maxStock);
@@ -68,7 +73,7 @@ const createProduct = async (req, res) => {
 };
 
 
-// updateProduct - Save supplierCosts, defaultCost and log changes
+// updateProduct
 const updateProduct = async (req, res) => {
   const io = req.app.get('socketio');
   try {
@@ -86,7 +91,8 @@ const updateProduct = async (req, res) => {
           maxStock: product.maxStock,
           image: product.image,
           defaultCost: product.defaultCost,
-          status: product.status, // --- Store original status ---
+          status: product.status,
+          isSerialized: product.isSerialized, // --- NEW: Track original value ---
           supplierCosts: product.supplierCosts.map(sc => ({
               supplier: String(sc.supplier?._id || sc.supplier),
               cost: sc.cost,
@@ -94,8 +100,7 @@ const updateProduct = async (req, res) => {
           }))
        };
 
-      // --- Add 'status' to allowed updates ---
-      const allowedUpdates = ['name', 'itemCode', 'category', 'brand', 'price', 'maxStock', 'image', 'supplierCosts', 'defaultCost', 'status'];
+      const allowedUpdates = ['name', 'itemCode', 'category', 'brand', 'price', 'maxStock', 'image', 'supplierCosts', 'defaultCost', 'status', 'isSerialized'];
       const oldStatus = product.stockStatus;
       let changesMade = false;
       let changeDetails = [];
@@ -132,7 +137,6 @@ const updateProduct = async (req, res) => {
                     changeDetails.push({ key, from: originalProductData[key], to: newValue });
                  }
              } else if (key === 'itemCode' && product) {
-                 // Prevent itemCode change after creation
                  if (String(originalProductData[key]) !== String(newValue)) {
                     console.warn(`Attempted to change itemCode from ${originalProductData[key]} to ${newValue} - ignoring.`);
                  }
@@ -146,6 +150,18 @@ const updateProduct = async (req, res) => {
                     isDifferent = true;
                     changeDetails.push(`changed status from '${originalProductData[key]}' to '${newValue}'`);
                  }
+             // --- NEW: Handle isSerialized Update ---
+             } else if (key === 'isSerialized') {
+                const newBoolValue = Boolean(newValue);
+                if (product.isSerialized !== newBoolValue) {
+                   // Prevent enabling serialization if stock > 0 to prevent data corruption
+                   if (newBoolValue === true && product.quantity > 0) {
+                       return res.status(400).json({ message: `Cannot enable serialization when current stock is ${product.quantity}. Set quantity to 0 first.` });
+                   }
+                   isDifferent = true;
+                   changeDetails.push(`changed serialization status from '${product.isSerialized}' to '${newBoolValue}'`);
+                }
+             // --- END NEW ---
              } else if (String(originalProductData[key]) !== String(newValue)) {
                  isDifferent = true;
                  changeDetails.push(`changed ${key} from '${originalProductData[key]}' to '${newValue}'`);
@@ -159,7 +175,7 @@ const updateProduct = async (req, res) => {
                     })) : [];
                 } else if (key === 'defaultCost') {
                     product[key] = Number(newValue) || 0;
-                } else if (key !== 'itemCode') { // Ensure itemCode is not overwritten here either
+                } else if (key !== 'itemCode') {
                     product[key] = newValue;
                 }
                 changesMade = true;
@@ -167,7 +183,6 @@ const updateProduct = async (req, res) => {
          }
       });
 
-      // Recalculate stockStatus based on current quantity and potentially updated maxStock
       const newStockStatus = getStockStatus(product.quantity, product.maxStock);
       if (newStockStatus !== oldStatus) {
          product.stockStatus = newStockStatus;
@@ -178,18 +193,15 @@ const updateProduct = async (req, res) => {
       if (!changesMade) {
           const populatedProduct = await Product.findById(product._id)
               .populate('category', 'name').populate('brand', 'name').populate('supplierCosts.supplier', 'name');
-          console.log("No effective changes detected, returning current product data.");
           return res.json(populatedProduct);
       }
 
       let savedProduct = await product.save();
 
-      // Send notification if stock status changed to a low state
       if (newStockStatus !== oldStatus && (newStockStatus === 'Low' || newStockStatus === 'Critical' || newStockStatus === 'Out of Stock')) {
         checkStockLevelAndNotify(savedProduct, io);
       }
 
-      // Populate related fields for logging descriptions
       let logMessage = `Updated product: '${savedProduct.name}' (Code: ${savedProduct.itemCode})`;
       if (changeDetails.length > 0) {
            const populatedChanges = await Promise.all(changeDetails.map(async (change) => {
@@ -201,7 +213,6 @@ const updateProduct = async (req, res) => {
                    const [oldBrand, newBrand] = await Promise.all([ mongoose.model('Brand').findById(change.from).select('name'), mongoose.model('Brand').findById(change.to).select('name') ]);
                   return `changed brand from '${oldBrand?.name || change.from}' to '${newBrand?.name || change.to}'`;
               }
-              // Handle complex supplier cost changes description if needed, otherwise keep simple string
               return change;
           }));
           logMessage += ` - ${populatedChanges.join(', ')}.`;
@@ -211,7 +222,6 @@ const updateProduct = async (req, res) => {
 
       logAction(req.user, 'UPDATE_PRODUCT', logMessage, { entityType: 'Product', entityId: savedProduct._id });
 
-      // Re-populate for the response
       savedProduct = await Product.findById(savedProduct._id)
          .populate('category', 'name')
          .populate('brand', 'name')
@@ -226,12 +236,11 @@ const updateProduct = async (req, res) => {
 };
 
 
-// Archives a product by setting its status to inactive
 const deleteProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
         if (product) {
-            product.status = 'inactive'; // Set status to inactive
+            product.status = 'inactive';
             await product.save();
 
             logAction(
@@ -241,7 +250,6 @@ const deleteProduct = async (req, res) => {
               { entityType: 'Product', entityId: product._id }
             );
 
-            // Return the updated (archived) product
             const populatedProduct = await Product.findById(product._id)
               .populate('category', 'name')
               .populate('brand', 'name')
@@ -257,14 +265,13 @@ const deleteProduct = async (req, res) => {
     }
 };
 
-// Gets active products with low stock status
 const getLowStockProducts = async (req, res) => {
     try {
         const lowStockProducts = await Product.find({
             stockStatus: { $in: ['Low', 'Critical', 'Out of Stock'] },
-            status: 'active' // Only active products
+            status: 'active'
         })
-            .select('name quantity maxStock stockStatus reorderLevel') // Include reorderLevel if needed for notifications
+            .select('name quantity maxStock stockStatus reorderLevel')
             .sort({ quantity: 'asc' });
         res.json(lowStockProducts);
     } catch (error) {
@@ -273,58 +280,34 @@ const getLowStockProducts = async (req, res) => {
     }
 };
 
-// Gets active products associated with a specific supplier
 const getProductsBySupplier = async (req, res) => {
   try {
     const { supplierId } = req.params;
-    // --- ADD LOG ---
-    console.log(`Backend: Fetching products for supplier ID: ${supplierId}`);
-    // --- END LOG ---
     if (!supplierId) { return res.status(400).json({ message: 'Supplier ID is required.' }); }
 
     const products = await Product.find({
         'supplierCosts.supplier': supplierId,
-        status: 'active' // Only find active products
+        status: 'active'
     })
-        // --- MODIFIED: Select fields needed for Autocomplete AND cost ---
-        // Also select defaultCost as a fallback
         .select('itemCode name supplierCosts defaultCost');
-        // If 'unit' is needed for display later, add it: .select('itemCode name supplierCosts defaultCost unit');
 
-    // --- ADD LOG ---
-    console.log(`Backend: Found ${products.length} raw active products from DB for supplier ${supplierId}:`, products);
-    // --- END LOG ---
-
-    // --- ADJUST MAPPING TO USE THE CORRECT COST FIELD ---
      const productsWithCost = products.map(p => {
-         // Find the cost entry specifically for THIS supplier
          const relevantCostEntry = p.supplierCosts?.find(sc => String(sc.supplier) === String(supplierId));
          return {
              _id: p._id,
              itemCode: p.itemCode,
              name: p.name,
-             // Use the cost from the specific supplier entry, or the product's defaultCost, or fallback to 0
              cost: relevantCostEntry ? relevantCostEntry.cost : (p.defaultCost || 0)
-             // unit: p.unit // Include unit if selected above and needed
          };
      });
-    // --- END ADJUSTMENT ---
-
-    // --- ADD LOG ---
-    console.log(`Backend: Mapped products being sent for supplier ${supplierId}:`, productsWithCost);
-    // --- END LOG ---
 
     res.json(productsWithCost);
   } catch (error) {
-    // --- ADD LOG ---
-    console.error("Backend Error getting products by supplier:", error);
-    // --- END LOG ---
     res.status(500).json({ message: 'Server error while fetching products by supplier.', error: error.message });
   }
 };
 
 
-// Recalculates stock status for all products
 const recalculateAllProductStatuses = async (req, res) => {
     try {
         const products = await Product.find({}); let updatedCount = 0;
@@ -347,7 +330,7 @@ module.exports = {
   getProducts,
   createProduct,
   updateProduct,
-  deleteProduct, // Note: This actually archives the product
+  deleteProduct,
   getLowStockProducts,
   getProductsBySupplier,
   recalculateAllProductStatuses

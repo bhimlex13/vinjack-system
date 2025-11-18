@@ -1,13 +1,17 @@
 // client/src/components/ImageViewModal.js
 import React from 'react';
-import { Dialog, DialogContent, IconButton, Box } from '@mui/material';
+import { Dialog, DialogContent, IconButton, Box, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 const ImageViewModal = ({ open, onClose, imageUrl }) => {
   if (!imageUrl) return null;
 
+  // The isPDF check has been removed as PDFs are now handled by window.open() in the parent component.
+  // This modal is strictly for image viewing now.
+  
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg">
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <IconButton
         aria-label="close"
         onClick={onClose}
@@ -20,23 +24,26 @@ const ImageViewModal = ({ open, onClose, imageUrl }) => {
           '&:hover': {
             backgroundColor: 'rgba(255, 255, 255, 0.9)',
           },
-          zIndex: 1 // Ensure it's above the image
+          zIndex: 1
         }}
       >
         <CloseIcon />
       </IconButton>
-      <DialogContent sx={{ p: 0, overflow: 'hidden' }}> {/* Remove padding and hide overflow */}
+      <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+
+        {/* --- Image Renderer Only --- */}
         <Box
           component="img"
           src={imageUrl}
-          alt="Receipt"
+          alt="Document Preview"
           sx={{
-            display: 'block', // Prevent extra space below image
-            width: '100%',    // Make image responsive
-            maxHeight: '85vh', // Limit height
-            objectFit: 'contain' // Ensure whole image is visible
+            display: 'block',
+            width: '100%', 
+            maxHeight: '85vh', 
+            objectFit: 'contain' 
           }}
         />
+
       </DialogContent>
     </Dialog>
   );

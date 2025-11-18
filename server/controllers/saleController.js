@@ -10,7 +10,6 @@ const { checkStockLevelAndNotify } = require('../utils/stockManager');
 const mongoose = require('mongoose');
 
 const createSale = async (req, res) => {
-  // --- Get the io object from the app ---
   const io = req.app.get('socketio');
   const { items, services, customerId, motorcycleId } = req.body;
 
@@ -39,7 +38,7 @@ const createSale = async (req, res) => {
     if (items && items.length > 0) {
         for (const item of items) {
           const product = await Product.findById(item.product)
-            .select('name quantity price defaultCost maxStock stockStatus consignedStock supplierCosts')
+            .select('name quantity price defaultCost maxStock stockStatus consignedStock supplierCosts isSerialized serializedItems')
             .populate({
               path: 'supplierCosts.supplier',
               model: 'Supplier',
@@ -49,6 +48,22 @@ const createSale = async (req, res) => {
 
           if (!product) throw new Error(`Product with ID ${item.product} not found.`);
           if (product.quantity < item.quantity) throw new Error(`Insufficient stock for ${product.name}. Only ${product.quantity} left.`);
+
+          // --- NEW: Handle Serial Numbers ---
+          if (product.isSerialized) {
+             if (!item.serialNumbers || item.serialNumbers.length !== item.quantity) {
+                throw new Error(`Serialized product ${product.name} requires ${item.quantity} serial numbers.`);
+             }
+             
+             for (const sn of item.serialNumbers) {
+                const serialEntry = product.serializedItems.find(s => s.serialNumber === sn && s.status === 'Available');
+                if (!serialEntry) {
+                    throw new Error(`Serial number ${sn} for ${product.name} is invalid or not available.`);
+                }
+                serialEntry.status = 'Sold';
+             }
+          }
+          // --- END NEW ---
 
           const stockBefore = product.quantity;
           product.quantity -= item.quantity;
@@ -83,7 +98,6 @@ const createSale = async (req, res) => {
             }
           }
           
-          // --- Add product to list to be updated ---
           productsToUpdate.push(product);
 
           movementsToLog.push({
@@ -97,7 +111,9 @@ const createSale = async (req, res) => {
             product: item.product,
             quantity: item.quantity,
             priceAtTime: salePrice,
-            costOfGoodsSold: itemCostOfGoodsSold
+            costOfGoodsSold: itemCostOfGoodsSold,
+            // --- NEW: Save serials in sale record ---
+            serialNumbers: item.serialNumbers || []
           });
         }
     }
@@ -111,7 +127,6 @@ const createSale = async (req, res) => {
       }
     }
 
-    // --- Save all updated products in the transaction ---
     for (const prod of productsToUpdate) {
         await prod.save({ session });
     }
@@ -138,25 +153,19 @@ const createSale = async (req, res) => {
       await newPayable.save({ session });
     }
 
-    // --- Commit all database changes ---
     await session.commitTransaction();
     session.endSession();
 
-    // --- THIS IS THE FIX ---
-    // After the transaction is successful, send real-time notifications
     try {
       for (const prod of productsToUpdate) {
-          // Re-fetch product to get the most current state
           const freshProduct = await Product.findById(prod._id);
           if (freshProduct) {
-            // Pass the `io` object to the notification utility
             await checkStockLevelAndNotify(freshProduct, io);
           }
       }
     } catch (notifyError) {
       console.error("Failed to send stock notifications after sale:", notifyError);
     }
-    // --- END OF FIX ---
 
     logAction(req.user, 'PROCESS_SALE', `Processed sale #${createdSale._id} with a total of ₱${calculatedTotal.toFixed(2)}.`, { entityType: 'Sale', entityId: createdSale._id });
 
