@@ -1,5 +1,6 @@
 // client/src/components/ReceiptModal.js
-import React, { useRef } from 'react';
+import React from 'react';
+import jsPDF from 'jspdf';
 
 // MUI Imports
 import {
@@ -10,37 +11,108 @@ import {
 import PrintIcon from '@mui/icons-material/Print';
 import ImageIcon from '@mui/icons-material/Image';
 
-// --- MODIFIED: Added 'open' prop ---
 const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
-  const receiptRef = useRef();
 
+  // --- NEW: Generate Receipt PDF using jsPDF ---
   const handlePrint = () => {
-    // (Print logic remains unchanged)
-    const printContents = receiptRef.current.innerHTML;
-    const styles = `
-      <style>
-        @media print {
-          body { font-family: "Courier New", Courier, monospace; color: #333; margin: 0; padding: 20px; }
-          .print-container { width: 100%; max-width: 300px; margin: auto; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-          th, td { text-align: left; padding: 2px 0; border: none; font-size: 0.8rem; }
-          th { border-bottom: 1px dashed #666; }
-          td:last-child, th:last-child { text-align: right; }
-          td:nth-child(2), th:nth-child(2) { text-align: center; }
-          .total-section { display: flex; justify-content: space-between; font-weight: bold; font-size: 1rem; margin-top: 10px; }
-          .footer-text { text-align: center; margin-top: 15px; font-size: 0.8rem; }
-          .header-text { text-align: center; margin-bottom: 10px; }
-          .details-text { margin-bottom: 10px; font-size: 0.8rem; }
-          .receipt-link { display: none; }
-          hr { border: none; border-top: 1px dashed #666; margin: 10px 0; }
-        }
-      </style>
-    `;
-    const originalContents = document.body.innerHTML;
-    document.body.innerHTML = styles + `<div class="print-container">${printContents}</div>`;
-    window.print();
-    document.body.innerHTML = originalContents;
+    // Create PDF with 80mm width (standard thermal receipt) and variable height
+    // We use 'pt' for easier small-scale adjustments
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [80, 200] // 80mm width, 200mm height (adjustable)
+    });
+
+    const pageWidth = 80;
+    let yPos = 10;
+    
+    doc.setFont("courier", "bold");
+    doc.setFontSize(12);
+    doc.text("VinJack System", pageWidth / 2, yPos, { align: "center" });
+    yPos += 5;
+    
+    doc.setFont("courier", "normal");
+    doc.setFontSize(10);
+    doc.text("Official Receipt", pageWidth / 2, yPos, { align: "center" });
+    yPos += 5;
+
+    doc.setFontSize(8);
+    doc.text("--------------------------------", pageWidth / 2, yPos, { align: "center" });
+    yPos += 5;
+
+    // Sale Details
+    doc.text(`Sale ID: ${saleData?._id?.slice(-8) || 'N/A'}`, 5, yPos);
+    yPos += 4;
+    doc.text(`Date: ${saleData?.createdAt ? new Date(saleData.createdAt).toLocaleDateString() : 'N/A'}`, 5, yPos);
+    yPos += 4;
+    doc.text(`Cashier: ${saleData?.recordedBy?.fullName || 'Admin'}`, 5, yPos);
+    yPos += 5;
+
+    if (saleData?.customer) {
+      doc.text(`Cust: ${saleData.customer.name}`, 5, yPos);
+      yPos += 4;
+    }
+    
+    doc.text("--------------------------------", pageWidth / 2, yPos, { align: "center" });
+    yPos += 5;
+
+    // Items Header
+    doc.setFont("courier", "bold");
+    doc.text("Item", 5, yPos);
+    doc.text("Qty", 45, yPos, { align: "right" });
+    doc.text("Total", 75, yPos, { align: "right" });
+    yPos += 4;
+    doc.setFont("courier", "normal");
+
+    // Items Loop
+    if (saleData?.items) {
+      saleData.items.forEach(item => {
+        const name = item.product?.name || 'Item';
+        // Simple text wrap for name if too long
+        const nameLines = doc.splitTextToSize(name, 40);
+        doc.text(nameLines, 5, yPos);
+        
+        doc.text(`${item.quantity}`, 45, yPos, { align: "right" });
+        const lineTotal = (item.quantity * (item.priceAtTime || 0)).toFixed(2);
+        doc.text(lineTotal, 75, yPos, { align: "right" });
+        
+        yPos += (nameLines.length * 4) + 2;
+      });
+    }
+
+    // Services Loop
+    if (saleData?.services) {
+      saleData.services.forEach(service => {
+        const name = service.service?.name || 'Service';
+        const nameLines = doc.splitTextToSize(name, 40);
+        doc.text(nameLines, 5, yPos);
+        doc.text("1", 45, yPos, { align: "right" });
+        const lineTotal = (service.priceAtTime || 0).toFixed(2);
+        doc.text(lineTotal, 75, yPos, { align: "right" });
+        
+        yPos += (nameLines.length * 4) + 2;
+      });
+    }
+
+    doc.text("--------------------------------", pageWidth / 2, yPos, { align: "center" });
+    yPos += 5;
+
+    // Total
+    doc.setFont("courier", "bold");
+    doc.setFontSize(12);
+    doc.text("TOTAL:", 5, yPos);
+    doc.text(`P ${saleData?.totalAmount?.toFixed(2)}`, 75, yPos, { align: "right" });
+    yPos += 10;
+
+    // Footer
+    doc.setFont("courier", "italic");
+    doc.setFontSize(8);
+    doc.text("Thank you for your purchase!", pageWidth / 2, yPos, { align: "center" });
+
+    // Open in new window/tab for printing
+    doc.output('dataurlnewwindow');
   };
+  // --- END NEW ---
 
   const hasItems = saleData?.items && saleData.items.length > 0;
   const hasServices = saleData?.services && saleData.services.length > 0;
@@ -54,11 +126,9 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
   };
 
   return (
-    // --- THIS IS THE FIX: Use the 'open' prop instead of 'open={true}' ---
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-    {/* --- END FIX --- */}
       <DialogContent sx={{ p: 0 }}>
-        <Box ref={receiptRef} sx={{ p: 3, fontFamily: '"Courier New", Courier, monospace', color: '#333' }}>
+        <Box sx={{ p: 3, fontFamily: '"Courier New", Courier, monospace', color: '#333' }}>
           {/* Receipt Header */}
           <Box className="header-text" sx={{ textAlign: 'center', mb: 2 }}>
             <Typography variant="h5" component="h2">VinJack System</Typography>
@@ -68,11 +138,11 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
 
           {/* Sale Details */}
           <Box className="details-text" sx={{ mb: 2, fontSize: '0.9rem' }}>
-            <Typography variant="body2"><strong>Sale ID:</strong> {saleData?._id || 'N/A'}</Typography>
+            <Typography variant="body2"><strong>Sale ID:</strong> {saleData?._id?.slice(-8) || 'N/A'}</Typography>
             <Typography variant="body2"><strong>Date:</strong> {saleData?.createdAt ? new Date(saleData.createdAt).toLocaleString() : 'N/A'}</Typography>
             <Typography variant="body2"><strong>Cashier:</strong> {saleData?.recordedBy?.fullName || 'N/A'}</Typography>
             {saleData?.customer && (<Typography variant="body2"><strong>Customer:</strong> {saleData.customer.name}</Typography>)}
-            {saleData?.motorcycle && (<Typography variant="body2"><strong>Vehicle:</strong> {`${saleData.motorcycle.make} ${saleData.motorcycle.model} (${saleData.motorcycle.plateNumber || 'No Plate'})`}</Typography>)}
+            {saleData?.motorcycle && (<Typography variant="body2"><strong>Vehicle:</strong> {`${saleData.motorcycle.make} ${saleData.motorcycle.model}`}</Typography>)}
           </Box>
 
           {/* Items and Services Table */}
@@ -80,9 +150,9 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ p: '4px 0', borderBottom: '1px solid #666' }}>Item / Service</TableCell>
+                  <TableCell sx={{ p: '4px 0', borderBottom: '1px solid #666' }}>Item</TableCell>
                   <TableCell align="center" sx={{ p: '4px 0', borderBottom: '1px solid #666' }}>Qty</TableCell>
-                  <TableCell align="right" sx={{ p: '4px 0', borderBottom: '1px solid #666' }}>Subtotal</TableCell>
+                  <TableCell align="right" sx={{ p: '4px 0', borderBottom: '1px solid #666' }}>Total</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -90,10 +160,6 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
                   <TableRow key={`prod-${item.product?._id || item._id}`}>
                     <TableCell sx={{ p: '4px 0', border: 'none' }}>
                       {item.product?.name || 'N/A'}
-                      <br />
-                      <Typography variant="caption">
-                        @{item.priceAtTime?.toFixed(2) || '0.00'}
-                      </Typography>
                     </TableCell>
                     <TableCell align="center" sx={{ p: '4px 0', border: 'none' }}>{item.quantity || 0}</TableCell>
                     <TableCell align="right" sx={{ p: '4px 0', border: 'none' }}>
@@ -105,11 +171,7 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
                 {hasServices && saleData.services.map((service) => (
                   <TableRow key={`serv-${service.service?._id || service._id}`}>
                     <TableCell sx={{ p: '4px 0', border: 'none' }}>
-                      {service.service?.name || 'N/A'} {/* Access name here */}
-                      <br />
-                      <Typography variant="caption">
-                        (Service Charge)
-                      </Typography>
+                      {service.service?.name || 'Service'}
                     </TableCell>
                     <TableCell align="center" sx={{ p: '4px 0', border: 'none' }}>1</TableCell>
                     <TableCell align="right" sx={{ p: '4px 0', border: 'none' }}>
@@ -157,7 +219,6 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
         </Box>
       </DialogContent>
       <DialogActions>
-        {/* This button correctly calls the onClose from props */}
         <Button onClick={onClose}>Close</Button> 
         <Button
           variant="contained"

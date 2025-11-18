@@ -4,13 +4,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getPurchaseOrderById, approveSupplierChanges, uploadSignedAgreement } from '../api/purchaseOrderApi';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
-import { useReactToPrint } from 'react-to-print';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
 import ReceiveStockModal from '../components/ReceiveStockModal';
 import ImageViewModal from '../components/ImageViewModal';
 import UploadAgreementModal from '../components/UploadAgreementModal';
-import ConsignmentAgreementPrint from '../components/ConsignmentAgreementPrint';
 
 // MUI Imports
 import {
@@ -23,14 +23,13 @@ import PrintIcon from '@mui/icons-material/Print';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import InfoIcon from '@mui/icons-material/Info';
-import ReceiptIcon from '@mui/icons-material/Receipt';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import LinkIcon from '@mui/icons-material/Link';
 import ImageIcon from '@mui/icons-material/Image';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
-
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 const PurchaseOrderDetailPage = () => {
   const { id } = useParams();
@@ -44,9 +43,7 @@ const PurchaseOrderDetailPage = () => {
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const printoutRef = useRef();
   
-  const agreementPrintRef = useRef();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  
   const [isImageViewOpen, setIsImageViewOpen] = useState(false);
   const [imageViewUrl, setImageViewUrl] = useState('');
 
@@ -67,13 +64,6 @@ const PurchaseOrderDetailPage = () => {
   useEffect(() => {
     fetchPo();
   }, [fetchPo]);
-
-  // --- NEW: Add this useEffect to debug the ref ---
-  useEffect(() => {
-    // This will fire when the page loads and when the ref is attached
-    console.log('[DEBUG] agreementPrintRef value changed:', agreementPrintRef.current);
-  }, [agreementPrintRef.current]);
-  // --- END NEW DEBUG ---
 
   const handleApprove = async () => {
     const isConsignment = po.poType === 'Consignment';
@@ -104,14 +94,121 @@ const PurchaseOrderDetailPage = () => {
     window.location.reload();
   };
 
-  const handlePrintAgreement = useReactToPrint({
-    content: () => {
-      // This console.log is the one that matters on click
-      console.log('[DEBUG] Print Agreement Clicked. Ref content is:', agreementPrintRef.current);
-      return agreementPrintRef.current;
-    },
-    documentTitle: `Consignment_Agreement_${po?.poNumber}_${po?.supplier?.name}`.replace(/ /g, '_'),
-  });
+  // --- Generate Consignment Agreement PDF ---
+  const handleDownloadAgreement = () => {
+    if (!po) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    
+    // Helper to center text
+    const centerText = (text, y) => {
+      const textWidth = doc.getStringUnitWidth(text) * doc.internal.getFontSize() / doc.internal.scaleFactor;
+      const x = (pageWidth - textWidth) / 2;
+      doc.text(text, x, y);
+    };
+
+    // Header
+    doc.setFont("times", "bold");
+    doc.setFontSize(18);
+    centerText("CONSIGNMENT AGREEMENT", 20);
+    
+    doc.setFontSize(12);
+    doc.setFont("times", "normal");
+    centerText(`Reference PO#: ${po.poNumber}`, 28);
+    centerText(`Date: ${new Date().toLocaleDateString()}`, 34);
+
+    // Line separator
+    doc.setLineWidth(0.5);
+    doc.line(20, 40, pageWidth - 20, 40);
+
+    // Parties
+    let yPos = 55;
+    doc.setFont("times", "bold");
+    doc.text("CONSIGNOR (Supplier):", 20, yPos);
+    doc.text("CONSIGNEE (VinJack Motorworks):", 110, yPos);
+    
+    yPos += 6;
+    doc.setFont("times", "normal");
+    doc.setFontSize(11);
+    
+    // Consignor Details
+    doc.text(po.supplier?.name || '', 20, yPos);
+    doc.text(po.supplier?.contactPerson || '', 20, yPos + 5);
+    doc.text(po.supplier?.email || '', 20, yPos + 10);
+    doc.text(po.supplier?.contactNumber || '', 20, yPos + 15);
+
+    // Consignee Details
+    doc.text("VinJack Motorworks", 110, yPos);
+    doc.text("Ms. Jackielou M. Manlapaz", 110, yPos + 5);
+    doc.text("Nangka, Marikina City", 110, yPos + 10);
+
+    // Terms
+    yPos += 30;
+    doc.setFont("times", "bold");
+    doc.text("TERMS AND CONDITIONS:", 20, yPos);
+    
+    yPos += 6;
+    doc.setFont("times", "normal");
+    
+    // --- UPDATED TERMS ---
+    const terms = [
+      "1. The Consignor agrees to place the items listed below with the Consignee for sale on a consignment basis.",
+      "2. Ownership of the items remains with the Consignor until they are sold to a customer.",
+      "3. The Consignee agrees to pay the Consignor the 'Unit Cost' indicated below only upon the successful sale.",
+      "4. The Consignee assumes responsibility for the safekeeping of the items while in their possession.",
+      "5. All consigned items shall be distinctively labeled to distinguish them from regular inventory. Returns are strictly restricted to items verifying this identification.",
+      "6. Unsold items may be returned to the Consignor if they remain unsold after 60 days from the date of delivery."
+    ];
+    
+    terms.forEach(term => {
+      const splitText = doc.splitTextToSize(term, pageWidth - 40);
+      doc.text(splitText, 20, yPos);
+      yPos += (splitText.length * 5) + 2;
+    });
+
+    // Items Table
+    yPos += 5;
+    const tableColumn = ["Item Code", "Product Name", "Qty", "Unit Cost", "Total Value"];
+    const tableRows = po.items.map(item => [
+      item.product?.itemCode || 'N/A',
+      item.product?.name || 'N/A',
+      item.quantity,
+      `P ${item.cost.toFixed(2)}`,
+      `P ${item.total.toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: yPos,
+      theme: 'grid',
+      headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: 'bold' },
+      styles: { font: "times", fontSize: 10, textColor: 0 },
+    });
+
+    // Totals
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFont("times", "bold");
+    doc.text(`TOTAL CONSIGNMENT VALUE:  P ${po.totalAmount.toFixed(2)}`, pageWidth - 20, finalY, { align: "right" });
+
+    // Signatures
+    const signY = finalY + 40;
+    
+    doc.setLineWidth(0.2);
+    doc.line(30, signY, 90, signY); // Line for Supplier
+    doc.line(120, signY, 180, signY); // Line for Owner
+
+    doc.setFontSize(10);
+    doc.text(po.supplier?.name || "Supplier", 60, signY + 5, { align: "center" });
+    doc.text("CONSIGNOR", 60, signY + 10, { align: "center" });
+
+    doc.text("Ms. Jackielou M. Manlapaz", 150, signY + 5, { align: "center" });
+    doc.text("CONSIGNEE", 150, signY + 10, { align: "center" });
+
+    // Open PDF
+    doc.output('dataurlnewwindow');
+  };
 
   const handleUploadSuccess = (updatedPo) => {
     setPo(updatedPo);
@@ -178,22 +275,6 @@ const PurchaseOrderDetailPage = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      
-      <Box 
-        sx={{ 
-          position: 'absolute', 
-          left: '-9999px', 
-          top: '-9999px', 
-          opacity: 0, 
-          overflow: 'hidden',
-          width: '1px',
-          height: '1px',
-          display: 'block' 
-        }}
-      >
-        <ConsignmentAgreementPrint ref={agreementPrintRef} poData={po} />
-      </Box>
-
       <UploadAgreementModal
         open={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
@@ -301,8 +382,8 @@ const PurchaseOrderDetailPage = () => {
                   )}
                 </CardContent>
                 <CardActions sx={{ p: 2, pt: 0, justifyContent: 'flex-start', gap: 2 }}>
-                  <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrintAgreement}>
-                    Print Agreement
+                  <Button variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadAgreement}>
+                    Download Agreement PDF
                   </Button>
                   <Button
                     variant="contained"
