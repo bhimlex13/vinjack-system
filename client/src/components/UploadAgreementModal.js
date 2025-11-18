@@ -6,9 +6,10 @@ import { toast } from 'react-toastify';
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box,
-  Typography, CircularProgress, Alert, Link as MuiLink
+  Typography, CircularProgress, Alert
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
   const [file, setFile] = useState(null);
@@ -20,19 +21,22 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
     if (selectedFile) {
-      if (!selectedFile.type.startsWith('image/')) {
-        setError('Invalid file type. Please upload an image (PNG, JPG, etc.).');
+      // --- UPDATED: Allow PDF ---
+      if (!selectedFile.type.startsWith('image/') && selectedFile.type !== 'application/pdf') {
+        setError('Invalid file type. Please upload an image (PNG, JPG) or PDF.');
         return;
       }
+      // --- END UPDATED ---
+
       if (selectedFile.size > 5 * 1024 * 1024) { // 5MB Limit
-        setError('File is too large. Please upload an image under 5MB.');
+        setError('File is too large. Please upload a file under 5MB.');
         return;
       }
 
       setError('');
       setFile(selectedFile);
       
-      // Create preview
+      // Create preview URL (works for images and PDF blobs)
       const previewUrl = URL.createObjectURL(selectedFile);
       setFilePreview(previewUrl);
 
@@ -73,8 +77,8 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
     
     try {
       const updatedPo = await uploadSignedAgreement(poId, base64String);
-      onUploadSuccess(updatedPo); // Pass the updated PO back
-      resetState(); // Reset state before closing
+      onUploadSuccess(updatedPo); 
+      resetState(); 
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to upload agreement.';
       setError(errMsg);
@@ -83,7 +87,6 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
     }
   };
   
-  // Clean up the object URL on component unmount or when preview changes
   React.useEffect(() => {
     return () => {
       if (filePreview) {
@@ -105,11 +108,11 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
             startIcon={<FileUploadIcon />}
             disabled={isLoading}
           >
-            {file ? 'Change File' : 'Select Image File'}
+            {file ? 'Change File' : 'Select File (Image or PDF)'}
             <input
               type="file"
               hidden
-              accept="image/*"
+              accept="image/*,application/pdf" // --- UPDATED ---
               onChange={handleFileChange}
             />
           </Button>
@@ -123,11 +126,24 @@ const UploadAgreementModal = ({ open, onClose, poId, onUploadSuccess }) => {
         {filePreview && (
           <Box sx={{ mt: 2, textAlign: 'center' }}>
             <Typography variant="subtitle2" gutterBottom>Preview:</Typography>
-            <img 
-              src={filePreview} 
-              alt="Agreement Preview" 
-              style={{ maxWidth: '100%', maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }} 
-            />
+            
+            {/* --- UPDATED: Handle PDF Preview differently --- */}
+            {file && file.type === 'application/pdf' ? (
+               <Box sx={{ p: 3, border: '1px solid #ddd', borderRadius: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', bgcolor: '#f9f9f9' }}>
+                  <PictureAsPdfIcon color="error" sx={{ fontSize: 60, mb: 1 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    PDF Document Ready to Upload
+                  </Typography>
+               </Box>
+            ) : (
+              <img 
+                src={filePreview} 
+                alt="Agreement Preview" 
+                style={{ maxWidth: '100%', maxHeight: '300px', border: '1px solid #ddd', borderRadius: '4px' }} 
+              />
+            )}
+            {/* --- END UPDATED --- */}
+
           </Box>
         )}
       </DialogContent>

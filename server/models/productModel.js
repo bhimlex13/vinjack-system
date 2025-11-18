@@ -37,11 +37,27 @@ const productSchema = new mongoose.Schema({
     _id: false,
     supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
     cost: { type: Number, required: true, min: 0 },
-    // --- THIS IS THE NEW FIELD ---
     note: { type: String, default: '' } 
-    // --- END NEW FIELD ---
   }],
   defaultCost: { type: Number, min: 0, default: 0 },
+
+  // --- NEW: SERIALIZATION SUPPORT ---
+  isSerialized: { 
+    type: Boolean, 
+    default: false 
+  },
+  // For items like Engines, ECUs, or specific Consigned Parts
+  serializedItems: [{
+    serialNumber: { type: String, required: true }, // The unique ID (e.g., "SN-001", "TAG-XYZ")
+    status: { 
+      type: String, 
+      enum: ['Available', 'Sold', 'Returned', 'Defective', 'Lost'],
+      default: 'Available'
+    },
+    purchaseOrder: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder' }, // Origin
+    dateReceived: { type: Date, default: Date.now }
+  }]
+  // --- END NEW ---
 
 }, { timestamps: true });
 
