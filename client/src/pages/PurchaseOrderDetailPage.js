@@ -4,8 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getPurchaseOrderById, approveSupplierChanges, uploadSignedAgreement } from '../api/purchaseOrderApi';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import jsPDF from 'jspdf'; // KEEP this import
+import autoTable from 'jspdf-autotable'; // KEEP this import
 
 import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
 import ReceiveStockModal from '../components/ReceiveStockModal';
@@ -29,13 +29,14 @@ import LinkIcon from '@mui/icons-material/Link';
 import ImageIcon from '@mui/icons-material/Image';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'; // RE-ADDED: PictureAsPdfIcon
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 
 // --- Row Component for Collapsible Functionality (Kept unchanged) ---
 const Row = ({ item, poStatus, formatCurrency }) => {
+// ... (Row component remains the same) ...
   const [open, setOpen] = useState(false);
   const hasSerials = item.serialNumbers && item.serialNumbers.length > 0; 
 
@@ -173,9 +174,10 @@ const PurchaseOrderDetailPage = () => {
     window.location.reload();
   };
 
+  // --- RE-ADDED: Full jsPDF logic for Download Agreement PDF button ---
   const handleDownloadAgreement = () => {
     if (!po) return;
-    // ... (jsPDF logic remains unchanged) ...
+    
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     
@@ -274,6 +276,7 @@ const PurchaseOrderDetailPage = () => {
 
     doc.output('dataurlnewwindow');
   };
+  // --- END RE-ADDED ---
 
   const handleUploadSuccess = (updatedPo) => {
     setPo(updatedPo);
@@ -297,21 +300,27 @@ const PurchaseOrderDetailPage = () => {
     }
   };
 
-  // --- MODIFIED: New Logic for Image/PDF Viewing (Base64 Fix) ---
-  const handleOpenImageView = (imageUrl) => {
-    if (!imageUrl) return;
+  // --- MODIFIED: Consolidated Logic for Image Viewing in Modal ---
+  const handleOpenImageView = (filePath) => {
+    if (!filePath) return;
     
-    // Check if the URL string is a Base64 Data URI
-    const isDataUri = imageUrl.startsWith('data:');
+    // 1. Check if the file is a Base64 Data URI
+    const isBase64DataUri = filePath.startsWith('data:');
     
-    if (isDataUri) {
-        // FIX: Use window.location.href to open Base64 Data URI. 
-        // This avoids the security/length limit error from window.open and top frame navigation block.
-        window.location.href = imageUrl;
+    if (isBase64DataUri) {
+        // If it's a Base64 string (image), pass it directly to the modal state.
+        setImageViewUrl(filePath);
+        setIsImageViewOpen(true);
     } else {
-        // If it's a regular URL (e.g., from Google Cloud Storage or local backend path), open in the modal
+        // 2. Handle non-Base64 files (regular path or full URL/Cloudinary links)
+        const isFullUrl = filePath.startsWith('http') || filePath.startsWith('https');
+        
+        // Construct the full URL path if it's a local path
         const imageBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-        setImageViewUrl(`${imageBaseUrl}${imageUrl}`);
+        const finalUrl = isFullUrl ? filePath : `${imageBaseUrl}${filePath}`;
+        
+        // Always open in modal for images, as PDF support is removed for uploads.
+        setImageViewUrl(finalUrl);
         setIsImageViewOpen(true);
     }
   };
@@ -454,6 +463,7 @@ const PurchaseOrderDetailPage = () => {
                   )}
                 </CardContent>
                 <CardActions sx={{ p: 2, pt: 0, justifyContent: 'flex-start', gap: 2 }}>
+                  {/* RE-ADDED: Download Agreement PDF button */}
                   <Button variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadAgreement}>
                     Download Agreement PDF
                   </Button>

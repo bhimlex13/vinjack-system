@@ -12,41 +12,7 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'; // Keep this icon
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 
-// --- NEW: Add the resizeImage function (copied from ProductForm.js) ---
-const resizeImage = (file, maxWidth, maxHeight) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        // Basic resizing logic
-        if (width > height) {
-          if (width > maxWidth) {
-            height *= maxWidth / width;
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width *= maxHeight / height;
-            height = maxHeight;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        // Use image/jpeg for smaller file size, adjust quality (0.9 = 90%)
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
-      };
-      img.onerror = (error) => reject(error);
-    };
-    reader.onerror = (error) => reject(error);
-  });
-};
-// --- END NEW ---
+// --- REMOVED: resizeImage function (not using canvas as requested) ---
 
 
 const UploadReceiptModal = ({ open, onClose, saleId, onUploadSuccess }) => {
@@ -57,8 +23,8 @@ const UploadReceiptModal = ({ open, onClose, saleId, onUploadSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // --- MODIFIED: Handle file selection, resize, and convert to Base64 ---
-  const handleFileSelect = async (e) => {
+  // --- MODIFIED: Handle file selection and convert directly to Base64 ---
+  const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       // Basic type check on the frontend for immediate feedback
@@ -79,21 +45,23 @@ const UploadReceiptModal = ({ open, onClose, saleId, onUploadSuccess }) => {
           return;
       }
 
-      setIsLoading(true); // Show loading while processing
       setError('');
       setSelectedFileName(file.name);
-      try {
-        // Resize and convert to Base64 (adjust dimensions as needed)
-        const resizedImage = await resizeImage(file, 800, 1200); // Max 800px wide, 1200px tall
-        setBase64Image(resizedImage);
+      setIsLoading(true);
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = () => {
+        setBase64Image(reader.result);
         toast.success("Image is ready to upload.");
-      } catch (err) {
-        setError("Failed to process image. Please try another file.");
+        setIsLoading(false);
+      };
+      reader.onerror = (err) => {
+        setError("Failed to read file.");
         setSelectedFileName('');
         setBase64Image(null);
-        console.error("Image processing error:", err);
-      } finally {
         setIsLoading(false);
+        console.error("File reader error:", err);
       }
     } else {
         // Handle case where user cancels file selection
@@ -145,7 +113,7 @@ const UploadReceiptModal = ({ open, onClose, saleId, onUploadSuccess }) => {
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Upload Customer Receipt</DialogTitle>
+      <DialogTitle>Upload Customer Receipt (Image Only)</DialogTitle>
       <DialogContent>
         {/* --- MODIFIED: Use Button for input like ProductForm --- */}
         <Box sx={{ p: 2, textAlign: 'center' }}>

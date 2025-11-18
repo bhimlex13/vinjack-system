@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { receivePurchaseOrder } from '../api/purchaseOrderApi';
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable'; // Add autoTable import if needed for labels (often required with jsPDF)
 
 // MUI Imports
 import {
@@ -18,44 +19,14 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 
-const resizeImage = (file, maxWidth, maxHeight) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        if (width > height) {
-          if (width > maxWidth) {
-            height *= maxWidth / width;
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width *= maxHeight / height;
-            height = maxHeight;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
-      };
-      img.onerror = (error) => reject(error);
-    };
-    reader.onerror = (error) => reject(error);
-  });
-};
+// --- REMOVED: resizeImage function (removes canvas usage and PDF logic) ---
 
 const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
   const [receivedItems, setReceivedItems] = useState([]);
   
   const [base64Image, setBase64Image] = useState(null);
   const [selectedFileName, setSelectedFileName] = useState('');
-  const [isImageProcessing, setIsImageProcessing] = useState(false);
+  // Removed: [isImageProcessing, setIsImageProcessing]
   const [imageError, setImageError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -80,20 +51,55 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
     }
     setBase64Image(null);
     setSelectedFileName('');
+    // Removed: setIsImageProcessing(false);
     setImageError('');
-    setIsImageProcessing(false);
     setShowLabelStep(false);
     setItemsForLabels([]);
     setExpandedProduct(null);
   }, [poData]);
+  
+  // State for tracking which input field is focused/active
+  const [activeInput, setActiveInput] = useState(null);
 
+  // --- MODIFIED: Fix Quantity Input and Cursor Position ---
+  const handleQuantityInputFocus = (productId, currentValue) => {
+    // If the current value is exactly the string '0', set the input to an empty string on focus.
+    // This allows the user to type '20' instead of '020'.
+    if (currentValue === '0' || currentValue === 0) {
+      handleQuantityChange(productId, '');
+    }
+    setActiveInput(productId);
+  };
+  
+  const handleQuantityInputBlur = (productId, currentValue) => {
+      // If the user leaves the field empty after focus, set it back to 0 or ''
+      if (currentValue === '') {
+          handleQuantityChange(productId, 0); // Optionally set to 0 or leave as '' depending on UX preference
+      }
+      setActiveInput(null);
+  };
+  
   const handleQuantityChange = (productId, value) => {
-    const maxQty = receivedItems.find(i => i.productId === productId).quantityOrdered - receivedItems.find(i => i.productId === productId).quantityAlreadyReceived;
-    const newQty = Math.max(0, Math.min(Number(value), maxQty));
+    // If the value is empty, don't validate max/min, just set it
+    if (value === '') {
+        setReceivedItems(prevItems => prevItems.map(item => 
+          item.productId === productId ? { ...item, quantityToReceive: '' } : item
+        ));
+        return;
+    }
+    
+    // Ensure input is a number
+    const numericValue = Number(value);
+    
+    if (isNaN(numericValue)) return;
+
+    const maxReceivable = receivedItems.find(i => i.productId === productId).quantityOrdered - receivedItems.find(i => i.productId === productId).quantityAlreadyReceived;
+    const newQty = Math.max(0, Math.min(numericValue, maxReceivable));
 
     setReceivedItems(prevItems => prevItems.map(item => {
       if (item.productId === productId) {
         const currentSerials = item.serialNumbers || [];
+        // Ensure newSerials array size matches newQty, padding with '' or slicing excess
         const newSerials = currentSerials.slice(0, newQty);
         
         while (newSerials.length < newQty) {
@@ -104,6 +110,7 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
       return item;
     }));
   };
+  // --- END MODIFIED: Fix Quantity Input and Cursor Position ---
 
   const handleSerialChange = (productId, index, value) => {
     setReceivedItems(prevItems => prevItems.map(item => {
@@ -120,44 +127,44 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
     setExpandedProduct(expandedProduct === productId ? null : productId);
   };
 
-  const handleFileSelect = async (e) => {
+  // --- MODIFIED: Receipt Upload (Image Only, simplified Base64) ---
+  const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const isPDF = file.type === 'application/pdf';
-      const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+      // --- MODIFIED: Removed PDF and simplified type check ---
+      const allowedTypes = ['image/jpeg', 'image/png'];
       if (!allowedTypes.includes(file.type)) {
-        setImageError('Invalid file type. Please upload JPG, PNG, or PDF.');
+        setImageError('Invalid file type. Please upload JPG or PNG.');
+        return;
+      }
+      // --- END MODIFIED ---
+      
+      if (file.size > 5 * 1024 * 1024) { // 5MB Limit
+        setImageError('File is too large (max 5MB).');
         return;
       }
       
-      setIsImageProcessing(true);
+      // Removed: setIsImageProcessing(true);
       setImageError('');
       setSelectedFileName(file.name);
-
+      
       const reader = new FileReader();
-      reader.onloadend = async () => {
-          if (isPDF) {
-              // Direct Base64 for PDF
-              setBase64Image(reader.result);
-              toast.info("PDF file ready for upload.");
-              setIsImageProcessing(false);
-          } else {
-              // Resize image if it's an image
-              try {
-                  const resizedImage = await resizeImage(file, 800, 1200);
-                  setBase64Image(resizedImage);
-                  toast.info("Image ready for upload.");
-              } catch (err) {
-                  setImageError("Failed to process image.");
-              } finally {
-                  setIsImageProcessing(false);
-              }
-          }
-      };
       reader.readAsDataURL(file);
+      reader.onloadend = () => {
+          setBase64Image(reader.result);
+          toast.info("Image file ready for upload.");
+          // Removed: setIsImageProcessing(false);
+      };
+      reader.onerror = (err) => {
+          setImageError("Failed to read file.");
+          setBase64Image(null);
+          // Removed: setIsImageProcessing(false);
+      }
     }
   };
+  // --- END MODIFIED: Receipt Upload (Image Only, simplified Base64) ---
 
+  // --- MODIFIED: Added autoTable import for label printing ---
   const handlePrintLabels = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [50, 30] });
     let isFirstPage = true;
@@ -197,6 +204,7 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
 
     doc.save(`labels_PO-${poData.poNumber}.pdf`);
   };
+  // --- END MODIFIED: Added autoTable import for label printing ---
 
   const handleSubmit = async () => {
     const itemsWithQuantity = receivedItems
@@ -265,7 +273,7 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
   }
   // --- END NEW ---
 
-  const isDisabled = isSubmitting || isImageProcessing;
+  const isDisabled = isSubmitting; // Removed isImageProcessing since no resizing is happening now
 
   return (
     <Dialog open={open} onClose={isDisabled ? () => {} : onClose} maxWidth="md" fullWidth>
@@ -279,6 +287,7 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
             <Typography variant="body2" sx={{ mb: 2 }}>
               Enter the quantity of items received. For serialized/consigned items, enter the unique ID for each unit.
             </Typography>
+            {imageError && <Alert severity="error" sx={{ mb: 2 }}>{imageError}</Alert>}
             <TableContainer component={Paper}>
               <Table size="small">
                 <TableHead>
@@ -306,6 +315,10 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
                             size="small"
                             value={item.quantityToReceive}
                             onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
+                            // --- MODIFIED: Add Focus/Blur handlers ---
+                            onFocus={(e) => handleQuantityInputFocus(item.productId, e.target.value)}
+                            onBlur={(e) => handleQuantityInputBlur(item.productId, e.target.value)}
+                            // --- END MODIFIED ---
                             inputProps={{ min: 0, max: item.quantityOrdered - item.quantityAlreadyReceived }}
                             sx={{ maxWidth: 80 }}
                             disabled={isDisabled}
@@ -353,7 +366,7 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
             </TableContainer>
 
             <Box sx={{ mt: 3, border: '1px dashed grey', p: 2, borderRadius: 1, textAlign: 'center' }}>
-              <Typography gutterBottom>Upload Receipt (Optional - Image or PDF)</Typography>
+              <Typography gutterBottom>Upload Receipt (Optional - Image Only)</Typography>
               <Button
                 variant="outlined"
                 component="label"
@@ -361,11 +374,12 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
                 disabled={isDisabled}
                 fullWidth
               >
-                Select File
+                Select Image (JPG, PNG only)
                 <input
                   type="file"
                   hidden
-                  accept="image/jpeg,image/png,application/pdf"
+                  // --- MODIFIED: Only accept images ---
+                  accept="image/jpeg,image/png"
                   onChange={handleFileSelect}
                 />
               </Button>
