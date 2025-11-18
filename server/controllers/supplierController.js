@@ -2,13 +2,12 @@
 const Supplier = require('../models/supplierModel');
 const Product = require('../models/productModel');
 const mongoose = require('mongoose');
-// --- NEW: Import models for order history ---
 const PurchaseOrder = require('../models/purchaseOrderModel');
 const Delivery = require('../models/deliveryModel');
-// --- END NEW ---
 const logAction = require('../utils/logger');
 
 const getSuppliers = async (req, res) => {
+  // (function unchanged)
   try {
     const suppliers = await Supplier.find({}).sort({ name: 1 });
     res.json(suppliers);
@@ -18,6 +17,7 @@ const getSuppliers = async (req, res) => {
 };
 
 const createSupplier = async (req, res) => {
+  // (function unchanged)
   try {
     const { name, email, contactPerson, contactNumber, address, status, defaultPaymentTerms } = req.body;
     
@@ -46,6 +46,7 @@ const createSupplier = async (req, res) => {
 };
 
 const updateSupplier = async (req, res) => {
+  // (function unchanged)
   try {
     const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
@@ -68,6 +69,7 @@ const updateSupplier = async (req, res) => {
 };
 
 const deleteSupplier = async (req, res) => {
+  // (function unchanged)
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -97,6 +99,7 @@ const deleteSupplier = async (req, res) => {
 };
 
 const getSupplierProductCatalog = async (req, res) => {
+  // (function unchanged)
   try {
     const supplierId = req.params.id;
     
@@ -107,13 +110,11 @@ const getSupplierProductCatalog = async (req, res) => {
         sc => sc.supplier.toString() === supplierId
       );
       
-      // --- MODIFIED: Also return the note ---
       return {
         product: product,
         cost: costEntry ? costEntry.cost : 0,
-        note: costEntry ? costEntry.note : '' // <-- ADDED
+        note: costEntry ? costEntry.note : '' 
       };
-      // --- END MODIFICATION ---
     });
 
     res.json(catalog);
@@ -123,10 +124,9 @@ const getSupplierProductCatalog = async (req, res) => {
 };
 
 const updateSupplierProductCatalog = async (req, res) => {
+  // (function unchanged)
   const supplierId = req.params.id;
-  // --- MODIFIED: Expect 'note' in the payload ---
-  const { products: newCatalog } = req.body; // Array of { product: 'productId', cost: 123, note: '...' }
-  // --- END MODIFICATION ---
+  const { products: newCatalog } = req.body; 
   
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -137,7 +137,6 @@ const updateSupplierProductCatalog = async (req, res) => {
 
     const newProductIds = new Set(newCatalog.map(item => item.product));
 
-    // 1. REMOVE supplier from any products that are NO LONGER in the new catalog
     await Product.updateMany(
       { 
         'supplierCosts.supplier': supplierId,
@@ -147,28 +146,19 @@ const updateSupplierProductCatalog = async (req, res) => {
       { session }
     );
 
-    // 2. ADD/UPDATE supplier for all products that ARE in the new catalog
     for (const item of newCatalog) {
-      // --- MODIFIED: Get 'note' from item ---
       const { product: productId, cost, note } = item;
-      // --- END MODIFICATION ---
       
-      // Try to update the cost/note if the supplier entry already exists
       const updateResult = await Product.updateOne(
         { _id: productId, 'supplierCosts.supplier': supplierId },
-        // --- MODIFIED: Update both cost and note ---
         { $set: { 'supplierCosts.$.cost': cost, 'supplierCosts.$.note': note } },
-        // --- END MODIFICATION ---
         { session }
       );
 
-      // If no document was matched, it means this is a NEW product for this supplier
       if (updateResult.matchedCount === 0) {
         await Product.updateOne(
           { _id: productId },
-          // --- MODIFIED: Push new entry with cost and note ---
           { $push: { supplierCosts: { supplier: supplierId, cost: cost, note: note } } },
-          // --- END MODIFICATION ---
           { session }
         );
       }
@@ -187,30 +177,26 @@ const updateSupplierProductCatalog = async (req, res) => {
   }
 };
 
-// --- NEW FUNCTION: Get order history for a specific supplier ---
 const getSupplierOrderHistory = async (req, res) => {
+  // (function unchanged)
   try {
     const supplierId = req.params.id;
 
-    // 1. Find Purchase Orders
     const poHistory = await PurchaseOrder.find({ supplier: supplierId })
       .select('poNumber status totalAmount createdAt poType')
       .sort({ createdAt: -1 })
-      .limit(50) // Limit to last 50
-      .lean(); // Use .lean() for faster, plain objects
+      .limit(50) 
+      .lean(); 
 
-    // 2. Find Direct Deliveries
     const deliveryHistory = await Delivery.find({ supplier: supplierId })
       .select('totalCost createdAt')
       .sort({ createdAt: -1 })
-      .limit(50) // Limit to last 50
+      .limit(50) 
       .lean();
 
-    // 3. Format and combine histories
     const formattedPOs = poHistory.map(po => ({
       _id: po._id,
       date: po.createdAt,
-      // Determine type based on poType
       type: po.poType === 'Consignment' ? 'PO (Consignment)' : 'PO (Purchase)',
       reference: po.poNumber,
       status: po.status,
@@ -221,18 +207,74 @@ const getSupplierOrderHistory = async (req, res) => {
       _id: d._id,
       date: d.createdAt,
       type: 'Direct Delivery',
-      reference: 'Direct', // Direct deliveries don't have a PO number
+      reference: 'Direct',
       status: 'Completed',
       amount: d.totalCost
     }));
 
-    // Combine and sort by date descending
     const combinedHistory = [...formattedPOs, ...formattedDeliveries];
     combinedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    res.json(combinedHistory.slice(0, 100)); // Send the most recent 100 entries
+    res.json(combinedHistory.slice(0, 100));
   } catch (error) {
     console.error("Error fetching supplier history:", error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// --- NEW FUNCTION: Get completed POs and Deliveries for returns ---
+const getSupplierCompletedOrders = async (req, res) => {
+  try {
+    const supplierId = req.params.id;
+
+    // 1. Find completed/received Purchase Orders
+    const poHistory = await PurchaseOrder.find({ 
+      supplier: supplierId,
+      status: { $in: ['Completed', 'Partially Received'] }
+    })
+      .select('poNumber createdAt items.product items.quantity')
+      .populate('items.product', 'name itemCode')
+      .sort({ createdAt: -1 })
+      .limit(20) 
+      .lean(); 
+
+    // 2. Find Direct Deliveries
+    const deliveryHistory = await Delivery.find({ supplier: supplierId })
+      .select('deliveryDate createdAt productsReceived.product productsReceived.quantity')
+      .populate('productsReceived.product', 'name itemCode')
+      .sort({ createdAt: -1 })
+      .limit(20) 
+      .lean();
+
+    // 3. Format and combine histories
+    const formattedPOs = poHistory.map(po => ({
+      _id: po._id,
+      name: `PO: ${po.poNumber} (from ${new Date(po.createdAt).toLocaleDateString()})`,
+      type: 'PurchaseOrder',
+      // Map items to a consistent format
+      items: po.items.map(item => ({
+        product: item.product, // This is now populated
+        quantity: item.quantity
+      }))
+    }));
+
+    const formattedDeliveries = deliveryHistory.map(d => ({
+      _id: d._id,
+      name: `Direct Delivery (from ${new Date(d.createdAt).toLocaleDateString()})`,
+      type: 'Delivery',
+      // Map items to a consistent format
+      items: d.productsReceived.map(item => ({
+        product: item.product, // This is now populated
+        quantity: item.quantity
+      }))
+    }));
+
+    const combinedHistory = [...formattedPOs, ...formattedDeliveries];
+    combinedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json(combinedHistory);
+  } catch (error) {
+    console.error("Error fetching supplier completed orders:", error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
@@ -245,6 +287,7 @@ module.exports = {
   deleteSupplier,
   getSupplierProductCatalog,
   updateSupplierProductCatalog,
+  getSupplierOrderHistory,
   // --- EXPORT NEW FUNCTION ---
-  getSupplierOrderHistory
+  getSupplierCompletedOrders
 };
