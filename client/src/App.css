@@ -36,3 +36,30 @@
     transform: rotate(360deg);
   }
 }
+
+/* --- MODIFIED: Custom Spinner CSS --- */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes run {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-5px) translateY(-2px);
+    }
+    75% {
+        transform: translateX(5px) translateY(2px);
+    }
+}
+
+.spinner-gear {
+  animation: run 0.8s ease-in-out infinite; /* Apply the running animation to the motorcycle icon */
+}
+/* --- END MODIFIED --- */
