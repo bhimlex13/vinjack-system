@@ -3,15 +3,22 @@ import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { getOwedPayables, markPayableAsPaid } from '../api/consignmentApi';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
-
-// MUI Imports
+// --- NEW: Import the history component and tabs ---
+import PayoutHistory from '../components/reports/PayoutHistory';
 import {
   Container, Typography, Paper, Box, CircularProgress, Alert, Tooltip, IconButton,
-  TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem
+  TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem,
+  Tabs, // <-- NEW
+  Tab   // <-- NEW
 } from '@mui/material';
+// --- END NEW ---
 import { DataGrid } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+// --- NEW: Icons for tabs ---
+import PaymentIcon from '@mui/icons-material/Payment';
+import HistoryIcon from '@mui/icons-material/History';
+// --- END NEW ---
 
 // Helper to format currency
 const formatCurrency = (value) => 
@@ -19,11 +26,33 @@ const formatCurrency = (value) =>
 
 // Helper to format dates
 const formatDateTime = (dateString) => 
-  new Date(dateString).toLocaleString('en-US', {
+  dateString ? new Date(dateString).toLocaleString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-  });
+  }) : 'N/A';
 
-const ConsignmentPayoutsPage = () => {
+// --- NEW: TabPanel helper ---
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`payout-tabpanel-${index}`}
+      aria-labelledby={`payout-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ pt: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+// --- END NEW ---
+
+// --- MOVED: This is now the content for the FIRST tab ---
+const OwedPayouts = () => {
   const [payables, setPayables] = useState([]);
   const [allSuppliers, setAllSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +67,6 @@ const ConsignmentPayoutsPage = () => {
       const data = await getOwedPayables();
       setPayables(data);
 
-      // Create a unique list of suppliers from the payables
       const suppliers = new Map();
       data.forEach(p => {
         if (p.supplier) {
@@ -71,7 +99,6 @@ const ConsignmentPayoutsPage = () => {
       try {
         await markPayableAsPaid(payable._id);
         toast.success('Payable marked as paid!');
-        // Refresh list by removing the paid item
         setPayables(prevPayables => prevPayables.filter(p => p._id !== payable._id));
       } catch (err) {
         toast.error(err.message || 'Failed to mark as paid.');
@@ -83,13 +110,11 @@ const ConsignmentPayoutsPage = () => {
   const filteredPayables = useMemo(() => {
     return payables.filter(p => {
       const supplierMatch = filterSupplier ? p.supplier?._id === filterSupplier : true;
-      
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const searchMatch = !searchTerm ||
         (p.product?.name?.toLowerCase().includes(lowerCaseSearchTerm)) ||
         (p.product?.itemCode?.toLowerCase().includes(lowerCaseSearchTerm)) ||
         (p.supplier?.name?.toLowerCase().includes(lowerCaseSearchTerm));
-      
       return supplierMatch && searchMatch;
     });
   }, [payables, searchTerm, filterSupplier]);
@@ -101,18 +126,15 @@ const ConsignmentPayoutsPage = () => {
   const columns = [
     {
       field: 'saleDate', headerName: 'Date Sold', flex: 1, minWidth: 180,
-      // --- FIX: Use (value, row) signature ---
       valueGetter: (value, row) => new Date(row.sale?.createdAt || row.createdAt),
       renderCell: (params) => formatDateTime(params.value),
     },
     { 
       field: 'supplier', headerName: 'Supplier', flex: 1.5, minWidth: 200,
-      // --- FIX: Use (value, row) signature ---
       valueGetter: (value, row) => row.supplier?.name || 'N/A'
     },
     { 
       field: 'product', headerName: 'Product', flex: 1.5, minWidth: 220,
-      // --- FIX: Use (value, row) signature ---
       valueGetter: (value, row) => `${row.product?.name} (${row.product?.itemCode})`
     },
     { 
@@ -146,15 +168,8 @@ const ConsignmentPayoutsPage = () => {
   ];
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-        Consignment Payouts
-      </Typography>
-      <Typography variant="body1" color="text.secondary" gutterBottom>
-        Review items sold on consignment and mark them as paid to the supplier.
-      </Typography>
-
-      {/* --- Filter and Search Bar --- */}
+    <Box> {/* Return a Box, not a Container, as it's inside a tab */}
+      {/* Filter and Search Bar */}
       <Paper sx={{ p: 2, my: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
         <TextField
           label="Search by Product or Supplier"
@@ -186,7 +201,7 @@ const ConsignmentPayoutsPage = () => {
         </FormControl>
       </Paper>
 
-      {/* --- Total Owed Box --- */}
+      {/* Total Owed Box */}
       <Box sx={{ mb: 2, textAlign: 'right' }}>
         <Typography variant="h5" component="p" color="error.main" fontWeight="bold">
           Total Owed (Filtered): {formatCurrency(totalOwed)}
@@ -204,9 +219,59 @@ const ConsignmentPayoutsPage = () => {
           initialState={{
             sorting: { sortModel: [{ field: 'saleDate', sort: 'desc' }] },
           }}
-          sx={{ '& .MuiDataGrid-cell': { py: 1 } }} // Add padding to cells
+          sx={{ '& .MuiDataGrid-cell': { py: 1 } }}
         />
       </Paper>
+    </Box>
+  );
+};
+// --- END of OwedPayouts component ---
+
+
+// --- NEW: Main Page Shell ---
+const ConsignmentPayoutsPage = () => {
+  const [currentTab, setCurrentTab] = useState(0);
+
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+  
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+        Consignment Payouts
+      </Typography>
+      <Typography variant="body1" color="text.secondary" gutterBottom>
+        Review items sold on consignment, mark them as paid, and view payout history.
+      </Typography>
+
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 3 }}>
+        <Tabs value={currentTab} onChange={handleTabChange} aria-label="consignment tabs">
+          <Tab 
+            label="Owed Payouts" 
+            icon={<PaymentIcon />} 
+            iconPosition="start" 
+            id="payout-tab-0"
+          />
+          <Tab 
+            label="Payout History" 
+            icon={<HistoryIcon />} 
+            iconPosition="start" 
+            id="payout-tab-1"
+          />
+        </Tabs>
+      </Box>
+
+      {/* Tab 1: Owed Payouts */}
+      <TabPanel value={currentTab} index={0}>
+        <OwedPayouts />
+      </TabPanel>
+
+      {/* Tab 2: Payout History */}
+      <TabPanel value={currentTab} index={1}>
+        <PayoutHistory />
+      </TabPanel>
+      
     </Container>
   );
 };
