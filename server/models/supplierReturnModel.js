@@ -23,21 +23,18 @@ const supplierReturnSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true,
-        enum: ['Defective', 'Wrong Item', 'Overstock', 'Other'], // This covers "items w/ defect"
+        enum: ['Defective', 'Wrong Item', 'Overstock', 'Other'], 
       },
-      // --- NEW ---
-      // We need to know if the item being returned was from consignment stock
       wasConsigned: {
         type: Boolean,
         default: false,
         required: true
       }
-      // --- END NEW ---
     }
   ],
   returnDate: {
     type: Date,
-    default: Date.now,
+    required: true // --- MODIFIED: Removed default, will be set by controller ---
   },
   notes: {
     type: String,
@@ -47,7 +44,19 @@ const supplierReturnSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+  },
+  // --- NEW: Fields to link to the original purchase ---
+  originalPurchase: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: 'originalPurchaseType',
+    required: false // Optional, as user may not select one
+  },
+  originalPurchaseType: {
+    type: String,
+    enum: ['PurchaseOrder', 'Delivery'],
+    required: function() { return !!this.originalPurchase; } // Required only if originalPurchase is set
   }
+  // --- END NEW ---
 }, { timestamps: true });
 
 module.exports = mongoose.model('SupplierReturn', supplierReturnSchema);

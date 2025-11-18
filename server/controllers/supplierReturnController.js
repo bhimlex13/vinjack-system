@@ -13,7 +13,15 @@ const mongoose = require('mongoose');
  */
 const createSupplierReturn = async (req, res) => {
   const io = req.app.get('socketio');
-  const { supplier, productsReturned, notes, returnDate } = req.body;
+  // --- MODIFIED: Removed returnDate, added new fields ---
+  const { 
+    supplier, 
+    productsReturned, 
+    notes, 
+    originalPurchaseId, 
+    originalPurchaseType 
+  } = req.body;
+  // --- END MODIFICATION ---
 
   if (!supplier || !productsReturned || productsReturned.length === 0) {
     return res.status(400).json({ message: 'Supplier and at least one product are required.' });
@@ -31,9 +39,7 @@ const createSupplierReturn = async (req, res) => {
         throw new Error('Return quantity must be a positive number.');
       }
       
-      // --- UPDATED: Also select consignedStock ---
       const product = await Product.findById(item.product).select('name quantity consignedStock').session(session);
-      // --- END UPDATED ---
       
       if (!product) {
         throw new Error(`Product with ID ${item.product} not found.`);
@@ -43,9 +49,8 @@ const createSupplierReturn = async (req, res) => {
       }
 
       const stockBefore = product.quantity;
-      product.quantity -= item.quantity; // Decrease total stock
+      product.quantity -= item.quantity; 
       
-      // --- NEW: Check if the returned item was from consignment stock ---
       if (item.wasConsigned) {
         const consignedStock = Number(product.consignedStock) || 0;
         if (consignedStock < item.quantity) {
@@ -53,15 +58,12 @@ const createSupplierReturn = async (req, res) => {
         }
         product.consignedStock = consignedStock - item.quantity;
       }
-      // --- END NEW ---
       
       await product.save({ session });
       
       await logMovement({
         product: product._id,
-        // --- NEW: Differentiate movement type ---
         type: item.wasConsigned ? 'RETURN (CONSIGN)' : 'SUPPLIER_RETURN',
-        // --- END NEW ---
         quantityChange: -item.quantity,
         stockBefore,
         notes: `Reason: ${item.reason}`,
@@ -71,10 +73,15 @@ const createSupplierReturn = async (req, res) => {
 
     const newReturn = new SupplierReturn({
       supplier,
-      productsReturned, // This now includes the 'wasConsigned' flag from req.body
+      productsReturned, 
       notes,
-      returnDate: returnDate || new Date(),
+      // --- MODIFIED: Set returnDate automatically ---
+      returnDate: new Date(), 
       recordedBy: req.user.id,
+      // --- NEW: Save the original purchase link ---
+      originalPurchase: originalPurchaseId || undefined,
+      originalPurchaseType: originalPurchaseType || undefined
+      // --- END NEW ---
     });
 
     const savedReturn = await newReturn.save({ session });

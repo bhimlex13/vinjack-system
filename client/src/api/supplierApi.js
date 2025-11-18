@@ -45,7 +45,6 @@ export const updateSupplierProductCatalog = async (supplierId, products) => {
   return response.data;
 };
 
-// --- NEW FUNCTION FOR ORDER HISTORY ---
 /**
  * Fetches the combined order history (POs and Deliveries) for a supplier.
  * @param {string} supplierId - The ID of the supplier.
@@ -59,6 +58,23 @@ export const getSupplierOrderHistory = async (supplierId) => {
   } catch (error) {
     console.error('Error fetching supplier order history:', error);
     throw error.response?.data || new Error('Failed to fetch order history');
+  }
+};
+
+// --- NEW FUNCTION FOR COMPLETED ORDERS (FOR RETURNS) ---
+/**
+ * Fetches completed POs and Deliveries for a supplier to populate the return modal.
+ * @param {string} supplierId - The ID of the supplier.
+ * @returns {Promise<Array>} A promise that resolves to an array of purchase history items.
+ */
+export const getSupplierCompletedOrders = async (supplierId) => {
+  if (!supplierId) throw new Error("Supplier ID is required.");
+  try {
+    const response = await api.get(`/suppliers/${supplierId}/completed-orders`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching supplier completed orders:', error);
+    throw error.response?.data || new Error('Failed to fetch completed orders');
   }
 };
 // --- END NEW FUNCTION ---
