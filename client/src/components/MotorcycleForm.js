@@ -1,9 +1,13 @@
 // client/src/components/MotorcycleForm.js
-import React, { useState, useEffect, useContext } from 'react'; // Import useContext
-import ConfirmationContext from '../context/ConfirmationContext'; // Import the context
+import React, { useState, useEffect, useContext } from 'react'; 
+import ConfirmationContext from '../context/ConfirmationContext'; 
 import { createMotorcycle, updateMotorcycle } from '../api/motorcycleApi';
 import { toast } from 'react-toastify';
 import { Box, TextField, Button, Stack, Alert } from '@mui/material';
+import { motion } from 'framer-motion'; // --- NEW IMPORT ---
+
+// --- NEW IMPORT ---
+import LoadingSpinner from './LoadingSpinner';
 
 const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) => {
   const [formData, setFormData] = useState({
@@ -11,7 +15,7 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { confirm } = useContext(ConfirmationContext); // Use the confirmation context
+  const { confirm } = useContext(ConfirmationContext); 
 
   useEffect(() => {
     if (motorcycleToEdit) {
@@ -41,7 +45,6 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
     };
   };
 
-  // --- NEW: Function to handle the forced creation after confirmation ---
   const handleForceCreate = async () => {
     setIsSubmitting(true);
     setError('');
@@ -49,7 +52,7 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
     const payload = { 
       ...cleanedData, 
       owner: customer._id, 
-      forceCreate: true // Add the override flag
+      forceCreate: true 
     };
 
     try {
@@ -87,16 +90,14 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'An error occurred.';
       
-      // --- MODIFIED: Catch the specific soft duplicate warning ---
       if (err.response?.status === 409 && err.response?.data?.isSoftDuplicate) {
-        const userConfirmed = await confirm(errorMsg); // Show confirmation dialog
+        const userConfirmed = await confirm(errorMsg); 
         if (userConfirmed) {
-          handleForceCreate(); // If confirmed, call the new function
-          return; // Stop further execution in this block
+          handleForceCreate(); 
+          return; 
         }
       }
       
-      // For all other errors, just display them
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -105,22 +106,30 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ p: 3, pt: 1 }}>
+    <Box 
+      component="form" 
+      onSubmit={handleSubmit} 
+      sx={{ p: 3, pt: 1 }}
+    >
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      <Stack spacing={2}>
-        <TextField label="Make (e.g., Honda)" name="make" value={formData.make} onChange={handleChange} required fullWidth />
-        <TextField label="Model (e.g., Click 125i)" name="model" value={formData.model} onChange={handleChange} required fullWidth />
-        <TextField label="Year" name="year" type="number" value={formData.year} onChange={handleChange} fullWidth />
-        <TextField label="Color" name="color" value={formData.color} onChange={handleChange} fullWidth />
-        <TextField label="Plate Number (Optional)" name="plateNumber" value={formData.plateNumber} onChange={handleChange} fullWidth />
-        <TextField label="VIN (Optional)" name="vin" value={formData.vin} onChange={handleChange} fullWidth />
-        <Stack direction="row" spacing={2} justifyContent="flex-end">
-          <Button onClick={onClose} disabled={isSubmitting}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Motorcycle'}
-          </Button>
+      
+      {/* --- WRAP FORM FIELDS IN MOTION DIV --- */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+        <Stack spacing={2}>
+            <TextField label="Make (e.g., Honda)" name="make" value={formData.make} onChange={handleChange} required fullWidth />
+            <TextField label="Model (e.g., Click 125i)" name="model" value={formData.model} onChange={handleChange} required fullWidth />
+            <TextField label="Year" name="year" type="number" value={formData.year} onChange={handleChange} fullWidth />
+            <TextField label="Color" name="color" value={formData.color} onChange={handleChange} fullWidth />
+            <TextField label="Plate Number (Optional)" name="plateNumber" value={formData.plateNumber} onChange={handleChange} fullWidth />
+            <TextField label="VIN (Optional)" name="vin" value={formData.vin} onChange={handleChange} fullWidth />
+            <Stack direction="row" spacing={2} justifyContent="flex-end">
+            <Button onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={isSubmitting}>
+                {isSubmitting ? <LoadingSpinner text="" /> : (motorcycleToEdit ? 'Update' : 'Save')}
+            </Button>
+            </Stack>
         </Stack>
-      </Stack>
+      </motion.div>
     </Box>
   );
 };

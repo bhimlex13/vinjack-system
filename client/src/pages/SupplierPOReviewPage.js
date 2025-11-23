@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { getPurchaseOrderByToken, updateBySupplier } from '../api/purchaseOrderApi';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import {
@@ -13,6 +14,9 @@ import {
   DialogContent, DialogActions, List, ListItem, ListItemText, 
 } from '@mui/material';
 
+// --- NEW IMPORT ---
+import LoadingSpinner from '../components/LoadingSpinner';
+
 const SupplierPOReviewPage = () => {
   const { token } = useParams();
   const [po, setPo] = useState(null);
@@ -21,12 +25,21 @@ const SupplierPOReviewPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // State to hold supplier's changes
   const [items, setItems] = useState([]);
   const [supplierNotes, setSupplierNotes] = useState('');
   
-  // --- ADDED: State to control the confirmation modal ---
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
+  // --- FRAMER MOTION VARIANTS ---
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.5, ease: "easeOut" }
+    }
+  };
+  // ------------------------------
 
   useEffect(() => {
     const fetchPO = async () => {
@@ -57,9 +70,8 @@ const SupplierPOReviewPage = () => {
     ));
   };
   
-  // --- MODIFIED: This is now the final submission logic, called from the modal ---
   const handleFinalSubmit = async () => {
-    setIsConfirmModalOpen(false); // Close the modal first
+    setIsConfirmModalOpen(false); 
     setSubmitting(true);
     try {
       const submissionData = {
@@ -80,20 +92,29 @@ const SupplierPOReviewPage = () => {
     }
   };
 
-  // --- ADDED: Calculate changes for the summary modal ---
   const summaryData = useMemo(() => {
     const priceChanges = items.filter(item => item.isAvailable && item.supplierUpdatedCost !== item.cost);
     const unavailableItems = items.filter(item => !item.isAvailable);
     return { priceChanges, unavailableItems };
   }, [items]);
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
+  if (loading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <LoadingSpinner text="Loading Order..." />
+    </Box>
+  );
+
   if (error) return <Container sx={{mt: 5}}><Alert severity="error">{error}</Alert></Container>;
   
   if (submitted) {
     return (
       <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Paper 
+          sx={{ p: 4, textAlign: 'center' }}
+          component={motion.div}
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+        >
           <Typography variant="h4" gutterBottom>Thank You!</Typography>
           <Typography>Your response has been submitted successfully.</Typography>
         </Paper>
@@ -105,64 +126,86 @@ const SupplierPOReviewPage = () => {
     <>
       <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
 
-      {/* --- ADDED: Confirmation and Summary Modal --- */}
-      <Dialog open={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Confirm Your Review</DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" gutterBottom>Please review the summary of your changes before submitting.</Typography>
-          
-          {summaryData.priceChanges.length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="h6" gutterBottom>Price Adjustments:</Typography>
-              <List dense>
-                {summaryData.priceChanges.map(item => (
-                  <ListItem key={item.product._id}>
-                    <ListItemText 
-                      primary={item.product.name} 
-                      secondary={`Changed from ₱${item.cost.toFixed(2)} to ₱${item.supplierUpdatedCost.toFixed(2)}`} 
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
+      <AnimatePresence>
+        {isConfirmModalOpen && (
+          <Dialog 
+            open={isConfirmModalOpen} 
+            onClose={() => setIsConfirmModalOpen(false)} 
+            maxWidth="sm" 
+            fullWidth
+            PaperComponent={motion.div}
+            PaperProps={{
+              initial: { y: 50, opacity: 0 },
+              animate: { y: 0, opacity: 1 },
+              exit: { y: 50, opacity: 0 },
+              transition: { duration: 0.3 },
+              sx: { backgroundColor: 'background.paper', boxShadow: 24, borderRadius: 2 }
+            }}
+          >
+            <DialogTitle>Confirm Your Review</DialogTitle>
+            <DialogContent>
+              <Typography variant="body1" gutterBottom>Please review the summary of your changes before submitting.</Typography>
+              
+              {summaryData.priceChanges.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="h6" gutterBottom>Price Adjustments:</Typography>
+                  <List dense>
+                    {summaryData.priceChanges.map(item => (
+                      <ListItem key={item.product._id}>
+                        <ListItemText 
+                          primary={item.product.name} 
+                          secondary={`Changed from ₱${item.cost.toFixed(2)} to ₱${item.supplierUpdatedCost.toFixed(2)}`} 
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
 
-          {summaryData.unavailableItems.length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="h6" gutterBottom>Unavailable Items:</Typography>
-              <List dense>
-                {summaryData.unavailableItems.map(item => (
-                  <ListItem key={item.product._id}>
-                    <ListItemText primary={item.product.name} />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
+              {summaryData.unavailableItems.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="h6" gutterBottom>Unavailable Items:</Typography>
+                  <List dense>
+                    {summaryData.unavailableItems.map(item => (
+                      <ListItem key={item.product._id}>
+                        <ListItemText primary={item.product.name} />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
 
-          {supplierNotes && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="h6" gutterBottom>Your Notes:</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{supplierNotes}</Typography>
-            </Box>
-          )}
+              {supplierNotes && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="h6" gutterBottom>Your Notes:</Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{supplierNotes}</Typography>
+                </Box>
+              )}
 
-          {(summaryData.priceChanges.length === 0 && summaryData.unavailableItems.length === 0 && !supplierNotes) && (
-            <Typography sx={{ mt: 2 }}>No changes were made. You are confirming the order as is.</Typography>
-          )}
+              {(summaryData.priceChanges.length === 0 && summaryData.unavailableItems.length === 0 && !supplierNotes) && (
+                <Typography sx={{ mt: 2 }}>No changes were made. You are confirming the order as is.</Typography>
+              )}
 
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsConfirmModalOpen(false)}>Cancel</Button>
-          <Button onClick={handleFinalSubmit} variant="contained" disabled={submitting}>
-            {submitting ? <CircularProgress size={24} /> : 'Confirm & Submit'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setIsConfirmModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleFinalSubmit} variant="contained" disabled={submitting}>
+                {submitting ? <CircularProgress size={24} /> : 'Confirm & Submit'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
+      </AnimatePresence>
 
 
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Paper sx={{ p: 3 }}>
+        <Paper 
+          sx={{ p: 3 }}
+          component={motion.div}
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
           <Typography variant="h4" gutterBottom>Purchase Order Review</Typography>
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={6}><Typography><strong>PO Number:</strong> {po.poNumber}</Typography></Grid>
@@ -182,7 +225,6 @@ const SupplierPOReviewPage = () => {
               </TableHead>
               <TableBody>
                 {items.map((item) => (
-                  // --- MODIFIED: Added conditional styling for unavailable items ---
                   <TableRow 
                     key={item.product._id}
                     sx={!item.isAvailable ? { backgroundColor: '#fafafa', '& > *': { color: 'text.disabled' } } : {}}
@@ -198,7 +240,7 @@ const SupplierPOReviewPage = () => {
                         value={item.supplierUpdatedCost}
                         onChange={(e) => handleItemChange(item.product._id, 'supplierUpdatedCost', parseFloat(e.target.value) || 0)}
                         inputProps={{ step: "0.01", min: 0 }}
-                        disabled={!item.isAvailable} // --- MODIFIED: Disable cost field if not available
+                        disabled={!item.isAvailable} 
                       />
                     </TableCell>
                     <TableCell align="center">
@@ -229,7 +271,6 @@ const SupplierPOReviewPage = () => {
           />
 
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-            {/* --- MODIFIED: Button now opens the confirmation modal --- */}
             <Button
               variant="contained"
               onClick={() => setIsConfirmModalOpen(true)}

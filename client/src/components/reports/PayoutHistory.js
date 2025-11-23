@@ -2,14 +2,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getPayoutHistory } from '../../api/consignmentApi';
 import { toast } from 'react-toastify';
+import { motion } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import {
-  Paper, Box, CircularProgress, Alert, TextField, InputAdornment, 
+  Paper, Box, Alert, TextField, InputAdornment, 
   FormControl, InputLabel, Select, MenuItem, Typography
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
+
+// --- NEW IMPORT ---
+import LoadingSpinner from '../LoadingSpinner';
 
 // Helper to format currency
 const formatCurrency = (value) => 
@@ -29,6 +33,17 @@ const PayoutHistory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
 
+  // --- FRAMER MOTION VARIANTS ---
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.4, ease: "easeOut" }
+    }
+  };
+  // ------------------------------
+
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -36,7 +51,6 @@ const PayoutHistory = () => {
         const data = await getPayoutHistory();
         setPayables(data);
 
-        // Create a unique list of suppliers from the history
         const suppliers = new Map();
         data.forEach(p => {
           if (p.supplier) {
@@ -61,13 +75,11 @@ const PayoutHistory = () => {
   const filteredPayables = useMemo(() => {
     return payables.filter(p => {
       const supplierMatch = filterSupplier ? p.supplier?._id === filterSupplier : true;
-      
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const searchMatch = !searchTerm ||
         (p.product?.name?.toLowerCase().includes(lowerCaseSearchTerm)) ||
         (p.product?.itemCode?.toLowerCase().includes(lowerCaseSearchTerm)) ||
         (p.supplier?.name?.toLowerCase().includes(lowerCaseSearchTerm));
-      
       return supplierMatch && searchMatch;
     });
   }, [payables, searchTerm, filterSupplier]);
@@ -104,8 +116,16 @@ const PayoutHistory = () => {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+        <LoadingSpinner text="Loading History..." />
+      </Box>
+    );
+  }
+
   return (
-    <Box>
+    <Box component={motion.div} variants={containerVariants} initial="hidden" animate="visible">
       {/* --- Filter and Search Bar --- */}
       <Paper sx={{ p: 2, my: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
         <TextField

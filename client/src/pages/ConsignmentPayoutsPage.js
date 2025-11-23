@@ -3,22 +3,23 @@ import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { getOwedPayables, markPayableAsPaid } from '../api/consignmentApi';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
-// --- NEW: Import the history component and tabs ---
 import PayoutHistory from '../components/reports/PayoutHistory';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+
 import {
-  Container, Typography, Paper, Box, CircularProgress, Alert, Tooltip, IconButton,
+  Container, Typography, Paper, Box, Alert, Tooltip, IconButton,
   TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem,
-  Tabs, // <-- NEW
-  Tab   // <-- NEW
+  Tabs, 
+  Tab   
 } from '@mui/material';
-// --- END NEW ---
 import { DataGrid } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-// --- NEW: Icons for tabs ---
 import PaymentIcon from '@mui/icons-material/Payment';
 import HistoryIcon from '@mui/icons-material/History';
-// --- END NEW ---
+
+// --- NEW IMPORT ---
+import LoadingSpinner from '../components/LoadingSpinner';
 
 // Helper to format currency
 const formatCurrency = (value) => 
@@ -30,7 +31,6 @@ const formatDateTime = (dateString) =>
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
   }) : 'N/A';
 
-// --- NEW: TabPanel helper ---
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
   return (
@@ -49,9 +49,7 @@ function TabPanel(props) {
     </div>
   );
 }
-// --- END NEW ---
 
-// --- MOVED: This is now the content for the FIRST tab ---
 const OwedPayouts = () => {
   const [payables, setPayables] = useState([]);
   const [allSuppliers, setAllSuppliers] = useState([]);
@@ -60,6 +58,17 @@ const OwedPayouts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const { confirm } = useContext(ConfirmationContext);
+
+  // --- FRAMER MOTION VARIANTS ---
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.4, ease: "easeOut" }
+    }
+  };
+  // ------------------------------
 
   const fetchPayables = async () => {
     try {
@@ -167,8 +176,16 @@ const OwedPayouts = () => {
     }
   ];
 
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+        <LoadingSpinner text="Loading Payables..." />
+      </Box>
+    );
+  }
+
   return (
-    <Box> {/* Return a Box, not a Container, as it's inside a tab */}
+    <Box component={motion.div} variants={containerVariants} initial="hidden" animate="visible"> 
       {/* Filter and Search Bar */}
       <Paper sx={{ p: 2, my: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
         <TextField
@@ -225,10 +242,7 @@ const OwedPayouts = () => {
     </Box>
   );
 };
-// --- END of OwedPayouts component ---
 
-
-// --- NEW: Main Page Shell ---
 const ConsignmentPayoutsPage = () => {
   const [currentTab, setCurrentTab] = useState(0);
 
@@ -262,15 +276,22 @@ const ConsignmentPayoutsPage = () => {
         </Tabs>
       </Box>
 
-      {/* Tab 1: Owed Payouts */}
-      <TabPanel value={currentTab} index={0}>
-        <OwedPayouts />
-      </TabPanel>
-
-      {/* Tab 2: Payout History */}
-      <TabPanel value={currentTab} index={1}>
-        <PayoutHistory />
-      </TabPanel>
+      <AnimatePresence mode="wait">
+        {currentTab === 0 && (
+            <motion.div key="owed" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.3 }}>
+                 <TabPanel value={currentTab} index={0}>
+                    <OwedPayouts />
+                </TabPanel>
+            </motion.div>
+        )}
+        {currentTab === 1 && (
+            <motion.div key="history" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
+                <TabPanel value={currentTab} index={1}>
+                    <PayoutHistory />
+                </TabPanel>
+            </motion.div>
+        )}
+      </AnimatePresence>
       
     </Container>
   );

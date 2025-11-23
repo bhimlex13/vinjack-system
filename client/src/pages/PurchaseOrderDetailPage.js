@@ -1,11 +1,12 @@
 // client/src/pages/PurchaseOrderDetailPage.js
 import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPurchaseOrderById, approveSupplierChanges, uploadSignedAgreement } from '../api/purchaseOrderApi';
+import { getPurchaseOrderById, approveSupplierChanges } from '../api/purchaseOrderApi';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
-import jsPDF from 'jspdf'; // KEEP this import
-import autoTable from 'jspdf-autotable'; // KEEP this import
+import jsPDF from 'jspdf'; 
+import autoTable from 'jspdf-autotable'; 
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
 import ReceiveStockModal from '../components/ReceiveStockModal';
@@ -14,7 +15,7 @@ import UploadAgreementModal from '../components/UploadAgreementModal';
 
 // MUI Imports
 import {
-  Container, Typography, Box, Paper, Grid, Button, CircularProgress, Alert,
+  Container, Typography, Box, Paper, Grid, Button, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
   Dialog, DialogContent, DialogActions, Chip, Link as MuiLink, IconButton,
   Tooltip, Card, CardContent, CardActions, Collapse
@@ -29,14 +30,16 @@ import LinkIcon from '@mui/icons-material/Link';
 import ImageIcon from '@mui/icons-material/Image';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'; // RE-ADDED: PictureAsPdfIcon
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'; 
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 
-// --- Row Component for Collapsible Functionality (Kept unchanged) ---
+// --- NEW IMPORT ---
+import LoadingSpinner from '../components/LoadingSpinner';
+
+// --- Row Component for Collapsible Functionality ---
 const Row = ({ item, poStatus, formatCurrency }) => {
-// ... (Row component remains the same) ...
   const [open, setOpen] = useState(false);
   const hasSerials = item.serialNumbers && item.serialNumbers.length > 0; 
 
@@ -45,7 +48,13 @@ const Row = ({ item, poStatus, formatCurrency }) => {
 
   return (
     <React.Fragment>
-      <TableRow sx={{ '& > *': { borderBottom: 'unset' }, ...(isUnavailable ? { textDecoration: 'line-through', color: 'text.disabled' } : {}) }}>
+      <TableRow 
+        component={motion.tr}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        sx={{ '& > *': { borderBottom: 'unset' }, ...(isUnavailable ? { textDecoration: 'line-through', color: 'text.disabled' } : {}) }}
+      >
         <TableCell>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {hasSerials && (
@@ -120,6 +129,27 @@ const PurchaseOrderDetailPage = () => {
   const [isImageViewOpen, setIsImageViewOpen] = useState(false);
   const [imageViewUrl, setImageViewUrl] = useState('');
 
+  // --- FRAMER MOTION VARIANTS ---
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1 
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.4, ease: "easeOut" }
+    }
+  };
+  // ------------------------------
+
   const fetchPo = useCallback(async () => {
     try {
       setLoading(true);
@@ -174,7 +204,6 @@ const PurchaseOrderDetailPage = () => {
     window.location.reload();
   };
 
-  // --- RE-ADDED: Full jsPDF logic for Download Agreement PDF button ---
   const handleDownloadAgreement = () => {
     if (!po) return;
     
@@ -276,7 +305,6 @@ const PurchaseOrderDetailPage = () => {
 
     doc.output('dataurlnewwindow');
   };
-  // --- END RE-ADDED ---
 
   const handleUploadSuccess = (updatedPo) => {
     setPo(updatedPo);
@@ -300,33 +328,30 @@ const PurchaseOrderDetailPage = () => {
     }
   };
 
-  // --- MODIFIED: Consolidated Logic for Image Viewing in Modal ---
   const handleOpenImageView = (filePath) => {
     if (!filePath) return;
     
-    // 1. Check if the file is a Base64 Data URI
     const isBase64DataUri = filePath.startsWith('data:');
     
     if (isBase64DataUri) {
-        // If it's a Base64 string (image), pass it directly to the modal state.
         setImageViewUrl(filePath);
         setIsImageViewOpen(true);
     } else {
-        // 2. Handle non-Base64 files (regular path or full URL/Cloudinary links)
         const isFullUrl = filePath.startsWith('http') || filePath.startsWith('https');
-        
-        // Construct the full URL path if it's a local path
         const imageBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
         const finalUrl = isFullUrl ? filePath : `${imageBaseUrl}${filePath}`;
-        
-        // Always open in modal for images, as PDF support is removed for uploads.
         setImageViewUrl(finalUrl);
         setIsImageViewOpen(true);
     }
   };
-  // --- END MODIFIED ---
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
+  // --- RENDER LOADING SPINNER ---
+  if (loading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+      <LoadingSpinner text="Loading Order Details..." />
+    </Box>
+  );
+
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!po) return <Alert severity="warning">Purchase Order not found.</Alert>;
 
@@ -376,17 +401,27 @@ const PurchaseOrderDetailPage = () => {
         onSuccess={fetchPo}
       />
 
-      <Dialog open={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} maxWidth="md" fullWidth>
-        <DialogContent><PurchaseOrderPrintout poData={po} ref={printoutRef} /></DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsPrintModalOpen(false)}>Close</Button>
-          <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>Print / Download PO</Button>
-        </DialogActions>
-      </Dialog>
+      <AnimatePresence>
+        {isPrintModalOpen && (
+            <Dialog open={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} maxWidth="md" fullWidth>
+                <DialogContent><PurchaseOrderPrintout poData={po} ref={printoutRef} /></DialogContent>
+                <DialogActions>
+                <Button onClick={() => setIsPrintModalOpen(false)}>Close</Button>
+                <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>Print / Download PO</Button>
+                </DialogActions>
+            </Dialog>
+        )}
+      </AnimatePresence>
 
-      <Paper sx={{ p: 3 }}>
+      <Paper 
+        sx={{ p: 3 }}
+        component={motion.div}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <div>
+          <motion.div variants={itemVariants}>
             <Typography variant="h4" gutterBottom>{po.poNumber}</Typography>
             <Typography variant="subtitle1" color="textSecondary">Order Date: {new Date(po.orderDate).toLocaleDateString()}</Typography>
             <Chip 
@@ -394,21 +429,22 @@ const PurchaseOrderDetailPage = () => {
               color={po.poType === 'Consignment' ? 'info' : 'default'}
               sx={{ mt: 1, fontWeight: 'bold' }}
             />
-          </div>
+          </motion.div>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button variant="outlined" onClick={() => navigate('/purchase-orders')}>Back to List</Button>
             <Button variant="contained" startIcon={<PrintIcon />} onClick={() => setIsPrintModalOpen(true)}>Print / Download PO</Button>
           </Box>
         </Box>
         <Divider sx={{ my: 2 }} />
+        
         <Grid container spacing={3}>
-          <Grid item size={{ xs: 12, md: 6 }}>
+          <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
             <Typography variant="h6">Supplier Details</Typography>
             <Typography><strong>Name:</strong> {po.supplier.name}</Typography>
             <Typography><strong>Contact:</strong> {po.supplier.contactPerson || 'N/A'}</Typography>
              <Typography><strong>Email:</strong> {po.supplier.email || 'N/A'}</Typography>
           </Grid>
-          <Grid item size={{ xs: 12, md: 6 }}>
+          <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
             <Typography variant="h6">Order Summary</Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
               <Typography><strong>Status:</strong></Typography> <StatusChip status={po.status} />
@@ -417,7 +453,7 @@ const PurchaseOrderDetailPage = () => {
           </Grid>
 
           {supplierLink && ['Pending', 'Awaiting Approval'].includes(po.status) && (
-            <Grid item size={{ xs: 12 }}>
+            <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
               <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <LinkIcon /> Supplier Review Link
               </Typography>
@@ -438,7 +474,7 @@ const PurchaseOrderDetailPage = () => {
           )}
 
           {po.poType === 'Consignment' && (
-            <Grid item size={{ xs: 12 }}>
+            <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
               <Card variant="outlined" sx={{ borderColor: 'info.main' }}>
                 <CardContent>
                   <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -463,7 +499,6 @@ const PurchaseOrderDetailPage = () => {
                   )}
                 </CardContent>
                 <CardActions sx={{ p: 2, pt: 0, justifyContent: 'flex-start', gap: 2 }}>
-                  {/* RE-ADDED: Download Agreement PDF button */}
                   <Button variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadAgreement}>
                     Download Agreement PDF
                   </Button>
@@ -481,7 +516,7 @@ const PurchaseOrderDetailPage = () => {
           )}
 
           {receiptImageUrl && (
-            <Grid item size={{ xs: 12 }}>
+            <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
               <Typography variant="h6">Attachments</Typography>
               <MuiLink
                 component="button"
@@ -504,32 +539,34 @@ const PurchaseOrderDetailPage = () => {
         )}
 
         <Divider sx={{ my: 3 }} />
-        <Typography variant="h6" gutterBottom>Items</Typography>
-        <TableContainer component={Paper} variant="outlined">
-           <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Product Name</TableCell>
-                <TableCell align="right">Ordered</TableCell>
-                <TableCell align="right">Received</TableCell>
-                <TableCell align="right">Unit Cost</TableCell>
-                <TableCell align="right">Subtotal</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {po.items.map((item, index) => (
-                <Row 
-                    key={index} 
-                    item={item} 
-                    poStatus={po.status} 
-                    formatCurrency={formatCurrency} 
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <motion.div variants={itemVariants}>
+            <Typography variant="h6" gutterBottom>Items</Typography>
+            <TableContainer component={Paper} variant="outlined">
+            <Table>
+                <TableHead>
+                <TableRow>
+                    <TableCell>Product Name</TableCell>
+                    <TableCell align="right">Ordered</TableCell>
+                    <TableCell align="right">Received</TableCell>
+                    <TableCell align="right">Unit Cost</TableCell>
+                    <TableCell align="right">Subtotal</TableCell>
+                </TableRow>
+                </TableHead>
+                <TableBody>
+                {po.items.map((item, index) => (
+                    <Row 
+                        key={index} 
+                        item={item} 
+                        poStatus={po.status} 
+                        formatCurrency={formatCurrency} 
+                    />
+                ))}
+                </TableBody>
+            </Table>
+            </TableContainer>
+        </motion.div>
 
-        <Box sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'grey.300', borderRadius: 1 }}>
+        <Box sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'grey.300', borderRadius: 1 }} component={motion.div} variants={itemVariants}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, alignItems: 'center' }}>
                 {po.status === 'Awaiting Approval' && (
                     <>
@@ -540,7 +577,6 @@ const PurchaseOrderDetailPage = () => {
                             startIcon={<ThumbUpIcon />} 
                             onClick={handleApprove}
                             sx={{
-                                // Add pulsing effect if agreement is missing
                                 animation: po.poType === 'Consignment' && !po.signedAgreementUrl 
                                     ? 'pulse 1.5s infinite' 
                                     : 'none',
@@ -549,7 +585,6 @@ const PurchaseOrderDetailPage = () => {
                                     '70%': { boxShadow: '0 0 0 10px rgba(255, 152, 0, 0)' },
                                     '100%': { boxShadow: '0 0 0 0 rgba(255, 152, 0, 0)' },
                                 },
-                                // Change color for warning visual cue
                                 bgcolor: po.poType === 'Consignment' && !po.signedAgreementUrl ? 'warning.main' : 'primary.main',
                                 '&:hover': {
                                      bgcolor: po.poType === 'Consignment' && !po.signedAgreementUrl ? 'warning.dark' : 'primary.dark',

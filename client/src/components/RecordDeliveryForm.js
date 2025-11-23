@@ -1,22 +1,23 @@
 // client/src/components/RecordDeliveryForm.js
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-// --- NEW: Import createDelivery from the API file ---
 import { createDelivery } from '../api/deliveryApi';
 import api from '../api/axios';
-// --- END NEW ---
 import AuthContext from '../context/AuthContext';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import {
   Box, Button, FormControl, InputLabel, Select, MenuItem, Grid, TextField,
   Typography, IconButton, Divider, Alert, Tooltip, Autocomplete,
-  TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper,
-  CircularProgress
+  TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper
 } from '@mui/material';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
+
+// --- NEW IMPORT ---
+import LoadingSpinner from './LoadingSpinner';
 
 // Helper to format date to YYYY-MM-DD for the input
 const formatDateForInput = (date) => {
@@ -34,9 +35,7 @@ const RecordDeliveryForm = ({ onClose }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
-  // --- NEW: State for Delivery Type ---
   const [deliveryType, setDeliveryType] = useState('Purchase');
-  // --- END NEW ---
   const [deliveryDate, setDeliveryDate] = useState(formatDateForInput(new Date()));
   const [productsReceived, setProductsReceived] = useState([]);
 
@@ -48,13 +47,21 @@ const RecordDeliveryForm = ({ onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isProductLoading, setIsProductLoading] = useState(false);
 
+  // --- FRAMER MOTION VARIANTS ---
+  const rowVariants = {
+    hidden: { opacity: 0, x: -20 },
+    visible: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: 20 }
+  };
+  // ------------------------------
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setIsProductLoading(true);
       try {
         const [suppliersRes, productsRes] = await Promise.all([
-          api.get('/suppliers?status=Approved'), // --- NEW: Only get Approved suppliers
+          api.get('/suppliers?status=Approved'), 
           api.get('/products?status=active'),
         ]);
         setSuppliers(suppliersRes.data);
@@ -71,7 +78,6 @@ const RecordDeliveryForm = ({ onClose }) => {
     fetchData();
   }, []);
   
-  // --- NEW: Handle supplier change to update default delivery type ---
   const handleSupplierChange = (e) => {
     const supplierId = e.target.value;
     setSelectedSupplier(supplierId);
@@ -82,7 +88,6 @@ const RecordDeliveryForm = ({ onClose }) => {
       setDeliveryType('Purchase');
     }
   };
-  // --- END NEW ---
 
   const totalCost = useMemo(() => {
       return productsReceived.reduce((sum, item) => {
@@ -94,7 +99,6 @@ const RecordDeliveryForm = ({ onClose }) => {
 
   const handleProductSelection = (event, newValue) => {
     setSelectedProduct(newValue);
-    // --- UPDATED: Find supplier-specific cost if available ---
     if (newValue && selectedSupplier) {
       const supplierCost = newValue.supplierCosts?.find(c => c.supplier === selectedSupplier);
       setCostAtTime(supplierCost?.cost?.toString() ?? newValue.defaultCost?.toString() ?? '');
@@ -103,7 +107,6 @@ const RecordDeliveryForm = ({ onClose }) => {
     } else {
       setCostAtTime('');
     }
-    // --- END UPDATED ---
     setQuantity('1');
   };
 
@@ -129,20 +132,23 @@ const RecordDeliveryForm = ({ onClose }) => {
 
   const handleAddItem = () => {
     setError('');
-    if (!selectedProduct || !quantity || !costAtTime) {
-      setError('Please select a product and enter quantity & cost.');
-      return;
+    // --- VALIDATION ---
+    if (!selectedProduct) {
+        setError('Please select a product.');
+        return;
     }
+    if (!quantity || Number(quantity) <= 0) {
+        setError('Please enter a valid quantity.');
+        return;
+    }
+    if (!costAtTime || Number(costAtTime) < 0) {
+        setError('Please enter a valid cost.');
+        return;
+    }
+    // ------------------
+
     const numQuantity = Number(quantity);
     const numCost = Number(costAtTime);
-    if (isNaN(numQuantity) || numQuantity <= 0) {
-        setError('Quantity must be a positive whole number.');
-        return;
-    }
-    if (isNaN(numCost) || numCost < 0) {
-        setError('Cost per item must be a non-negative number.');
-        return;
-    }
 
     if (productsReceived.some(p => p.product._id === selectedProduct._id)) {
       setError(`${selectedProduct.name} is already in the list. Remove it first to change quantity/cost.`);
@@ -183,9 +189,7 @@ const RecordDeliveryForm = ({ onClose }) => {
     const deliveryData = {
       supplier: selectedSupplier,
       deliveryDate: deliveryDate,
-      // --- NEW: Add deliveryType ---
       deliveryType: deliveryType,
-      // --- END NEW ---
       productsReceived: productsReceived.map(item => ({
         product: item.product._id,
         quantity: Number(item.quantity),
@@ -198,19 +202,15 @@ const RecordDeliveryForm = ({ onClose }) => {
     const formattedDate = new Date(deliveryDate).toLocaleDateString();
     const formattedTotal = totalCost.toFixed(2);
 
-    // --- NEW: Dynamic confirmation message ---
     const isConfirmed = await confirm(
         `Confirm ${deliveryType} Delivery`,
         `Save ${deliveryType.toUpperCase()} delivery from ${supplierName} on ${formattedDate} with ${productsReceived.length} item(s) (Total: ₱${formattedTotal})? Stock levels will be updated.`
     );
-    // --- END NEW ---
 
     if (isConfirmed) {
       setIsLoading(true);
       try {
-        // --- UPDATED: Use centralized API function ---
         await createDelivery(deliveryData);
-        // --- END UPDATED ---
         toast.success('Direct delivery recorded successfully and stock updated!');
         onClose();
       } catch (err) {
@@ -228,10 +228,19 @@ const RecordDeliveryForm = ({ onClose }) => {
     return products.filter(p => !addedIds.has(p._id));
   }, [products, productsReceived]);
 
+  // --- LOADING SPINNER ON INIT ---
+  if (isLoading && suppliers.length === 0) {
+      return (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+              <LoadingSpinner text="Loading form data..." />
+          </Box>
+      );
+  }
+
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {/* --- SYNTAX CHANGED TO 'size={{...}}' --- */}
+      
       <Grid container spacing={2}>
           <Grid item size={{ xs: 12, sm: 5 }}>
               <FormControl fullWidth required margin="dense">
@@ -304,7 +313,7 @@ const RecordDeliveryForm = ({ onClose }) => {
                   ...params.InputProps,
                   endAdornment: (
                     <>
-                      {isProductLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {isProductLoading ? <LoadingSpinner text="" /> : null} 
                       {params.InputProps.endAdornment}
                     </>
                   ),
@@ -352,7 +361,6 @@ const RecordDeliveryForm = ({ onClose }) => {
           </Tooltip>
         </Grid>
       </Grid>
-      {/* --- END OF SYNTAX CHANGE --- */}
 
       <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
         Items in this Delivery
@@ -369,7 +377,7 @@ const RecordDeliveryForm = ({ onClose }) => {
               <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
-          <TableBody>
+          <TableBody component={AnimatePresence}>
             {productsReceived.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} align="center">
@@ -378,7 +386,16 @@ const RecordDeliveryForm = ({ onClose }) => {
               </TableRow>
             ) : (
               productsReceived.map((item) => (
-                <TableRow key={item.product._id} hover>
+                <TableRow 
+                    key={item.product._id} 
+                    hover
+                    component={motion.tr}
+                    variants={rowVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                    layout
+                >
                   <TableCell>{item.product.name} ({item.product.itemCode})</TableCell>
                   <TableCell align="right">{item.quantity}</TableCell>
                   <TableCell align="right">₱{Number(item.costAtTime).toFixed(2)}</TableCell>
@@ -418,7 +435,7 @@ const RecordDeliveryForm = ({ onClose }) => {
             variant="contained"
             disabled={productsReceived.length === 0 || !selectedSupplier || !deliveryDate || isLoading}
           >
-            {isLoading ? <CircularProgress size={24} /> : 'Save Delivery & Update Stock'}
+            {isLoading ? <LoadingSpinner text="" /> : 'Save Delivery & Update Stock'}
           </Button>
       </Box>
     </Box>

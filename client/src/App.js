@@ -12,6 +12,7 @@ import WarningModal from './components/WarningModal';
 import ForceChangePasswordModal from './components/ForceChangePasswordModal';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/MainLayout';
+import LoadingSpinner from './components/LoadingSpinner'; // Import the new spinner
 
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -22,9 +23,7 @@ import SuppliersPage from './pages/SuppliersPage';
 import ReportsPage from './pages/ReportsPage';
 import AuditLogPage from './pages/AuditLogPage';
 import SettingsPage from './pages/SettingsPage';
-// --- UPDATED: Corrected file path ---
 import UserManagementPage from './pages/UserManagementPage';
-// --- END UPDATED ---
 import DataManagementPage from './pages/DataManagementPage';
 import TransactionsPage from './pages/TransactionsPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
@@ -35,10 +34,7 @@ import CustomersPage from './pages/CustomersPage';
 import ReturnsPage from './pages/ReturnsPage';
 import SupplierPOReviewPage from './pages/SupplierPOReviewPage';
 import SupplierReturnsPage from './pages/SupplierReturnsPage';
-
-// --- NEW: Import the Consignment Payouts page ---
 import ConsignmentPayoutsPage from './pages/ConsignmentPayoutsPage';
-// --- END NEW ---
 
 
 const InnerApp = () => {
@@ -58,7 +54,12 @@ const InnerApp = () => {
   }, [user, isInitializing]); 
 
   if (isInitializing) {
-    return <div>Loading Application...</div>;
+    // Replaced simple div with the new animated spinner
+    return (
+      <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <LoadingSpinner text="Starting VinJack System..." />
+      </div>
+    );
   }
 
   return (
@@ -103,7 +104,6 @@ const InnerApp = () => {
             <Route path="/returns" element={<ReturnsPage />} />
             <Route path="/supplier-returns" element={<SupplierReturnsPage />} />
             <Route path="/consignment-payouts" element={<ConsignmentPayoutsPage />} />
-
 
             <Route path="/" element={<Navigate to="/dashboard" />} />
           </Route>

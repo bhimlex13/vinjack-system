@@ -1,17 +1,21 @@
 // client/src/components/CustomerMotorcyclesModal.js
-import React, { useState, useEffect, useCallback } from 'react'; // Import useCallback
+import React, { useState, useEffect, useCallback } from 'react';
 import { getMotorcyclesByCustomer, deleteMotorcycle } from '../api/motorcycleApi';
 import MotorcycleForm from './MotorcycleForm';
 import { toast } from 'react-toastify';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, Button, Box, Typography, List, ListItem,
-  ListItemText, IconButton, CircularProgress, Stack, Divider,
+  ListItemText, IconButton, Stack, Divider,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+
+// --- NEW IMPORT ---
+import LoadingSpinner from './LoadingSpinner';
 
 const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
   const [motorcycles, setMotorcycles] = useState([]);
@@ -19,7 +23,6 @@ const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingMotorcycle, setEditingMotorcycle] = useState(null);
 
-  // Wrap fetchMotorcycles in useCallback
   const fetchMotorcycles = useCallback(async () => {
     if (!customer) return;
     setIsLoading(true);
@@ -31,9 +34,8 @@ const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [customer]); // Add customer as a dependency
+  }, [customer]);
 
-  // Add fetchMotorcycles to the dependency array
   useEffect(() => {
     if (open) {
       fetchMotorcycles();
@@ -69,35 +71,46 @@ const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
           Manage Vehicles for: {customer?.name}
         </DialogTitle>
         <DialogContent>
+          {/* --- USE LOADING SPINNER AND ANIMATION --- */}
           {isLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}><CircularProgress /></Box>
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
+                <LoadingSpinner text="Loading Vehicles..." />
+            </Box>
           ) : (
-            <List>
+            <List component={motion.ul} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               {motorcycles.length === 0 && (
                 <Typography sx={{ textAlign: 'center', my: 2 }}>No vehicles registered for this customer.</Typography>
               )}
-              {motorcycles.map(moto => (
-                <React.Fragment key={moto._id}>
-                  <ListItem
-                    secondaryAction={
-                      <Stack direction="row" spacing={1}>
-                        <IconButton edge="end" aria-label="edit" onClick={() => handleOpenFormForEdit(moto)}>
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton edge="end" aria-label="delete" onClick={() => handleDelete(moto._id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Stack>
-                    }
+              <AnimatePresence>
+                {motorcycles.map(moto => (
+                  <motion.div 
+                    key={moto._id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    <ListItemText
-                      primary={`${moto.make} ${moto.model}`}
-                      secondary={`Plate: ${moto.plateNumber || 'N/A'} | Year: ${moto.year || 'N/A'} | Color: ${moto.color || 'N/A'}`}
-                    />
-                  </ListItem>
-                  <Divider />
-                </React.Fragment>
-              ))}
+                    <ListItem
+                        secondaryAction={
+                        <Stack direction="row" spacing={1}>
+                            <IconButton edge="end" aria-label="edit" onClick={() => handleOpenFormForEdit(moto)}>
+                            <EditIcon />
+                            </IconButton>
+                            <IconButton edge="end" aria-label="delete" onClick={() => handleDelete(moto._id)}>
+                            <DeleteIcon />
+                            </IconButton>
+                        </Stack>
+                        }
+                    >
+                        <ListItemText
+                        primary={`${moto.make} ${moto.model}`}
+                        secondary={`Plate: ${moto.plateNumber || 'N/A'} | Year: ${moto.year || 'N/A'} | Color: ${moto.color || 'N/A'}`}
+                        />
+                    </ListItem>
+                    <Divider />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </List>
           )}
           <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
@@ -109,18 +122,22 @@ const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
       </Dialog>
 
       {/* Nested Modal for the Form */}
-      <Dialog open={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingMotorcycle ? 'Edit Motorcycle' : 'Add New Motorcycle'}</DialogTitle>
-        <MotorcycleForm
-            customer={customer}
-            motorcycleToEdit={editingMotorcycle}
-            onFormSubmit={() => {
-                setIsFormModalOpen(false);
-                fetchMotorcycles();
-            }}
-            onClose={() => setIsFormModalOpen(false)}
-        />
-      </Dialog>
+      <AnimatePresence>
+        {isFormModalOpen && (
+            <Dialog open={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>{editingMotorcycle ? 'Edit Motorcycle' : 'Add New Motorcycle'}</DialogTitle>
+                <MotorcycleForm
+                    customer={customer}
+                    motorcycleToEdit={editingMotorcycle}
+                    onFormSubmit={() => {
+                        setIsFormModalOpen(false);
+                        fetchMotorcycles();
+                    }}
+                    onClose={() => setIsFormModalOpen(false)}
+                />
+            </Dialog>
+        )}
+      </AnimatePresence>
     </>
   );
 };

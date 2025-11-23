@@ -5,14 +5,13 @@ import AuthContext from '../context/AuthContext';
 import { Bar, Line } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { toast } from 'react-toastify';
+import { motion } from 'framer-motion';
 
 // MUI Imports
 import {
-  Box, Grid, Paper, Typography, ToggleButton, ToggleButtonGroup, CircularProgress, Container,
+  Box, Grid, Paper, Typography, ToggleButton, ToggleButtonGroup, Container,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
-  FormControl, InputLabel, Select, MenuItem, Stack,
-  Button,
-  Tooltip // <<<--- VERIFIED TOOLTIP IMPORT
+  Stack, Tooltip
 } from '@mui/material';
 import { FaMoneyBillWave, FaShoppingCart, FaWarehouse } from 'react-icons/fa';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -26,17 +25,14 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import CategoryIcon from '@mui/icons-material/Category';
 import ShoppingCartCheckoutIcon from '@mui/icons-material/ShoppingCartCheckout';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import SaveIcon from '@mui/icons-material/Save';
 
-// --- NEW IMPORT: Loading Spinner ---
+// Loading Spinner
 import LoadingSpinner from '../components/LoadingSpinner';
 
 Chart.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, ChartTooltip, Legend);
 
-// --- HELPER FUNCTION for number shortening (remains the same) ---
+// --- HELPER FUNCTION for number shortening ---
 const formatStatValue = (value) => {
-// ... (formatStatValue function content remains the same) ...
   let prefix = '';
   let numberStr = String(value);
 
@@ -77,9 +73,8 @@ const formatStatValue = (value) => {
   return { display, tooltip };
 };
 
-// --- StatCard component with Tooltip (remains the same) ---
+// --- StatCard component ---
 const StatCard = ({ title, value, icon, color }) => {
-
   const { display, tooltip } = formatStatValue(value);
 
   return (
@@ -103,14 +98,13 @@ const StatCard = ({ title, value, icon, color }) => {
               textOverflow: 'ellipsis'
             }}
           >
-            {display} {/* Show the shortened display value */}
+            {display}
           </Typography>
         </Box>
       </Tooltip>
     </Paper>
   );
 }
-
 
 const DashboardPage = () => {
   const { user } = useContext(AuthContext);
@@ -121,34 +115,47 @@ const DashboardPage = () => {
   const [pendingPOs, setPendingPOs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [timeRange, setTimeRange] = useState('all');
-  const [categories, setCategories] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedSupplier, setSelectedSupplier] = useState('');
-  const [isFilterDataLoading, setIsFilterDataLoading] = useState(false);
-  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+  // --- MODIFIED: Default set to 'today' ---
+  const [timeRange, setTimeRange] = useState('today');
 
+  // --- FRAMER MOTION VARIANTS ---
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1 // Stagger effect for cards
+      }
+    }
+  };
 
-  // Load user preferences on mount (remains the same)
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: 'spring',
+        stiffness: 100,
+        damping: 12
+      }
+    }
+  };
+  // ------------------------------
+
+  // Load user preferences on mount (only timeRange now)
   useEffect(() => {
-    // --- UPDATED: Use 'Super Admin' role ---
     if (user?.role === 'Super Admin' || user?.role === 'Admin') {
       const loadPreferences = async () => {
         try {
           if (user.dashboardPreferences) {
              const prefs = user.dashboardPreferences;
              if (prefs.timeRange) setTimeRange(prefs.timeRange);
-             if (prefs.selectedCategory) setSelectedCategory(prefs.selectedCategory);
-             if (prefs.selectedSupplier) setSelectedSupplier(prefs.selectedSupplier);
           } else {
-             // Fallback to fetch from /me if not on initial user object
              const { data } = await api.get('/users/me');
              if (data.dashboardPreferences) {
                 const prefs = data.dashboardPreferences;
                 if (prefs.timeRange) setTimeRange(prefs.timeRange);
-                if (prefs.selectedCategory) setSelectedCategory(prefs.selectedCategory);
-                if (prefs.selectedSupplier) setSelectedSupplier(prefs.selectedSupplier);
              }
           }
         } catch (error) {
@@ -157,41 +164,17 @@ const DashboardPage = () => {
       };
       loadPreferences();
     }
-  }, [user]); // Runs when user is available
-
-  // useEffect to load filter dropdown data (remains the same)
-  useEffect(() => {
-    // --- UPDATED: Use 'Super Admin' role ---
-    if (user?.role === 'Super Admin' || user?.role === 'Admin') {
-      const fetchFilterData = async () => {
-        setIsFilterDataLoading(true);
-        try {
-          const [catRes, supRes] = await Promise.all([
-            api.get('/categories'),
-            api.get('/suppliers')
-          ]);
-          setCategories(catRes.data || []);
-          setSuppliers(supRes.data || []);
-        } catch (error) {
-          console.error("Failed to load filter data:", error);
-        } finally {
-          setIsFilterDataLoading(false);
-        }
-      };
-      fetchFilterData();
-    }
   }, [user]);
 
-  // Main data fetching effect (remains the same)
+  // Main data fetching effect
   useEffect(() => {
     if (!user) return;
 
     const fetchData = async () => {
       setIsLoading(true);
       try {
+        // Only timeRange is sent now
         const summaryParams = new URLSearchParams({ range: timeRange });
-        if (selectedCategory) summaryParams.append('categoryId', selectedCategory);
-        if (selectedSupplier) summaryParams.append('supplierId', selectedSupplier);
 
         const [summaryResponse, lowStockResponse, salesTrendResponse, recentActivitiesResponse, pendingPOsResponse] = await Promise.all([
           api.get(`/reports/summary?${summaryParams.toString()}`),
@@ -214,44 +197,15 @@ const DashboardPage = () => {
       }
     };
     fetchData();
-  }, [timeRange, selectedCategory, selectedSupplier, user]);
+  }, [timeRange, user]);
 
-  // handleTimeRangeChange (remains the same)
   const handleTimeRangeChange = (event, newTimeRange) => {
     if (newTimeRange !== null) {
       setTimeRange(newTimeRange);
     }
   };
 
-  // Filter change handlers (remain the same)
-  const handleCategoryChange = (event) => {
-      setSelectedCategory(event.target.value);
-  };
-
-  const handleSupplierChange = (event) => {
-      setSelectedSupplier(event.target.value);
-  };
-
-  // Save user preferences (remains the same)
-  const handleSavePreferences = async () => {
-    setIsSavingPrefs(true);
-    try {
-      await api.put('/users/dashboard-preferences', {
-        timeRange,
-        selectedCategory,
-        selectedSupplier
-      });
-      toast.success('Preferences saved!');
-    } catch (error) {
-      console.error("Failed to save preferences", error);
-      toast.error('Could not save preferences.');
-    } finally {
-      setIsSavingPrefs(false);
-    }
-  };
-
-
-  // Chart functions (remains the same)
+  // Chart functions
   const getTrendChartTitle = () => {
     switch (timeRange) {
       case 'today': return 'Revenue Trend (Today)';
@@ -316,14 +270,12 @@ const DashboardPage = () => {
   };
 
 
-  if (isLoading || (user?.role === 'Super Admin' && isFilterDataLoading)) {
-    // --- MODIFIED: Use LoadingSpinner Component ---
+  if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <LoadingSpinner text="Fetching dashboard data..." />
       </Box>
     );
-    // --- END MODIFIED ---
   }
 
   if (!user) {
@@ -341,100 +293,54 @@ const DashboardPage = () => {
 
   return (
     <Container maxWidth="lx" sx={{ mt: 4, mb: 4 }}>
-      {/* Header, Time Range Toggle, AND FILTERS */}
+      {/* Header & Time Range Toggle */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mr: 2 }}>
           Dashboard
         </Typography>
 
-        {/* Filter Stack */}
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center">
-            {/* --- UPDATED: Use 'Super Admin' and 'Admin' roles --- */}
-            {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
-              <>
-                <FormControl size="small" sx={{ minWidth: 180 }}>
-                  <InputLabel id="category-filter-label">Category</InputLabel>
-                  <Select
-                    labelId="category-filter-label"
-                    value={selectedCategory}
-                    label="Category"
-                    onChange={handleCategoryChange}
-                    startAdornment={<FilterListIcon sx={{ mr: 1, color: 'action.active' }} />}
-                  >
-                    <MenuItem value=""><em>All Categories</em></MenuItem>
-                    {categories.map((cat) => (
-                      <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl size="small" sx={{ minWidth: 180 }}>
-                  <InputLabel id="supplier-filter-label">Supplier</InputLabel>
-                  <Select
-                    labelId="supplier-filter-label"
-                    value={selectedSupplier}
-                    label="Supplier"
-                    onChange={handleSupplierChange}
-                    startAdornment={<FilterListIcon sx={{ mr: 1, color: 'action.active' }} />}
-                  >
-                    <MenuItem value=""><em>All Suppliers</em></MenuItem>
-                    {suppliers.map((sup) => (
-                      <MenuItem key={sup._id} value={sup._id}>{sup.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </>
-            )}
-
-            {/* Time Range Filter (Visible to all) */}
+        <Stack direction="row" spacing={1.5} alignItems="center">
+            {/* Time Range Filter */}
             <ToggleButtonGroup color="primary" value={timeRange} exclusive onChange={handleTimeRangeChange} size="small">
               <ToggleButton value="all">All Time</ToggleButton>
               <ToggleButton value="month">Month</ToggleButton>
               <ToggleButton value="week">Week</ToggleButton>
               <ToggleButton value="today">Today</ToggleButton>
             </ToggleButtonGroup>
-
-            {/* Save Preferences Button */}
-            {/* --- UPDATED: Use 'Super Admin' and 'Admin' roles --- */}
-            {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<SaveIcon />}
-                onClick={handleSavePreferences}
-                disabled={isSavingPrefs}
-                sx={{ height: '40px' }} // Match toggle button height
-              >
-                {isSavingPrefs ? <CircularProgress size={24} /> : 'Save View'}
-              </Button>
-            )}
         </Stack>
       </Box>
 
-      {/* Row 1: Stat Cards */}
-      <Grid container spacing={3}>
-        {/* Values are now formatted dynamically */}
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+      {/* Dashboard Grid with Animations */}
+      <Grid 
+        container 
+        spacing={3}
+        component={motion.div}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Stat Cards */}
+        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Total Revenue" value={`₱${(summary?.totalRevenue)?.toFixed(2) || '0.00'}`} icon={<FaMoneyBillWave />} color="primary" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Total Profit" value={`₱${(summary?.totalProfit)?.toFixed(2) || '0.00'}`} icon={<MonetizationOnIcon />} color="info" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Total Sales" value={summary?.totalSales || 0} icon={<FaShoppingCart />} color="success" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Total Items Sold" value={summary?.totalQuantitySold || 0} icon={<ShoppingCartCheckoutIcon />} color="success" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Total Units in Stock" value={summary?.totalStockQuantity || 0} icon={<FaWarehouse />} color="error" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Product Types (SKUs)" value={summary?.totalSKUs || 0} icon={<InventoryIcon />} color="secondary" />
         </Grid>
 
-        {/* Row 2: Main Chart */}
-        <Grid item size={{ xs: 12 }}>
+        {/* Main Trend Chart */}
+        <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
           <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: 350 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <ShowChartIcon color="action" sx={{ mr: 1 }}/>
@@ -453,7 +359,7 @@ const DashboardPage = () => {
         </Grid>
 
         {/* Top 5 Selling Products */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <BarChartIcon color="action" sx={{ mr: 1 }}/>
@@ -470,8 +376,9 @@ const DashboardPage = () => {
             </Box>
           </Paper>
         </Grid>
+
         {/* Top 5 Selling Services */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
            <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <BuildIcon color="info" sx={{ mr: 1 }} />
@@ -505,8 +412,9 @@ const DashboardPage = () => {
             </TableContainer>
           </Paper>
         </Grid>
+
         {/* Slow Moving Products */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <TrendingDownIcon color="error" sx={{ mr: 1 }} />
@@ -540,8 +448,9 @@ const DashboardPage = () => {
             </TableContainer>
           </Paper>
         </Grid>
+
         {/* Inventory by Category Summary */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <CategoryIcon color="secondary" sx={{ mr: 1 }} />
@@ -579,8 +488,9 @@ const DashboardPage = () => {
             </TableContainer>
           </Paper>
         </Grid>
+
         {/* Low Stock Items */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                   <WarningAmberIcon color="warning" sx={{ mr: 1 }}/>
@@ -604,8 +514,8 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* Recent Activities Section */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }}>
+        {/* Recent Activities */}
+        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
            <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <ReceiptLongIcon color="primary" sx={{ mr: 1 }} />
@@ -654,8 +564,9 @@ const DashboardPage = () => {
             </TableContainer>
           </Paper>
         </Grid>
+
         {/* Pending Purchase Orders */}
-        <Grid item size={{  md: 12 }} sx={{ height: '420px' }}>
+        <Grid item size={{  md: 12 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                 <AssignmentIcon color="secondary" sx={{ mr: 1 }} />

@@ -1,27 +1,28 @@
 // client/src/components/CreateReturnModal.js
 import React, { useState, useEffect, useContext } from 'react';
 import { searchSales, getSaleById } from '../api/saleApi';
-// --- NEW: Import returnApi ---
-import { createReturn, getReturnsBySaleId } from '../api/returnApi'; // Assuming getReturnsBySaleId exists
+import { createReturn, getReturnsBySaleId } from '../api/returnApi'; 
 import { getCustomers } from '../api/customerApi';
 import { getUsers } from '../api/userApi';
 import { toast } from 'react-toastify';
 import ConfirmationContext from '../context/ConfirmationContext';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, TextField, Button,
-  Typography, CircularProgress, Alert, Table, TableBody, TableCell,
+  Typography, Alert, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, IconButton, Grid, Autocomplete,
   Divider,
   Select, MenuItem, FormControl, InputLabel,
-  // --- NEW: Import Tooltip ---
   Tooltip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import SearchIcon from '@mui/icons-material/Search';
 
+// --- NEW IMPORT ---
+import LoadingSpinner from './LoadingSpinner';
 
 const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
   const { confirm } = useContext(ConfirmationContext);
@@ -39,8 +40,14 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
   const [itemsToReturn, setItemsToReturn] = useState({});
   const [reason, setReason] = useState('');
   const [outcome, setOutcome] = useState('Restocked');
-  // --- NEW: State to store max returnable quantities ---
   const [maxReturnableQuantities, setMaxReturnableQuantities] = useState({});
+
+  // --- ANIMATION VARIANTS ---
+  const stepVariants = {
+    hidden: { opacity: 0, x: 20 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
+    exit: { opacity: 0, x: -20, transition: { duration: 0.2 } }
+  };
 
   useEffect(() => {
     if (open) {
@@ -66,7 +73,6 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
     setItemsToReturn({});
     setReason('');
     setOutcome('Restocked');
-    // --- NEW: Reset max returnable quantities ---
     setMaxReturnableQuantities({});
   };
 
@@ -104,19 +110,16 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
     }
   };
 
-  // --- MODIFIED: handleSelectSale ---
   const handleSelectSale = async (sale) => {
     setStep('loading');
     try {
-      // Fetch both sale details and previous returns concurrently
       const [fullSaleDetails, previousReturns] = await Promise.all([
         getSaleById(sale._id),
-        getReturnsBySaleId(sale._id) // Assumes this API function exists
+        getReturnsBySaleId(sale._id) 
       ]);
 
       setSaleDetails(fullSaleDetails);
 
-      // Calculate already returned quantities
       const alreadyReturned = {};
       previousReturns.forEach(ret => {
         ret.itemsReturned.forEach(item => {
@@ -124,54 +127,46 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
         });
       });
 
-      // Calculate max returnable and initialize itemsToReturn
       const initialItems = {};
       const maxQuantities = {};
       fullSaleDetails.items.forEach(item => {
         if (item.product && item.product._id) {
           const previouslyReturnedQty = alreadyReturned[item.product._id] || 0;
           const maxReturnable = item.quantity - previouslyReturnedQty;
-          maxQuantities[item.product._id] = maxReturnable >= 0 ? maxReturnable : 0; // Ensure non-negative
-          initialItems[item.product._id] = 0; // Start with 0 return quantity
+          maxQuantities[item.product._id] = maxReturnable >= 0 ? maxReturnable : 0; 
+          initialItems[item.product._id] = 0; 
         }
       });
       setItemsToReturn(initialItems);
-      setMaxReturnableQuantities(maxQuantities); // Store the calculated maximums
+      setMaxReturnableQuantities(maxQuantities); 
 
       setStep('process');
     } catch (err) {
       toast.error('Failed to fetch sale details or previous returns.');
-      console.error(err); // Log the actual error
+      console.error(err); 
       setStep('results');
     }
   };
-  // --- END MODIFICATION ---
 
-  // --- MODIFIED: handleQuantityChange ---
   const handleQuantityChange = (productId, amount) => {
     const maxReturnable = maxReturnableQuantities[productId];
-    // No need to find soldItem here as maxReturnable already accounts for it
 
     setItemsToReturn(prev => {
         const currentQty = prev[productId] || 0;
         const newQty = currentQty + amount;
 
-        // Check against 0 and the calculated maxReturnable
         if (newQty >= 0 && newQty <= maxReturnable) {
             return { ...prev, [productId]: newQty };
         }
-        // If trying to add more than allowed, set to max
         if (amount > 0 && newQty > maxReturnable) {
             return { ...prev, [productId]: maxReturnable };
         }
-        // If trying to remove below 0, set to 0
         if (amount < 0 && newQty < 0) {
             return { ...prev, [productId]: 0 };
         }
-        return prev; // Otherwise, no change
+        return prev; 
     });
   };
-  // --- END MODIFICATION ---
 
   const handleProcessReturn = async () => {
     const returnPayload = {
@@ -192,10 +187,8 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
         return;
     }
 
-    // --- Recalculate refund based ONLY on items being returned now ---
     const totalRefund = returnPayload.itemsReturned.reduce((acc, returnedItem) => {
       const originalItem = saleDetails.items.find(i => i.product._id === returnedItem.product);
-      // Ensure originalItem exists before calculating; fallback to 0 if not found (shouldn't happen ideally)
       return acc + ((originalItem?.priceAtTime || 0) * returnedItem.quantity);
     }, 0);
 
@@ -209,117 +202,119 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
         confirmMessage += ` The item(s) will NOT be restocked.`;
     }
 
-    const isConfirmed = await confirm("Confirm Return", confirmMessage); // Added title
+    const isConfirmed = await confirm("Confirm Return", confirmMessage); 
 
     if (isConfirmed) {
       setStep('loading');
       try {
-          // Pass the already calculated totalRefundAmount to the backend
           await createReturn({ ...returnPayload, totalRefundAmount: totalRefund });
           toast.success('Return processed successfully!');
           onReturnSuccess();
           handleClose();
       } catch (err) {
           toast.error(err.response?.data?.message || 'Failed to process return.');
-          setStep('process'); // Go back to process step on error
+          setStep('process'); 
       }
     }
   };
 
   const renderContent = () => {
     if (step === 'loading') {
-      return <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}><CircularProgress /></Box>;
+      // --- USE LOADING SPINNER ---
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
+          <LoadingSpinner text="Processing..." />
+        </Box>
+      );
     }
 
     if (step === 'search') {
       return (
-        <Grid container spacing={2} sx={{ pt: 1 }}>
-          <Grid item size={{ xs: 12 }}>
-            <TextField
-              fullWidth
-              label="Search by Exact Sales ID"
-              value={searchSaleId}
-              onChange={(e) => setSearchSaleId(e.target.value)}
-            />
+        <motion.div key="search" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
+          <Grid container spacing={2} sx={{ pt: 1 }}>
+            <Grid item size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                label="Search by Exact Sales ID"
+                value={searchSaleId}
+                onChange={(e) => setSearchSaleId(e.target.value)}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12 }}><Divider>OR</Divider></Grid>
+            <Grid item size={{ xs: 12 }}>
+              <Autocomplete
+                options={customers}
+                getOptionLabel={(option) => option.name}
+                value={searchParams.customer}
+                onChange={(e, value) => setSearchParams(prev => ({...prev, customer: value}))}
+                renderInput={(params) => <TextField {...params} label="Filter by Customer" />}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12 }}>
+              <Autocomplete
+                options={users}
+                getOptionLabel={(option) => option.fullName}
+                value={searchParams.user}
+                onChange={(e, value) => setSearchParams(prev => ({...prev, user: value}))}
+                renderInput={(params) => <TextField {...params} label="Filter by Cashier" />}
+              />
+            </Grid>
+            <Grid item size={{ xs: 6 }}>
+              <TextField type="date" label="Start Date" value={searchParams.startDate} onChange={(e) => setSearchParams(prev => ({...prev, startDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
+            </Grid>
+            <Grid item size={{ xs: 6 }}>
+              <TextField type="date" label="End Date" value={searchParams.endDate} onChange={(e) => setSearchParams(prev => ({...prev, endDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
+            </Grid>
           </Grid>
-          <Grid item size={{ xs: 12 }}><Divider>OR</Divider></Grid>
-          <Grid item size={{ xs: 12 }}>
-            <Autocomplete
-              options={customers}
-              getOptionLabel={(option) => option.name}
-              value={searchParams.customer}
-              onChange={(e, value) => setSearchParams(prev => ({...prev, customer: value}))}
-              renderInput={(params) => <TextField {...params} label="Filter by Customer" />}
-            />
-          </Grid>
-          <Grid item size={{ xs: 12 }}>
-            <Autocomplete
-              options={users}
-              getOptionLabel={(option) => option.fullName}
-              value={searchParams.user}
-              onChange={(e, value) => setSearchParams(prev => ({...prev, user: value}))}
-              renderInput={(params) => <TextField {...params} label="Filter by Cashier" />}
-            />
-          </Grid>
-          <Grid item size={{ xs: 6 }}>
-            <TextField type="date" label="Start Date" value={searchParams.startDate} onChange={(e) => setSearchParams(prev => ({...prev, startDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
-          </Grid>
-          <Grid item size={{ xs: 6 }}>
-            <TextField type="date" label="End Date" value={searchParams.endDate} onChange={(e) => setSearchParams(prev => ({...prev, endDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
-          </Grid>
-        </Grid>
+        </motion.div>
       );
     }
 
     if (step === 'results') {
         return (
-            <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                    <TableHead><TableRow><TableCell>Sale Date</TableCell><TableCell>Customer</TableCell><TableCell align="right">Total</TableCell><TableCell align="center">Action</TableCell></TableRow></TableHead>
-                    <TableBody>
-                        {searchResults.map(sale => (
-                            <TableRow key={sale._id} hover>
-                                <TableCell>{new Date(sale.createdAt).toLocaleString()}</TableCell>
-                                <TableCell>{sale.customer?.name || 'Walk-in'}</TableCell> {/* Display Walk-in */}
-                                <TableCell align="right">₱{sale.totalAmount.toFixed(2)}</TableCell>
-                                <TableCell align="center"><Button size="small" onClick={() => handleSelectSale(sale)}>Select</Button></TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+            <motion.div key="results" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
+              <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                      <TableHead><TableRow><TableCell>Sale Date</TableCell><TableCell>Customer</TableCell><TableCell align="right">Total</TableCell><TableCell align="center">Action</TableCell></TableRow></TableHead>
+                      <TableBody>
+                          {searchResults.map(sale => (
+                              <TableRow key={sale._id} hover>
+                                  <TableCell>{new Date(sale.createdAt).toLocaleString()}</TableCell>
+                                  <TableCell>{sale.customer?.name || 'Walk-in'}</TableCell> 
+                                  <TableCell align="right">₱{sale.totalAmount.toFixed(2)}</TableCell>
+                                  <TableCell align="center"><Button size="small" onClick={() => handleSelectSale(sale)}>Select</Button></TableCell>
+                              </TableRow>
+                          ))}
+                      </TableBody>
+                  </Table>
+              </TableContainer>
+            </motion.div>
         );
     }
 
     if (step === 'process' && saleDetails) {
       return (
-        <Box>
+        <motion.div key="process" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
           <Typography variant="body2">ID: {saleDetails._id}</Typography>
-          <Typography variant="body2" sx={{ mb: 2 }}>Customer: {saleDetails.customer?.name || 'Walk-in'}</Typography> {/* Display Walk-in */}
+          <Typography variant="body2" sx={{ mb: 2 }}>Customer: {saleDetails.customer?.name || 'Walk-in'}</Typography> 
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
-              {/* --- MODIFIED: Added Max Returnable Column --- */}
               <TableHead><TableRow><TableCell>Product</TableCell><TableCell align="center">Sold</TableCell><TableCell align="center">Max Return</TableCell><TableCell align="center">Return Qty</TableCell></TableRow></TableHead>
               <TableBody>
                 {saleDetails.items.map(item => {
-                   // --- NEW: Get max returnable for this item ---
                   const maxReturnable = maxReturnableQuantities[item.product?._id] ?? 0;
                   const currentReturnQty = itemsToReturn[item.product?._id] ?? 0;
                   return (
-                    // --- NEW: Dim row if maxReturnable is 0 ---
                     <TableRow key={item.product?._id} sx={ maxReturnable === 0 ? { backgroundColor: '#f5f5f5', color: 'text.disabled' } : {}}>
                       <TableCell sx={ maxReturnable === 0 ? { color: 'inherit' } : {}}>{item.product?.name || 'Product not found'}</TableCell>
                       <TableCell align="center" sx={ maxReturnable === 0 ? { color: 'inherit' } : {}}>{item.quantity}</TableCell>
-                      {/* --- NEW: Display Max Returnable --- */}
                       <TableCell align="center" sx={ maxReturnable === 0 ? { color: 'inherit', fontWeight: 'bold' } : {fontWeight: 'bold'}}>{maxReturnable}</TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {/* --- NEW: Disable buttons if maxReturnable is 0 --- */}
                             <IconButton size="small" onClick={() => handleQuantityChange(item.product._id, -1)} disabled={maxReturnable === 0}><RemoveIcon fontSize="small"/></IconButton>
                             <Typography sx={{ mx: 1 }}>{currentReturnQty}</Typography>
-                            {/* --- NEW: Disable add button if current qty equals max OR max is 0 --- */}
                             <Tooltip title={maxReturnable === 0 ? "All items already returned" : ""}>
-                              <span> {/* Span needed for tooltip on disabled button */}
+                              <span> 
                                 <IconButton size="small" onClick={() => handleQuantityChange(item.product._id, 1)} disabled={currentReturnQty >= maxReturnable || maxReturnable === 0}><AddIcon fontSize="small"/></IconButton>
                               </span>
                             </Tooltip>
@@ -347,7 +342,7 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
               <MenuItem value="Discarded">Discarded (Do not restock)</MenuItem>
             </Select>
           </FormControl>
-        </Box>
+        </motion.div>
       );
     }
     return <Alert severity="error">An unexpected error occurred. Please try again.</Alert>;
@@ -356,7 +351,11 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md">
       <DialogTitle>Process New Return</DialogTitle>
-      <DialogContent>{renderContent()}</DialogContent>
+      <DialogContent>
+        <AnimatePresence mode="wait">
+          {renderContent()}
+        </AnimatePresence>
+      </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>Cancel</Button>
         {step === 'search' && <Button onClick={handleSearch} variant="contained" startIcon={<SearchIcon />}>Search Sales</Button>}

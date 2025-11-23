@@ -1,6 +1,7 @@
 // client/src/components/CustomerForm.js
 import React, { useState, useEffect } from 'react';
 import { createCustomer, updateCustomer } from '../api/customerApi';
+import { isEmail, isMobilePhone } from 'validator'; // Added validator
 
 // MUI Imports
 import { Box, TextField, Button, Stack, Alert } from '@mui/material';
@@ -32,11 +33,38 @@ const CustomerForm = ({ onFormSubmit, customerToEdit, onClose }) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // --- NEW: Comprehensive Validation Function ---
+  const validate = () => {
+    if (!formData.name.trim()) {
+      setError('Customer Name is required.');
+      return false;
+    }
+    
+    if (formData.email && !isEmail(formData.email)) {
+      setError('Please enter a valid email address.');
+      return false;
+    }
+
+    // Basic validation for PH mobile numbers (09xxxxxxxxx) or landline
+    // Using validator's isMobilePhone with 'en-PH' locale, strict mode false to allow other formats if needed
+    // Or manual regex for flexibility: /^(09|\+639)\d{9}$/
+    if (formData.phone && !/^[0-9+\- ]{7,15}$/.test(formData.phone)) {
+       setError('Please enter a valid phone number (e.g., 09123456789).');
+       return false;
+    }
+
+    setError('');
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError('');
+    
+    // --- NEW: Run Validation ---
+    if (!validate()) return;
 
+    setIsSubmitting(true);
+    
     try {
       if (customerToEdit) {
         await updateCustomer(customerToEdit._id, formData);
@@ -46,7 +74,7 @@ const CustomerForm = ({ onFormSubmit, customerToEdit, onClose }) => {
       onFormSubmit();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred.');
+      setError(err.response?.data?.message || 'An error occurred while saving.');
     } finally {
       setIsSubmitting(false);
     }
@@ -63,6 +91,7 @@ const CustomerForm = ({ onFormSubmit, customerToEdit, onClose }) => {
           onChange={handleChange}
           required
           fullWidth
+          error={error.includes('Name')}
         />
         <TextField
           label="Email Address"
@@ -71,6 +100,8 @@ const CustomerForm = ({ onFormSubmit, customerToEdit, onClose }) => {
           value={formData.email}
           onChange={handleChange}
           fullWidth
+          error={error.includes('email')}
+          helperText={error.includes('email') ? "Format: example@mail.com" : ""}
         />
         <TextField
           label="Phone Number"
@@ -78,6 +109,8 @@ const CustomerForm = ({ onFormSubmit, customerToEdit, onClose }) => {
           value={formData.phone}
           onChange={handleChange}
           fullWidth
+          error={error.includes('phone')}
+          helperText={error.includes('phone') ? "Format: 09xxxxxxxxx" : ""}
         />
         <TextField
           label="Address"

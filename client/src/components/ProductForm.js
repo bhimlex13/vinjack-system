@@ -4,6 +4,7 @@ import api from '../api/axios';
 import ConfirmationContext from '../context/ConfirmationContext'; 
 import AuthContext from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import {
@@ -11,31 +12,30 @@ import {
   Grid, ToggleButtonGroup, ToggleButton, Alert, Stack, InputAdornment, IconButton,
   Typography, Tooltip, FormHelperText,
   Autocomplete, 
-  CircularProgress,
   Dialog, 
   DialogTitle,
   DialogContent,
   DialogActions,
   Paper, 
-  Chip, 
   List, 
   ListItem, 
   Divider,
-  FormControlLabel, // --- NEW IMPORT ---
-  Checkbox // --- NEW IMPORT ---
+  FormControlLabel, 
+  Checkbox 
 } from '@mui/material';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'; 
 import DeleteIcon from '@mui/icons-material/Delete'; 
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import StarIcon from '@mui/icons-material/Star'; 
 import StarBorderIcon from '@mui/icons-material/StarBorder'; 
 import ArchiveIcon from '@mui/icons-material/Archive';
-import UnarchiveIcon from '@mui/icons-material/Unarchive';
 
-// Add Supplier Dialog Component (remains the same)
+// --- NEW IMPORT ---
+import LoadingSpinner from './LoadingSpinner';
+
+// Add Supplier Dialog Component
 const AddSupplierDialog = ({ open, onClose, allSuppliers, assignedSupplierIds, onAddSuppliers }) => {
   const [selectedSuppliers, setSelectedSuppliers] = useState([]);
   const availableSuppliers = useMemo(() => {
@@ -77,7 +77,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
     defaultCost: 0, 
     supplierCosts: [],
     status: 'active',
-    isSerialized: false // --- ADD DEFAULT VALUE HERE ---
+    isSerialized: false 
   });
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -118,9 +118,6 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
 
   // Initialize form data
   useEffect(() => {
-    console.log("--- ProductForm Init UseEffect START ---");
-    console.log("productToEdit prop:", productToEdit);
-
     const initialData = productToEdit ? {
       itemCode: productToEdit.itemCode, name: productToEdit.name, category: productToEdit.category?._id || '',
       brand: productToEdit.brand?._id || '', price: productToEdit.price, quantity: productToEdit.quantity,
@@ -128,13 +125,11 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
       defaultCost: productToEdit.defaultCost || 0,
       supplierCosts: Array.isArray(productToEdit.supplierCosts) ? productToEdit.supplierCosts.map(sc => ({ supplier: sc.supplier?._id || sc.supplier, cost: sc.cost || 0 })).filter(sc => sc.supplier) : [],
       status: productToEdit.status || 'active',
-      isSerialized: productToEdit.isSerialized || false // --- SET INITIAL VALUE FROM PROP ---
-    } : { itemCode: '', name: '', category: '', brand: '', price: '', quantity: '', maxStock: '', image: '', defaultCost: 0, supplierCosts: [], status: 'active', isSerialized: false }; // --- SET INITIAL DEFAULT ---
+      isSerialized: productToEdit.isSerialized || false 
+    } : { itemCode: '', name: '', category: '', brand: '', price: '', quantity: '', maxStock: '', image: '', defaultCost: 0, supplierCosts: [], status: 'active', isSerialized: false }; 
     
-    console.log("Setting initial formData:", initialData);
     setFormData(initialData); setUploadedFileName('');
     if (productToEdit && productToEdit.image && !productToEdit.image.startsWith('data:image')) { setImageSource('url'); } else if (productToEdit && productToEdit.image) { setImageSource('upload'); } else { setImageSource('url'); }
-     console.log("--- ProductForm Init UseEffect END ---");
   }, [productToEdit]);
 
 
@@ -142,11 +137,9 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
     setFormData({ ...formData, [e.target.name]: e.target.value });
    };
    
-   // --- NEW: Handle Checkbox Change ---
    const handleCheckboxChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.checked });
    };
-   // --- END NEW ---
 
   const handleSupplierCostChange = (supplierId, newCost) => {
       setFormData(prevData => ({ ...prevData, supplierCosts: prevData.supplierCosts.map(sc => sc.supplier === supplierId ? { ...sc, cost: newCost === '' ? '' : Number(newCost) } : sc ) }));
@@ -214,13 +207,11 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // --- NEW: Pre-submission validation for serialization ---
     if (productToEdit && formData.isSerialized === true && productToEdit.quantity > 0) {
         setError(`Cannot enable serialization when current stock is ${productToEdit.quantity}. Set quantity to 0 first.`);
         toast.error(`Cannot enable serialization when current stock is > 0.`);
         return;
     }
-    // --- END NEW ---
     
     const invalidCostEntry = formData.supplierCosts.find(sc => sc.cost === '' || isNaN(sc.cost) || Number(sc.cost) < 0);
     if (invalidCostEntry) { setError(`Please enter a valid, non-negative cost for all assigned suppliers.`); toast.warn(`Please enter a valid cost for all suppliers.`); return; }
@@ -273,6 +264,15 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
   }, [formData.supplierCosts, allSuppliers]);
 
 
+  // --- SHOW LOADING SPINNER IF DATA FETCHING ---
+  if (supplierLoading && !dropdownsLoaded) {
+      return (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
+              <LoadingSpinner text="Loading form data..." />
+          </Box>
+      );
+  }
+
   return (
     <Box sx={{ minWidth: 600, p: 3, pt: 1 }}>
         <AddSupplierDialog
@@ -317,7 +317,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
               </FormControl>
             </Grid>
             
-            {/* --- NEW: Is Serialized Checkbox --- */}
+            {/* Is Serialized Checkbox */}
              <Grid item size={{ xs: 12 }}>
                 <FormControlLabel
                     control={
@@ -341,55 +341,61 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
                     <FormHelperText error>Cannot enable serialization while current stock is {productToEdit.quantity}. Set quantity to 0 first.</FormHelperText>
                 )}
             </Grid>
-            {/* --- END NEW --- */}
 
             {/* Supplier Display Area */}
             <Grid item size={{ xs: 12 }}>
                 <Typography variant="subtitle2" gutterBottom>Assigned Suppliers & Costs</Typography>
                 <Paper variant="outlined" sx={{ p: 1.5 }}>
-                    {getAssignedSupplierDetailsWithCost.length > 0 ? (
-                        <List dense disablePadding>
-                            {getAssignedSupplierDetailsWithCost.map((supplier, index) => {
-                                const isDefault = Number(supplier.cost) === Number(formData.defaultCost) && Number(supplier.cost) >= 0 && supplier.cost !== '';
-                                return (
-                                    <React.Fragment key={supplier._id}>
-                                        <ListItem sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, px: 0 }}>
-                                            <Typography sx={{ flexShrink: 0, minWidth: '100px', mr: 1 }}>{supplier.name}</Typography>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Tooltip title={isDefault ? "This is the default cost" : "Set as default cost"}>
-                                                    <span> 
-                                                        <IconButton
-                                                            onClick={() => handleSetDefaultCost(supplier._id, supplier.cost)}
-                                                            color={isDefault ? "primary" : "default"}
-                                                            size="small"
-                                                            disabled={isDefault || supplier.cost === '' || isNaN(Number(supplier.cost)) || Number(supplier.cost) < 0}
-                                                        >
-                                                            {isDefault ? <StarIcon /> : <StarBorderIcon />}
+                    <AnimatePresence>
+                        {getAssignedSupplierDetailsWithCost.length > 0 ? (
+                            <List dense disablePadding component={motion.ul}>
+                                {getAssignedSupplierDetailsWithCost.map((supplier, index) => {
+                                    const isDefault = Number(supplier.cost) === Number(formData.defaultCost) && Number(supplier.cost) >= 0 && supplier.cost !== '';
+                                    return (
+                                        <motion.li 
+                                            key={supplier._id} 
+                                            initial={{ opacity: 0, height: 0 }} 
+                                            animate={{ opacity: 1, height: 'auto' }} 
+                                            exit={{ opacity: 0, height: 0 }}
+                                        >
+                                            <ListItem sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, px: 0 }}>
+                                                <Typography sx={{ flexShrink: 0, minWidth: '100px', mr: 1 }}>{supplier.name}</Typography>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <Tooltip title={isDefault ? "This is the default cost" : "Set as default cost"}>
+                                                        <span> 
+                                                            <IconButton
+                                                                onClick={() => handleSetDefaultCost(supplier._id, supplier.cost)}
+                                                                color={isDefault ? "primary" : "default"}
+                                                                size="small"
+                                                                disabled={isDefault || supplier.cost === '' || isNaN(Number(supplier.cost)) || Number(supplier.cost) < 0}
+                                                            >
+                                                                {isDefault ? <StarIcon /> : <StarBorderIcon />}
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
+                                                    <TextField
+                                                        size="small" label="Cost" type="number" required
+                                                        value={supplier.cost ?? ''} 
+                                                        onChange={(e) => handleSupplierCostChange(supplier._id, e.target.value)}
+                                                        inputProps={{ step: "0.01", min: 0 }} sx={{ width: '120px' }}
+                                                        InputProps={{ startAdornment: <InputAdornment position="start">₱</InputAdornment> }}
+                                                    />
+                                                    <Tooltip title={`Remove ${supplier.name}`}>
+                                                        <IconButton onClick={() => handleRemoveSupplier(supplier._id)} size="small" color="error">
+                                                            <DeleteIcon />
                                                         </IconButton>
-                                                    </span>
-                                                </Tooltip>
-                                                <TextField
-                                                    size="small" label="Cost" type="number" required
-                                                    value={supplier.cost ?? ''} 
-                                                    onChange={(e) => handleSupplierCostChange(supplier._id, e.target.value)}
-                                                    inputProps={{ step: "0.01", min: 0 }} sx={{ width: '120px' }}
-                                                    InputProps={{ startAdornment: <InputAdornment position="start">₱</InputAdornment> }}
-                                                />
-                                                <Tooltip title={`Remove ${supplier.name}`}>
-                                                    <IconButton onClick={() => handleRemoveSupplier(supplier._id)} size="small" color="error">
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Box>
-                                        </ListItem>
-                                        {index < getAssignedSupplierDetailsWithCost.length - 1 && <Divider component="li" />}
-                                    </React.Fragment>
-                                );
-                            })}
-                        </List>
-                    ) : (
-                        <Typography variant="body2" color="text.secondary" sx={{ml: 1}}>No suppliers assigned yet.</Typography>
-                    )}
+                                                    </Tooltip>
+                                                </Box>
+                                            </ListItem>
+                                            {index < getAssignedSupplierDetailsWithCost.length - 1 && <Divider component="li" />}
+                                        </motion.li>
+                                    );
+                                })}
+                            </List>
+                        ) : (
+                            <Typography variant="body2" color="text.secondary" sx={{ml: 1}}>No suppliers assigned yet.</Typography>
+                        )}
+                    </AnimatePresence>
                 </Paper>
                  <Button size="small" startIcon={<AddCircleOutlineIcon />} onClick={() => setIsAddSupplierDialogOpen(true)} sx={{ mt: 1 }} disabled={supplierLoading} > Add Supplier </Button>
                  {(!productToEdit && (!formData.supplierCosts || formData.supplierCosts.length === 0)) && (error.includes('supplier') || error.includes('cost')) && <FormHelperText error>{error}</FormHelperText> }
@@ -403,7 +409,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
              <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="quantity" label="Current Qty" value={formData.quantity} onChange={handleChange} inputProps={{ min: 0 }} disabled={!!productToEdit} InputProps={productToEdit ? { endAdornment: ( <InputAdornment position="end"> <Tooltip title="Use 'Adjust Stock' button in the inventory list to change quantity."> <InfoOutlinedIcon color="action" /> </Tooltip> </InputAdornment> ) }: {}} /> {!!productToEdit && <FormHelperText>Quantity is managed via transactions. Use Adjust Stock for corrections.</FormHelperText>} </Grid>
              <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="maxStock" label="Max Stock" value={formData.maxStock} onChange={handleChange} inputProps={{ min: 1 }} /> </Grid>
              
-             {/* Status Dropdown (Super Admin or Admin only, Edit mode only) */}
+             {/* Status Dropdown */}
              {productToEdit && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
                 <Grid item size={{ xs: 6 }}>
                     <FormControl fullWidth required>
