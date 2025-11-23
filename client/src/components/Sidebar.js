@@ -2,6 +2,7 @@
 import React, { useContext } from 'react';
 import { NavLink } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import {
@@ -16,9 +17,7 @@ import {
   FaTachometerAlt, FaBoxOpen, FaShoppingCart, FaTruck, FaChartBar,
   FaUsersCog, FaDatabase, FaFileAlt, FaReceipt, FaFileInvoice,
   FaTruckLoading, FaUserFriends, FaUndo,
-  // --- NEW: Added Hand Holding USD icon ---
   FaHandHoldingUsd,
-  // --- END NEW ---
   FaTruckMoving 
 } from 'react-icons/fa';
 
@@ -50,21 +49,29 @@ const StyledDrawer = styled(Drawer, { shouldForwardProp: (prop) => prop !== 'ope
   }),
 );
 
+// --- MODIFIED: Wrapped ListItem in motion.div ---
 const NavListItem = ({ to, icon, text, isCollapsed }) => (
-  <ListItem disablePadding component={NavLink} to={to}
-    style={({ isActive }) => ({
-      textDecoration: 'none',
-      color: 'inherit',
-      backgroundColor: isActive ? 'rgba(0, 123, 255, 0.1)' : 'transparent',
-    })}
+  <motion.div
+    layout
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ duration: 0.3 }}
   >
-    <ListItemButton sx={{ pl: isCollapsed ? 2.5 : 3 }}>
-      <ListItemIcon sx={{ minWidth: 0, mr: isCollapsed ? 'auto' : 3, justifyContent: 'center' }}>
-        {icon}
-      </ListItemIcon>
-      <ListItemText primary={text} sx={{ opacity: isCollapsed ? 0 : 1 }} />
-    </ListItemButton>
-  </ListItem>
+    <ListItem disablePadding component={NavLink} to={to}
+      style={({ isActive }) => ({
+        textDecoration: 'none',
+        color: 'inherit',
+        backgroundColor: isActive ? 'rgba(0, 123, 255, 0.1)' : 'transparent',
+      })}
+    >
+      <ListItemButton sx={{ pl: isCollapsed ? 2.5 : 3 }}>
+        <ListItemIcon sx={{ minWidth: 0, mr: isCollapsed ? 'auto' : 3, justifyContent: 'center' }}>
+          {icon}
+        </ListItemIcon>
+        <ListItemText primary={text} sx={{ opacity: isCollapsed ? 0 : 1 }} />
+      </ListItemButton>
+    </ListItem>
+  </motion.div>
 );
 
 const Sidebar = ({ isCollapsed, toggleSidebar }) => {
@@ -86,9 +93,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
     { text: 'Purchase Orders', to: '/purchase-orders', icon: <FaFileInvoice />, perm: hasPermission('canManagePurchaseOrders') },
     { text: 'Suppliers', to: '/suppliers', icon: <FaTruck />, perm: hasPermission('canViewSuppliers') },
     { text: 'Supplier Returns', to: '/supplier-returns', icon: <FaTruckMoving />, perm: hasPermission('canManageSuppliers') },
-    // --- NEW: Consignment Payouts Page Link ---
     { text: 'Consignment Payouts', to: '/consignment-payouts', icon: <FaHandHoldingUsd />, perm: hasPermission('canManageSuppliers') },
-    // --- END NEW ---
   ];
 
   const reportingNav = [
@@ -119,7 +124,15 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
     <StyledDrawer variant="permanent" open={!isCollapsed}>
       <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: [1] }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mr: 'auto', pl: 1 }}>
-          <img src="/assets/vinjack_logo.png" alt="VinJack Logo" style={{ width: 40, height: 40, marginRight: 12 }} />
+          {/* --- ANIMATED LOGO --- */}
+          <motion.img 
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+            src="/assets/vinjack_logo.png" 
+            alt="VinJack Logo" 
+            style={{ width: 40, height: 40, marginRight: 12 }} 
+          />
           <Typography component="h1" variant="h6" noWrap>VinJack MS</Typography>
         </Box>
         <IconButton onClick={toggleSidebar}><ChevronLeftIcon /></IconButton>

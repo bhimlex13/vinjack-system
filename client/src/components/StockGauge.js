@@ -1,8 +1,8 @@
 // client/src/components/StockGauge.js
 import React from 'react';
 import { Box, Typography, LinearProgress, Tooltip } from '@mui/material';
+import { motion } from 'framer-motion'; // --- NEW IMPORT ---
 
-// Function to get status details (text and color)
 const getStatusDetails = (status) => {
   switch (status) {
     case 'Out of Stock':
@@ -11,64 +11,68 @@ const getStatusDetails = (status) => {
       return { text: 'Critical', color: 'error' };   // Red
     case 'Low':
       return { text: 'Low', color: 'warning' }; // Orange
-    case 'Healthy': // Keep Healthy internally
+    case 'Healthy': 
     default:
       return { text: 'In Stock', color: 'success' }; // Green
   }
 };
 
 const StockGauge = ({ quantity, maxStock, stockStatus }) => {
-  // Ensure maxStock is a valid number > 0 for calculation
   const safeMaxStock = Math.max(1, maxStock || 1);
-
-  // Calculate raw percentage
   const rawPercentage = (quantity / safeMaxStock) * 100;
 
-  // Cap percentage at 100 for display and bar
   let displayPercentage = Math.round(rawPercentage);
   if (quantity > 0 && displayPercentage === 0) {
-    displayPercentage = 1; // Show at least 1% if there's stock
+    displayPercentage = 1; 
   }
-  const progressBarValue = Math.min(displayPercentage, 100); // Bar caps at 100%
+  const progressBarValue = Math.min(displayPercentage, 100); 
 
-  // Get status text and color
   const { text: statusText, color: statusColor } = getStatusDetails(stockStatus);
-
-  // --- MODIFIED: Tooltip shows status text ---
   const tooltipTitle = statusText;
-
-  // --- MODIFIED: Main text shows "Quantity / MaxStock" ---
   const quantityDisplay = `${quantity.toLocaleString()} / ${safeMaxStock.toLocaleString()}`;
 
   return (
     <Tooltip title={tooltipTitle} arrow>
       <Box sx={{ width: '100%', pt: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-          {/* --- MODIFIED: Display "Quantity / MaxStock" --- */}
           <Typography
             variant="body2"
             component="span"
             sx={{
               fontWeight: 'bold',
-              // Use status color for quantity text too
               color: statusColor === 'inherit' ? 'text.secondary' : `${statusColor}.main`,
-              // Add whiteSpace to prevent wrapping if numbers get very large
               whiteSpace: 'nowrap'
             }}
           >
-            {quantityDisplay} {/* Display "763 / 1000", etc. */}
+            {quantityDisplay} 
           </Typography>
-          {/* Display Capped Percentage */}
           <Typography variant="body2" component="span" sx={{ color: 'text.secondary' }}>
-            {progressBarValue}% {/* Show capped percentage */}
+            {progressBarValue}% 
           </Typography>
         </Box>
-        <LinearProgress
-          variant="determinate"
-          value={progressBarValue} // Use the capped value for the bar
-          color={statusColor} // 'inherit' results in a grey bar
-          sx={{ height: 6, borderRadius: 5 }}
-        />
+        
+        {/* --- ANIMATED PROGRESS BAR --- */}
+        <Box sx={{ width: '100%', height: 6, bgcolor: 'grey.200', borderRadius: 5, overflow: 'hidden' }}>
+            <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${progressBarValue}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                style={{ 
+                    height: '100%', 
+                    // Need to map MUI colors to actual CSS colors for motion style if not using classes
+                    // Simple workaround: Use MUI LinearProgress inside motion div or just stick to simple LinearProgress if animation is overkill
+                    // Actually, standard MUI LinearProgress animates on value change by default. 
+                    // Let's enhance it by animating from 0 on mount.
+                }}
+            >
+                 <LinearProgress
+                    variant="determinate"
+                    value={progressBarValue} 
+                    color={statusColor} 
+                    sx={{ height: 6, borderRadius: 5 }}
+                />
+            </motion.div>
+        </Box>
       </Box>
     </Tooltip>
   );

@@ -5,6 +5,7 @@ import CustomerForm from '../components/CustomerForm';
 import CustomerMotorcyclesModal from '../components/CustomerMotorcyclesModal';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import { 
@@ -21,6 +22,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { FaUserFriends, FaMotorcycle } from 'react-icons/fa';
 
+// --- NEW IMPORT ---
+import LoadingSpinner from '../components/LoadingSpinner';
+
 const CustomersPage = () => {
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,6 +34,17 @@ const CustomersPage = () => {
   const { confirm } = useContext(ConfirmationContext);
   const [searchTerm, setSearchTerm] = useState('');
   const [motorcycleFilter, setMotorcycleFilter] = useState('');
+
+  // --- FRAMER MOTION VARIANTS ---
+  const pageVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.4, ease: "easeOut" }
+    }
+  };
+  // ------------------------------
 
   const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
@@ -132,16 +147,104 @@ const CustomersPage = () => {
     }
   ];
 
+  // --- RENDER LOADING SPINNER IF FETCHING ---
+  if (isLoading && customers.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <LoadingSpinner text="Loading Customers..." />
+      </Box>
+    );
+  }
+
   return (
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
-      <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
-        <CustomerForm
-          onFormSubmit={handleFormSubmit}
-          customerToEdit={editingCustomer}
-          onClose={() => setIsModalOpen(false)}
-        />
-      </Dialog>
+      
+      {/* --- ANIMATED HEADER SECTION --- */}
+      <motion.div initial="hidden" animate="visible" variants={pageVariants}>
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+              <FaUserFriends size={32} />
+              <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+                Customer Management
+              </Typography>
+          </Stack>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openModalForAdd}>
+            Add Customer
+          </Button>
+        </Box>
+        
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Grid container spacing={2}>
+            <Grid item size={{ xs: 12, md: 8 }}>
+              <TextField
+                label="Search Customers (by Name, Email, or Phone)"
+                variant="outlined"
+                size="small"
+                fullWidth
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 4 }}>
+              <TextField
+                label="Filter by Motorcycle Make (e.g., Honda)"
+                variant="outlined"
+                size="small"
+                fullWidth
+                value={motorcycleFilter}
+                onChange={(e) => setMotorcycleFilter(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <FaMotorcycle />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+          </Grid>
+        </Paper>
+
+        <Paper sx={{ height: '70vh', width: '100%' }}>
+          <DataGrid
+            rows={filteredCustomers} 
+            columns={columns}
+            loading={isLoading}
+            getRowId={(row) => row._id}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 10 } },
+            }}
+            pageSizeOptions={[10, 25, 50]}
+          />
+        </Paper>
+      </motion.div>
+
+      {/* --- ANIMATED DIALOGS --- */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <Dialog 
+            open={isModalOpen} 
+            onClose={() => setIsModalOpen(false)} 
+            fullWidth 
+            maxWidth="sm"
+            // PaperProps={{ component: motion.div, initial: { y: 50, opacity: 0 }, animate: { y: 0, opacity: 1 } }} // Optional: Animate dialog entrance
+          >
+            <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
+            <CustomerForm
+              onFormSubmit={handleFormSubmit}
+              customerToEdit={editingCustomer}
+              onClose={() => setIsModalOpen(false)}
+            />
+          </Dialog>
+        )}
+      </AnimatePresence>
 
       {managingCustomer && (
           <CustomerMotorcyclesModal
@@ -151,67 +254,6 @@ const CustomersPage = () => {
           />
       )}
 
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Stack direction="row" alignItems="center" spacing={2}>
-            <FaUserFriends size={32} />
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-              Customer Management
-            </Typography>
-        </Stack>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openModalForAdd}>
-          Add Customer
-        </Button>
-      </Box>
-      
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2}>
-          {/* --- THIS IS THE FIX --- */}
-          <Grid item size={{ xs: 12, md: 8 }}>
-            <TextField
-              label="Search Customers (by Name, Email, or Phone)"
-              variant="outlined"
-              size="small"
-              fullWidth
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          {/* --- THIS IS THE FIX --- */}
-          <Grid item size={{ xs: 12, md: 4 }}>
-            <TextField
-              label="Filter by Motorcycle Make (e.g., Honda)"
-              variant="outlined"
-              size="small"
-              fullWidth
-              value={motorcycleFilter}
-              onChange={(e) => setMotorcycleFilter(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <FaMotorcycle />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-        </Grid>
-      </Paper>
-
-      <Paper sx={{ height: '70vh', width: '100%' }}>
-        <DataGrid
-          rows={filteredCustomers} 
-          columns={columns}
-          loading={isLoading}
-          getRowId={(row) => row._id}
-        />
-      </Paper>
     </Container>
   );
 };

@@ -6,6 +6,7 @@ import AuthContext from '../context/AuthContext';
 import StockAdjustmentModal from '../components/StockAdjustmentModal';
 import MovementHistoryModal from '../components/MovementHistoryModal';
 import StockGauge from '../components/StockGauge';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import {
@@ -19,7 +20,10 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import TuneIcon from '@mui/icons-material/Tune';
 import HistoryIcon from '@mui/icons-material/History';
-import SyncIcon from '@mui/icons-material/Sync';
+// import SyncIcon from '@mui/icons-material/Sync'; // Kept commented out as per original code
+
+// --- NEW IMPORT ---
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const InventoryPage = () => {
   const { user } = useContext(AuthContext);
@@ -36,10 +40,19 @@ const InventoryPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
-  // --- Filter for product status ---
   const [filterStatus, setFilterStatus] = useState('active');
-  // --- NEW: Filter for stock level ---
   const [filterStockLevel, setFilterStockLevel] = useState('');
+
+  // --- FRAMER MOTION VARIANTS ---
+  const pageVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.4, ease: "easeOut" }
+    }
+  };
+  // ------------------------------
 
   const fetchInitialData = async () => {
     try {
@@ -89,14 +102,12 @@ const InventoryPage = () => {
       const brandId = typeof product.brand === 'object' ? product.brand?._id : product.brand;
       const categoryMatch = filterCategory ? categoryId === filterCategory : true;
       const brandMatch = filterBrand ? brandId === filterBrand : true;
-      // --- Filter by status ---
       const statusMatch = filterStatus ? product.status === filterStatus : true;
-      // --- NEW: Filter by stock level ---
       const stockLevelMatch = filterStockLevel ? product.stockStatus === filterStockLevel : true;
 
       return searchMatch && categoryMatch && brandMatch && statusMatch && stockLevelMatch;
     });
-  }, [products, searchTerm, filterCategory, filterBrand, filterStatus, filterStockLevel]); // --- Added filterStockLevel
+  }, [products, searchTerm, filterCategory, filterBrand, filterStatus, filterStockLevel]); 
 
   const handleProductFormSubmit = (productData) => {
     const existingProductIndex = products.findIndex(p => p._id === productData._id);
@@ -126,24 +137,18 @@ const InventoryPage = () => {
     setIsProductModalOpen(true);
   };
 
-  // --- RENAMED: from handleDelete to handleArchive ---
   const handleArchive = async (productId) => {
     try {
-      // The backend 'DELETE' route now archives, not deletes
       const response = await api.delete(`/products/${productId}`);
-      
-      // Update the product in the local state with the returned (archived) product
       handleProductFormSubmit(response.data.product); 
-      
-      return Promise.resolve(); // Indicate success
+      return Promise.resolve(); 
     } catch (err) {
       setError('Failed to archive product.');
-      return Promise.reject(err); // Indicate failure
+      return Promise.reject(err); 
     }
   };
 
   const getRowClassName = (params) => {
-    // --- MODIFIED: Add class for inactive products ---
     if (params.row.status === 'inactive') {
       return 'inactive-row';
     }
@@ -158,7 +163,7 @@ const InventoryPage = () => {
     { field: 'brand', headerName: 'Brand', width: 150, renderCell: (params) => params.row.brand?.name || 'N/A' },
     { field: 'price', headerName: 'Price', width: 120, renderCell: (params) => `₱${(params.row?.price || 0).toFixed(2)}` },
     { 
-      field: 'stockStatus', // Renamed from 'status' to avoid confusion
+      field: 'stockStatus', 
       headerName: 'Stock Level', 
       width: 200, 
       renderCell: (params) => (
@@ -169,7 +174,6 @@ const InventoryPage = () => {
         />
       ) 
     },
-    // --- Status Column ---
     {
       field: 'status',
       headerName: 'Status',
@@ -185,11 +189,9 @@ const InventoryPage = () => {
         />
       )
     },
-    // --- END ---
     {
       field: 'actions', headerName: 'Actions', width: 180, sortable: false, align: 'center', headerAlign: 'center',
       renderCell: (params) => (
-        // --- UPDATED: Changed roles to 'Super Admin' and 'Admin' ---
         (user?.role === 'Super Admin' || user?.role === 'Admin') && (
           <Box>
             <Tooltip title="View History">
@@ -207,7 +209,7 @@ const InventoryPage = () => {
                 size="small" 
                 color="secondary" 
                 onClick={() => setAdjustmentProduct(params.row)}
-                disabled={params.row.status === 'inactive'} // --- Disable adjustment for inactive items ---
+                disabled={params.row.status === 'inactive'} 
               >
                 <TuneIcon />
               </IconButton>
@@ -220,20 +222,39 @@ const InventoryPage = () => {
 
   if (error) return <Typography color="error">{error}</Typography>;
 
+  // --- RENDER LOADING SPINNER ---
+  if (isLoading && products.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <LoadingSpinner text="Loading Inventory..." />
+      </Box>
+    );
+  }
+
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Dialog open={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
-        <DialogContent>
-          <ProductForm
-            onFormSubmit={handleProductFormSubmit}
-            productToEdit={editingProduct}
-            onClose={() => setIsProductModalOpen(false)}
-            // --- MODIFIED: Pass the archive handler ---
-            onProductArchive={handleArchive}
-          />
-        </DialogContent>
-      </Dialog>
+      
+      <AnimatePresence>
+        {isProductModalOpen && (
+          <Dialog 
+            open={isProductModalOpen} 
+            onClose={() => setIsProductModalOpen(false)} 
+            maxWidth="md" 
+            fullWidth
+            // PaperProps={{ component: motion.div, initial: { y: 50, opacity: 0 }, animate: { y: 0, opacity: 1 } }}
+          >
+            <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+            <DialogContent>
+              <ProductForm
+                onFormSubmit={handleProductFormSubmit}
+                productToEdit={editingProduct}
+                onClose={() => setIsProductModalOpen(false)}
+                onProductArchive={handleArchive}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
+      </AnimatePresence>
       
       {adjustmentProduct && (
         <StockAdjustmentModal
@@ -250,107 +271,103 @@ const InventoryPage = () => {
         />
       )}
 
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-          Inventory Management
-        </Typography>
-        
-        <Stack direction="row" spacing={2}>
-          {/* --- UPDATED: Changed roles to 'Super Admin' and 'Admin' --- */}
-          {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
-            <Tooltip title="Recalculate stock status for all products">
-              {/* <Button 
-                variant="outlined" 
-                startIcon={<SyncIcon />} 
-                onClick={handleSyncStatuses}
-              >
-                Sync Statuses
-              </Button> */}
-            </Tooltip>
-          )}
+      {/* --- ANIMATED PAGE CONTENT --- */}
+      <motion.div initial="hidden" animate="visible" variants={pageVariants}>
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+            Inventory Management
+          </Typography>
           
-          {/* --- **CORRECTED**: Changed roles to 'Super Admin' and 'Admin' based on image --- */}
-          {user && (user.role === 'Super Admin' || user.role === 'Admin') && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={openProductModalForAdd}>
-              Add New Product
-            </Button>
-          )}
-        </Stack>
-      </Box>
+          <Stack direction="row" spacing={2}>
+            {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
+              <Tooltip title="Recalculate stock status for all products">
+                {/* <Button 
+                  variant="outlined" 
+                  startIcon={<SyncIcon />} 
+                  onClick={handleSyncStatuses}
+                >
+                  Sync Statuses
+                </Button> */}
+              </Tooltip>
+            )}
+            
+            {user && (user.role === 'Super Admin' || user.role === 'Admin') && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={openProductModalForAdd}>
+                Add New Product
+              </Button>
+            )}
+          </Stack>
+        </Box>
 
-      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <TextField label="Search" variant="outlined" size="small" value={searchTerm} 
-          onChange={(e) => setSearchTerm(e.target.value)} 
-          sx={{ flexGrow: 1, minWidth: '200px' }} 
-          InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
-        />
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Category</InputLabel>
-          <Select value={filterCategory} label="Category" onChange={(e) => setFilterCategory(e.target.value)}>
-            <MenuItem value=""><em>All Categories</em></MenuItem>
-            {categories.map(cat => <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Brand</InputLabel>
-          <Select value={filterBrand} label="Brand" onChange={(e) => setFilterBrand(e.target.value)}>
-            <MenuItem value=""><em>All Brands</em></MenuItem>
-            {brands.map(brand => <MenuItem key={brand._id} value={brand._id}>{brand.name}</MenuItem>)}
-          </Select>
-        </FormControl>
-        {/* --- Status Filter --- */}
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Status</InputLabel>
-          <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)}>
-            <MenuItem value=""><em>All Statuses</em></MenuItem>
-            <MenuItem value="active">Active Only</MenuItem>
-            <MenuItem value="inactive">Archived Only</MenuItem>
-          </Select>
-        </FormControl>
-        {/* --- END --- */}
+        <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <TextField label="Search" variant="outlined" size="small" value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            sx={{ flexGrow: 1, minWidth: '200px' }} 
+            InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
+          />
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Category</InputLabel>
+            <Select value={filterCategory} label="Category" onChange={(e) => setFilterCategory(e.target.value)}>
+              <MenuItem value=""><em>All Categories</em></MenuItem>
+              {categories.map(cat => <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Brand</InputLabel>
+            <Select value={filterBrand} label="Brand" onChange={(e) => setFilterBrand(e.target.value)}>
+              <MenuItem value=""><em>All Brands</em></MenuItem>
+              {brands.map(brand => <MenuItem key={brand._id} value={brand._id}>{brand.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Status</InputLabel>
+            <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)}>
+              <MenuItem value=""><em>All Statuses</em></MenuItem>
+              <MenuItem value="active">Active Only</MenuItem>
+              <MenuItem value="inactive">Archived Only</MenuItem>
+            </Select>
+          </FormControl>
 
-        {/* --- NEW: Stock Level Filter --- */}
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Stock Level</InputLabel>
-          <Select value={filterStockLevel} label="Stock Level" onChange={(e) => setFilterStockLevel(e.target.value)}>
-            <MenuItem value=""><em>All Levels</em></MenuItem>
-            <MenuItem value="Healthy">Healthy</MenuItem>
-            <MenuItem value="Low">Low</MenuItem>
-            <MenuItem value="Critical">Critical</MenuItem>
-            <MenuItem value="Out of Stock">Out of Stock</MenuItem>
-          </Select>
-        </FormControl>
-        {/* --- END NEW --- */}
-      </Paper>
-      
-      <Paper sx={{
-          height: '70vh',
-          width: '100%',
-          // --- STYLING for new row classes ---
-          '& .out-of-stock-row': {
-            backgroundColor: '#fafafa',
-            color: '#9e9e9e',
-            '&:hover': { backgroundColor: '#f0f0f0', }
-          },
-          '& .inactive-row': {
-            backgroundColor: '#f5f5f5',
-            color: '#bdbdbd',
-            textDecoration: 'line-through',
-            '&:hover': { backgroundColor: '#eeeeee', }
-          },
-          // --- END STYLING ---
-      }}>
-        <DataGrid
-          rows={filteredProducts}
-          columns={columns}
-          loading={isLoading}
-          getRowId={(row) => row._id}
-          initialState={{ 
-            sorting: { sortModel: [{ field: 'status', sort: 'asc' }] }, // --- Sort by status first ---
-          }}
-          getRowClassName={getRowClassName}
-        />
-      </Paper>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Stock Level</InputLabel>
+            <Select value={filterStockLevel} label="Stock Level" onChange={(e) => setFilterStockLevel(e.target.value)}>
+              <MenuItem value=""><em>All Levels</em></MenuItem>
+              <MenuItem value="Healthy">Healthy</MenuItem>
+              <MenuItem value="Low">Low</MenuItem>
+              <MenuItem value="Critical">Critical</MenuItem>
+              <MenuItem value="Out of Stock">Out of Stock</MenuItem>
+            </Select>
+          </FormControl>
+        </Paper>
+        
+        <Paper sx={{
+            height: '70vh',
+            width: '100%',
+            '& .out-of-stock-row': {
+              backgroundColor: '#fafafa',
+              color: '#9e9e9e',
+              '&:hover': { backgroundColor: '#f0f0f0', }
+            },
+            '& .inactive-row': {
+              backgroundColor: '#f5f5f5',
+              color: '#bdbdbd',
+              textDecoration: 'line-through',
+              '&:hover': { backgroundColor: '#eeeeee', }
+            },
+        }}>
+          <DataGrid
+            rows={filteredProducts}
+            columns={columns}
+            loading={isLoading}
+            getRowId={(row) => row._id}
+            initialState={{ 
+              sorting: { sortModel: [{ field: 'status', sort: 'asc' }] }, 
+            }}
+            getRowClassName={getRowClassName}
+          />
+        </Paper>
+      </motion.div>
     </Container>
   );
 };

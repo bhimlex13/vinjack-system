@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { getDeliveries } from '../api/deliveryApi';
 import RecordDeliveryForm from '../components/RecordDeliveryForm';
+import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
 
 // MUI Imports
 import { 
@@ -17,6 +18,9 @@ import AddIcon from '@mui/icons-material/Add';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SearchIcon from '@mui/icons-material/Search';
 
+// --- NEW IMPORT ---
+import LoadingSpinner from '../components/LoadingSpinner';
+
 const DeliveriesPage = () => {
   const [deliveries, setDeliveries] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -27,6 +31,17 @@ const DeliveriesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const navigate = useNavigate();
+
+  // --- FRAMER MOTION VARIANTS ---
+  const pageVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.4, ease: "easeOut" }
+    }
+  };
+  // ------------------------------
 
   const fetchDeliveries = async () => {
     try {
@@ -72,22 +87,17 @@ const DeliveriesPage = () => {
     {
       field: 'date',
       headerName: 'Date', flex: 1, minWidth: 200,
-      // --- FIX: Changed (params) to (value, row) ---
       valueGetter: (value, row) => {
-        // Try deliveryDate first, fall back to createdAt
         const date = row.deliveryDate || row.createdAt;
         return date ? new Date(date) : null;
       },
-      // --- END FIX ---
       renderCell: (params) => params.value ? params.value.toLocaleString('en-US', {
         year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
       }) : 'N/A',
     },
     { 
       field: 'supplier', headerName: 'Supplier', flex: 1, minWidth: 180,
-      // --- FIX: Changed (params) to (value, row) ---
       valueGetter: (value, row) => row.supplier?.name || 'N/A'
-      // --- END FIX ---
     },
     {
       field: 'purchaseOrder', headerName: 'Origin', flex: 1, minWidth: 150,
@@ -100,7 +110,7 @@ const DeliveriesPage = () => {
       field: 'deliveryType', headerName: 'Type', flex: 0.5, minWidth: 120,
       renderCell: (params) => (
         <Chip 
-          label={params.value || 'Purchase'} // Default old data to 'Purchase'
+          label={params.value || 'Purchase'} 
           color={params.value === 'Consignment' ? 'info' : 'default'} 
           variant="filled" 
           size="small" 
@@ -109,9 +119,7 @@ const DeliveriesPage = () => {
     },
     {
       field: 'recordedBy', headerName: 'Recorded By', flex: 1, minWidth: 180,
-      // --- FIX: Changed (params) to (value, row) ---
       valueGetter: (value, row) => row.recordedBy?.fullName || 'N/A'
-      // --- END FIX ---
     },
     {
       field: 'actions', headerName: 'Actions', width: 150, sortable: false, align: 'center', headerAlign: 'center',
@@ -127,84 +135,111 @@ const DeliveriesPage = () => {
 
   if (error) return <Typography color="error" sx={{ p: 3 }}>{error}</Typography>;
 
+  // --- RENDER LOADING SPINNER ---
+  if (isLoading && deliveries.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <LoadingSpinner text="Loading Deliveries..." />
+      </Box>
+    );
+  }
+
   return (
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-                Deliveries Hub
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-                Log direct deliveries or create new purchase orders.
-            </Typography>
+      
+      {/* --- ANIMATED HEADER & GRID --- */}
+      <motion.div initial="hidden" animate="visible" variants={pageVariants}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box>
+              <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+                  Deliveries Hub
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                  Log direct deliveries or create new purchase orders.
+              </Typography>
+          </Box>
+          <Stack direction="row" spacing={2}>
+              <Button 
+                  variant="contained" 
+                  color="success"
+                  startIcon={<LocalShippingIcon />}
+                  onClick={() => setIsDeliveryModalOpen(true)}
+              >
+                  Record Direct Delivery
+              </Button>
+              <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => navigate('/purchase-orders/new')}
+              >
+                  Create Purchase Order
+              </Button>
+          </Stack>
         </Box>
-        <Stack direction="row" spacing={2}>
-            <Button 
-                variant="contained" 
-                color="success"
-                startIcon={<LocalShippingIcon />}
-                onClick={() => setIsDeliveryModalOpen(true)}
-            >
-                Record Direct Delivery
-            </Button>
-            <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => navigate('/purchase-orders/new')}
-            >
-                Create Purchase Order
-            </Button>
-        </Stack>
-      </Box>
 
-      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <TextField
-          label="Search by Supplier, PO Number, or Type"
-          variant="outlined"
-          size="small"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{ flexGrow: 1 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel>Filter by Supplier</InputLabel>
-          <Select
-            value={filterSupplier}
-            label="Filter by Supplier"
-            onChange={(e) => setFilterSupplier(e.target.value)}
+        <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+          <TextField
+            label="Search by Supplier, PO Number, or Type"
+            variant="outlined"
+            size="small"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            sx={{ flexGrow: 1 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel>Filter by Supplier</InputLabel>
+            <Select
+              value={filterSupplier}
+              label="Filter by Supplier"
+              onChange={(e) => setFilterSupplier(e.target.value)}
+            >
+              <MenuItem value=""><em>All Suppliers</em></MenuItem>
+              {suppliers.map(sup => (
+                <MenuItem key={sup._id} value={sup._id}>{sup.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Paper>
+
+        <Paper sx={{ height: '70vh', width: '100%' }}>
+          <DataGrid
+            rows={filteredDeliveries}
+            columns={columns}
+            loading={isLoading}
+            getRowId={(row) => row._id}
+            initialState={{
+              sorting: { sortModel: [{ field: 'date', sort: 'desc' }] },
+            }}
+          />
+        </Paper>
+      </motion.div>
+
+      {/* --- ANIMATED DETAILS MODAL --- */}
+      <AnimatePresence>
+        {selectedDelivery && (
+          <Dialog 
+            open={!!selectedDelivery} 
+            onClose={() => setSelectedDelivery(null)} 
+            fullWidth 
+            maxWidth="md"
+            PaperComponent={motion.div}
+            PaperProps={{
+              initial: { y: 50, opacity: 0 },
+              animate: { y: 0, opacity: 1 },
+              exit: { y: 50, opacity: 0 },
+              transition: { duration: 0.3 },
+              sx: { backgroundColor: 'background.paper', boxShadow: 24, borderRadius: 2 }
+            }}
           >
-            <MenuItem value=""><em>All Suppliers</em></MenuItem>
-            {suppliers.map(sup => (
-              <MenuItem key={sup._id} value={sup._id}>{sup.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Paper>
-
-      <Paper sx={{ height: '70vh', width: '100%' }}>
-        <DataGrid
-          rows={filteredDeliveries}
-          columns={columns}
-          loading={isLoading}
-          getRowId={(row) => row._id}
-          initialState={{
-            sorting: { sortModel: [{ field: 'date', sort: 'desc' }] },
-          }}
-        />
-      </Paper>
-
-      <Dialog open={!!selectedDelivery} onClose={() => setSelectedDelivery(null)} fullWidth maxWidth="md">
-        <DialogTitle>Delivery Details</DialogTitle>
-        <DialogContent>
-            {selectedDelivery && (
-              <>
+            <DialogTitle>Delivery Details</DialogTitle>
+            <DialogContent>
                 <Box sx={{ mb: 2 }}>
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={4}>
@@ -224,7 +259,7 @@ const DeliveriesPage = () => {
                       <Typography variant="body2" color="text.secondary">Delivery Type</Typography>
                       <Typography variant="h6" component="p">
                         <Chip 
-                          label={selectedDelivery.deliveryType || 'Purchase'} // Default old data
+                          label={selectedDelivery.deliveryType || 'Purchase'} 
                           color={selectedDelivery.deliveryType === 'Consignment' ? 'info' : 'default'} 
                           variant="filled"
                         />
@@ -244,7 +279,7 @@ const DeliveriesPage = () => {
                     </TableHead>
                     <TableBody>
                         {selectedDelivery.productsReceived.map(item => (
-                            <TableRow key={item.product?._id || item._id}> {/* Safer key */}
+                            <TableRow key={item.product?._id || item._id}> 
                                 <TableCell>{item.product?.name || 'Unknown Product'}</TableCell>
                                 <TableCell align="right">{item.quantity}</TableCell>
                                 <TableCell align="right">{new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(item.costAtTime)}</TableCell>
@@ -252,25 +287,39 @@ const DeliveriesPage = () => {
                         ))}
                     </TableBody>
                 </Table>
-              </>
-            )}
-        </DialogContent>
-        <DialogActions>
-            <Button onClick={() => setSelectedDelivery(null)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setSelectedDelivery(null)}>Close</Button>
+            </DialogActions>
+          </Dialog>
+        )}
+      </AnimatePresence>
 
-      <Dialog
-        open={isDeliveryModalOpen}
-        onClose={() => setIsDeliveryModalOpen(false)}
-        fullWidth
-        maxWidth="md"
-      >
-        <DialogTitle>Record New Direct Delivery</DialogTitle>
-        <DialogContent>
-          <RecordDeliveryForm onClose={handleDeliveryFormClose} />
-        </DialogContent>
-      </Dialog>
+      {/* --- ANIMATED FORM MODAL --- */}
+      <AnimatePresence>
+        {isDeliveryModalOpen && (
+          <Dialog
+            open={isDeliveryModalOpen}
+            onClose={() => setIsDeliveryModalOpen(false)}
+            fullWidth
+            maxWidth="md"
+            PaperComponent={motion.div}
+            PaperProps={{
+              initial: { y: 50, opacity: 0 },
+              animate: { y: 0, opacity: 1 },
+              exit: { y: 50, opacity: 0 },
+              transition: { duration: 0.3 },
+              sx: { backgroundColor: 'background.paper', boxShadow: 24, borderRadius: 2 }
+            }}
+          >
+            <DialogTitle>Record New Direct Delivery</DialogTitle>
+            <DialogContent>
+              <RecordDeliveryForm onClose={handleDeliveryFormClose} />
+            </DialogContent>
+          </Dialog>
+        )}
+      </AnimatePresence>
+
     </Container>
   );
 };

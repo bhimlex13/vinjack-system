@@ -12,14 +12,18 @@ import CustomerForm from '../components/CustomerForm';
 import MotorcycleForm from '../components/MotorcycleForm';
 import { grey } from '@mui/material/colors';
 import { io } from 'socket.io-client';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // MUI Imports
 import {
   Box, Grid, Paper, TextField, InputAdornment, Typography, Card, CardActionArea,
   CardMedia, CardContent, ToggleButtonGroup, ToggleButton, List, ListItem,
   ListItemText, IconButton, Divider, Button, Tooltip, Autocomplete, Stack,
-  Dialog, DialogTitle, CircularProgress, Checkbox, DialogContent, DialogActions, FormControlLabel
+  Dialog, DialogTitle, CircularProgress, Checkbox, DialogContent, DialogActions, FormControlLabel,
+  ListItemAvatar, Avatar // --- NEW: For Cart Images ---
 } from '@mui/material';
+
+// Icons
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -28,7 +32,11 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import BuildIcon from '@mui/icons-material/Build'; // --- NEW: Wrench for Services ---
+import InventoryIcon from '@mui/icons-material/Inventory'; // --- NEW: Fallback for Products ---
 import { FaUserTag } from 'react-icons/fa';
+
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const getInitialCartState = () => {
   try {
@@ -76,11 +84,69 @@ const SalesPage = () => {
   const [lastSaleData, setLastSaleData] = useState(null);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
 
-  // --- NEW: State for Serial Selection ---
   const [isSerialModalOpen, setIsSerialModalOpen] = useState(false);
   const [currentSerializedProduct, setCurrentSerializedProduct] = useState(null);
-  const [selectedSerials, setSelectedSerials] = useState([]); // Array of SN strings
-  // --- END NEW ---
+  const [selectedSerials, setSelectedSerials] = useState([]); 
+  const [isLoading, setIsLoading] = useState(true);
+
+  // --- FRAMER MOTION VARIANTS ---
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05 
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0, scale: 0.95 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      scale: 1,
+      transition: {
+        type: 'spring',
+        stiffness: 100,
+        damping: 12
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.9, 
+      transition: { duration: 0.2 } 
+    }
+  };
+
+  const cartItemVariants = {
+    hidden: { opacity: 0, x: 50 },
+    visible: { 
+      opacity: 1, 
+      x: 0, 
+      transition: { type: 'spring', stiffness: 300, damping: 30 } 
+    },
+    exit: { 
+      opacity: 0, 
+      x: 50, 
+      transition: { duration: 0.2 } 
+    }
+  };
+
+  const expandVariants = {
+    hidden: { opacity: 0, height: 0, overflow: 'hidden' },
+    visible: { 
+      opacity: 1, 
+      height: 'auto', 
+      transition: { duration: 0.3, ease: "easeOut" } 
+    },
+    exit: { 
+      opacity: 0, 
+      height: 0, 
+      transition: { duration: 0.2, ease: "easeIn" } 
+    }
+  };
+  // ------------------------------
 
   useEffect(() => {
     const socket = io(process.env.REACT_APP_API_URL);
@@ -149,6 +215,7 @@ const SalesPage = () => {
 
   useEffect(() => {
     const fetchInitialData = async () => {
+      setIsLoading(true);
       try {
         const [productsRes, categoriesRes, brandsRes, servicesRes, customersRes] = await Promise.all([
           api.get('/products'), api.get('/categories'), api.get('/brands'),
@@ -185,6 +252,8 @@ const SalesPage = () => {
         }
       } catch (error) {
         console.error("Failed to fetch initial data", error);
+      } finally {
+        setIsLoading(false); 
       }
     };
     fetchInitialData();
@@ -220,25 +289,21 @@ const SalesPage = () => {
     const productInState = products.find(p => p._id === product._id);
     if (!productInState || productInState.quantity <= 0) return;
 
-    // --- NEW: Check for serialization ---
     if (product.isSerialized) {
       setCurrentSerializedProduct(product);
       setSelectedSerials([]);
       setIsSerialModalOpen(true);
       return; 
     }
-    // --- END NEW ---
 
     addToCartLogic(product, 1);
   };
 
-  // Extracted logic for re-use
   const addToCartLogic = (product, qty, serials = []) => {
     setCartItems(prevCart => {
       const existingItem = prevCart.find(item => item.type === 'product' && item._id === product._id);
       
       if (existingItem) {
-        // If serialized, we merge the new serials
         const updatedSerials = existingItem.serialNumbers 
             ? [...existingItem.serialNumbers, ...serials] 
             : serials;
@@ -298,7 +363,6 @@ const SalesPage = () => {
 
 
   const updateQuantity = (product, amount) => {
-    // --- Block manual quantity updates for serialized items (must use remove/add) ---
     if (product.isSerialized) return;
 
     setCartItems(prevCart => {
@@ -337,7 +401,6 @@ const SalesPage = () => {
     });
   };
 
-  // --- NEW: Remove serialized item (removes specific serials) ---
   const removeSerializedItem = (product) => {
      setProducts(prevProducts =>
           prevProducts.map(p =>
@@ -346,7 +409,6 @@ const SalesPage = () => {
      );
      setCartItems(prevCart => prevCart.filter(item => item._id !== product._id));
   };
-  // --- END NEW ---
 
   const calculateTotal = useMemo(() => {
     return cartItems.reduce((total, item) => {
@@ -399,7 +461,7 @@ const SalesPage = () => {
             product: item._id, 
             quantity: item.cartQuantity, 
             priceAtTime: item.price,
-            serialNumbers: item.serialNumbers || [] // Pass serials to backend
+            serialNumbers: item.serialNumbers || []
         })),
         services: cartItems.filter(item => item.type === 'service').map(item => ({ service: item._id, priceAtTime: item.charge })),
         recordedBy: user._id, customerId: selectedCustomer ? selectedCustomer._id : undefined, motorcycleId: selectedMotorcycle ? selectedMotorcycle._id : undefined,
@@ -446,6 +508,14 @@ const SalesPage = () => {
 
   const handleFilterChange = (setter) => (event, newValue) => { setter(newValue); };
 
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <LoadingSpinner text="Loading Sales Terminal..." />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ 
       display: 'flex', 
@@ -454,7 +524,13 @@ const SalesPage = () => {
     }}>
       {/* Left Column: Product Grid */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Paper 
+          sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}
+          component={motion.div}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+        >
           <TextField
             fullWidth label="Search Products" variant="outlined" size="small" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }} sx={{ mb: 1 }}
@@ -477,24 +553,44 @@ const SalesPage = () => {
           </Box>
           
           <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
-            <Grid container spacing={2}>
-              {filteredProducts.map(product => (
-                <Grid item key={product._id} size={{ xs: 12, sm: 4, md: 3, lg: 2 }}> 
-                  <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', ...(product.quantity === 0 && { backgroundColor: grey[300], cursor: 'not-allowed' }) }}>
-                    <CardActionArea 
-                      onClick={() => addProductToCart(product)} disabled={product.quantity === 0}
-                      sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1}} 
-                    >
-                      <CardMedia component="img" height="120" image={product.image || 'https://placehold.co/300x200'} alt={product.name}
-                        sx={{ objectFit: 'contain', p: 1, ...(product.quantity === 0 && { filter: 'grayscale(100%)' }) }}
-                      />
-                      {product.quantity === 0 && (<Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '120px', backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center'}}><Typography variant="button" color="error" sx={{ fontWeight: 'bold'}}>Out of Stock</Typography></Box>)}
-                      <CardContent sx={{ p: 1, flexGrow: 1, width: '100%' }}><Typography gutterBottom variant="body2" component="div" sx={{ fontWeight: 'bold', minHeight: '40px' }}>{product.name}</Typography><Typography variant="body2" color="text.secondary">Stock: {product.quantity}</Typography></CardContent>
-                      <Box sx={{ p: 1, pt: 0, width: '100%', mt: 'auto' }}><Typography variant="h6" color="primary.main">₱{product.price.toFixed(2)}</Typography></Box>
-                    </CardActionArea>
-                  </Card>
-                </Grid>
-              ))}
+            <Grid 
+              container 
+              spacing={2}
+              component={motion.div}
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              key={searchTerm + "-" + selectedCategory + "-" + selectedBrand}
+            >
+              <AnimatePresence mode="popLayout">
+                {filteredProducts.map(product => (
+                  <Grid 
+                    item 
+                    key={product._id} 
+                    size={{ xs: 12, sm: 4, md: 3, lg: 2 }}
+                    component={motion.div}
+                    variants={itemVariants}
+                    layout 
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                  > 
+                    <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', ...(product.quantity === 0 && { backgroundColor: grey[300], cursor: 'not-allowed' }) }}>
+                      <CardActionArea 
+                        onClick={() => addProductToCart(product)} disabled={product.quantity === 0}
+                        sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1}} 
+                      >
+                        <CardMedia component="img" height="120" image={product.image || 'https://placehold.co/300x200'} alt={product.name}
+                          sx={{ objectFit: 'contain', p: 1, ...(product.quantity === 0 && { filter: 'grayscale(100%)' }) }}
+                        />
+                        {product.quantity === 0 && (<Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '120px', backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center'}}><Typography variant="button" color="error" sx={{ fontWeight: 'bold'}}>Out of Stock</Typography></Box>)}
+                        <CardContent sx={{ p: 1, flexGrow: 1, width: '100%' }}><Typography gutterBottom variant="body2" component="div" sx={{ fontWeight: 'bold', minHeight: '40px' }}>{product.name}</Typography><Typography variant="body2" color="text.secondary">Stock: {product.quantity}</Typography></CardContent>
+                        <Box sx={{ p: 1, pt: 0, width: '100%', mt: 'auto' }}><Typography variant="h6" color="primary.main">₱{product.price.toFixed(2)}</Typography></Box>
+                      </CardActionArea>
+                    </Card>
+                  </Grid>
+                ))}
+              </AnimatePresence>
             </Grid>
           </Box>
         </Paper>
@@ -502,7 +598,13 @@ const SalesPage = () => {
 
       {/* Right Column: Cart */}
       <Box sx={{ width: '380px', height: '100%', position: 'sticky', top: '88px' }}>
-        <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Paper 
+          sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}
+          component={motion.div}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+        >
           <Box sx={{ mb: 2 }}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}><FaUserTag style={{ marginRight: '8px' }} /> Customer Details</Typography>
             <Stack direction="row" spacing={1} alignItems="center">
@@ -513,17 +615,28 @@ const SalesPage = () => {
               />
               <Button variant="outlined" size="small" onClick={() => setIsCustomerModalOpen(true)}>New</Button>
             </Stack>
-            {selectedCustomer && (
-              <Box sx={{ mt: 2 }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Autocomplete sx={{ flexGrow: 1 }} options={customerMotorcycles} loading={isFetchingMotorcycles} getOptionLabel={(option) => `${option.make} ${option.model} (${option.plateNumber || 'No Plate'})`}
-                    value={selectedMotorcycle} onChange={(event, newValue) => { setSelectedMotorcycle(newValue); }} isOptionEqualToValue={(option, value) => option?._id === value?._id}
-                    renderInput={(params) => (<TextField {...params} label="Select Motorcycle (Optional)" size="small" InputProps={{ ...params.InputProps, endAdornment: (<>{isFetchingMotorcycles ? <CircularProgress color="inherit" size={20} /> : null}{params.InputProps.endAdornment}</>),}}/>)}
-                  />
-                  <Button variant="outlined" size="small" onClick={() => setIsMotorcycleModalOpen(true)}>New</Button>
-                </Stack>
-              </Box>
-            )}
+            
+            <AnimatePresence>
+              {selectedCustomer && (
+                <Box
+                  component={motion.div}
+                  variants={expandVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  sx={{ mt: 1, pt: 1, pb: 1, overflow: 'hidden' }} 
+                >
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Autocomplete sx={{ flexGrow: 1 }} options={customerMotorcycles} loading={isFetchingMotorcycles} getOptionLabel={(option) => `${option.make} ${option.model} (${option.plateNumber || 'No Plate'})`}
+                      value={selectedMotorcycle} onChange={(event, newValue) => { setSelectedMotorcycle(newValue); }} isOptionEqualToValue={(option, value) => option?._id === value?._id}
+                      renderInput={(params) => (<TextField {...params} label="Select Motorcycle (Optional)" size="small" InputProps={{ ...params.InputProps, endAdornment: (<>{isFetchingMotorcycles ? <CircularProgress color="inherit" size={20} /> : null}{params.InputProps.endAdornment}</>),}}/>)}
+                    />
+                    <Button variant="outlined" size="small" onClick={() => setIsMotorcycleModalOpen(true)}>New</Button>
+                  </Stack>
+                </Box>
+              )}
+            </AnimatePresence>
+
           </Box>
           <Divider sx={{ mb: 1 }} />
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -540,49 +653,77 @@ const SalesPage = () => {
             </Stack>
           </Box>
           <Divider sx={{ mb: 1 }} />
-          <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+          <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden' }}> {/* overflowX hidden prevents scrollbar during slide-in */}
             {cartItems.length === 0 ? (<Typography color="text.secondary" align="center" sx={{ mt: 4 }}>Cart is empty</Typography>) : (
               <List>
-                {cartItems.map(item => (
-                  <ListItem key={item._id} disablePadding>
-                    {item.type === 'product' ? (
-                        <>
-                            <ListItemText 
-                                primary={
-                                    <React.Fragment>
-                                        {item.name}
-                                        {item.serialNumbers && item.serialNumbers.length > 0 && (
-                                            <Typography variant="caption" display="block" color="text.secondary">
-                                                SNs: {item.serialNumbers.join(', ')}
-                                            </Typography>
-                                        )}
-                                    </React.Fragment>
-                                } 
-                                secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`}
-                            />
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                {/* If serialized, remove entirely instead of decrementing quantity */}
-                                {item.isSerialized ? (
-                                     <IconButton size="small" edge="end" aria-label="delete" onClick={() => removeSerializedItem(item)}>
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                ) : (
-                                    <>
-                                        <IconButton size="small" onClick={() => updateQuantity(item, -1)}><RemoveIcon fontSize="small"/></IconButton>
-                                        <Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography>
-                                        <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton>
-                                    </>
-                                )}
-                            </Box>
-                        </>
-                    ) : (
-                        <>
-                            <ListItemText primary={item.name} secondary={`₱${(item.charge).toFixed(2)}`}/>
-                            <Tooltip title="Remove Service"><IconButton size="small" edge="end" aria-label="delete" onClick={() => removeServiceFromCart(item._id)}><DeleteIcon /></IconButton></Tooltip>
-                        </>
-                    )}
-                  </ListItem>
-                ))}
+                <AnimatePresence mode='popLayout' initial={false}>
+                  {cartItems.map(item => (
+                    <ListItem 
+                      key={item._id} // Using product _id as key
+                      disablePadding
+                      component={motion.li}
+                      layout // Smooths layout changes when other items are removed
+                      variants={cartItemVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                    >
+                      {/* --- NEW: Cart Item Images & Icons --- */}
+                      <ListItemAvatar>
+                        <Avatar 
+                          variant={item.type === 'product' ? "rounded" : "circular"}
+                          src={item.type === 'product' ? (item.image || 'https://placehold.co/50') : undefined}
+                          alt={item.name}
+                          sx={{ 
+                            bgcolor: item.type === 'service' ? 'action.selected' : 'grey.200',
+                            color: 'primary.main',
+                            width: 48, height: 48, mr: 1.5
+                          }}
+                        >
+                          {item.type === 'service' && <BuildIcon fontSize="small" />}
+                          {item.type === 'product' && !item.image && <InventoryIcon fontSize="small" color="action" />}
+                        </Avatar>
+                      </ListItemAvatar>
+                      {/* --- END NEW --- */}
+
+                      {item.type === 'product' ? (
+                          <>
+                              <ListItemText 
+                                  primary={
+                                      <React.Fragment>
+                                          {item.name}
+                                          {item.serialNumbers && item.serialNumbers.length > 0 && (
+                                              <Typography variant="caption" display="block" color="text.secondary">
+                                                  SNs: {item.serialNumbers.join(', ')}
+                                              </Typography>
+                                          )}
+                                      </React.Fragment>
+                                  } 
+                                  secondary={`₱${(item.price * item.cartQuantity).toFixed(2)}`}
+                              />
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  {item.isSerialized ? (
+                                      <IconButton size="small" edge="end" aria-label="delete" onClick={() => removeSerializedItem(item)}>
+                                          <DeleteIcon fontSize="small" />
+                                      </IconButton>
+                                  ) : (
+                                      <>
+                                          <IconButton size="small" onClick={() => updateQuantity(item, -1)}><RemoveIcon fontSize="small"/></IconButton>
+                                          <Typography sx={{ mx: 1 }}>{item.cartQuantity}</Typography>
+                                          <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock}><AddIcon fontSize="small"/></IconButton>
+                                      </>
+                                  )}
+                              </Box>
+                          </>
+                      ) : (
+                          <>
+                              <ListItemText primary={item.name} secondary={`₱${(item.charge).toFixed(2)}`}/>
+                              <Tooltip title="Remove Service"><IconButton size="small" edge="end" aria-label="delete" onClick={() => removeServiceFromCart(item._id)}><DeleteIcon /></IconButton></Tooltip>
+                          </>
+                      )}
+                    </ListItem>
+                  ))}
+                </AnimatePresence>
               </List>
             )}
           </Box>
@@ -599,7 +740,6 @@ const SalesPage = () => {
         </Paper>
       </Box>
 
-      {/* --- NEW: Serial Selection Modal --- */}
       <Dialog open={isSerialModalOpen} onClose={() => setIsSerialModalOpen(false)} maxWidth="sm" fullWidth>
           <DialogTitle>Select Specific Items: {currentSerializedProduct?.name}</DialogTitle>
           <DialogContent>
@@ -607,7 +747,6 @@ const SalesPage = () => {
                   <Grid container spacing={1}>
                     {currentSerializedProduct.serializedItems
                         .filter(s => s.status === 'Available')
-                        // Filter out already selected serials in the cart!
                         .filter(s => {
                              const inCart = cartItems.find(c => c._id === currentSerializedProduct._id);
                              return !inCart || !inCart.serialNumbers.includes(s.serialNumber);
@@ -638,9 +777,7 @@ const SalesPage = () => {
               <Button variant="contained" onClick={handleSerialSubmit} disabled={selectedSerials.length === 0}>Confirm Selection ({selectedSerials.length})</Button>
           </DialogActions>
       </Dialog>
-      {/* --- END NEW --- */}
 
-      {/* Existing Modals */}
       {selectedCustomer && (
         <Dialog open={isMotorcycleModalOpen} onClose={() => setIsMotorcycleModalOpen(false)} maxWidth="sm" fullWidth>
             <DialogTitle>Add New Motorcycle for {selectedCustomer.name}</DialogTitle>

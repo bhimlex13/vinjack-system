@@ -1,11 +1,11 @@
 // client/src/components/ReturnDetailsModal.js
 import React from 'react';
+import { motion } from 'framer-motion'; 
 
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Divider, Grid,
-  // --- NEW: Import Chip ---
   Chip
 } from '@mui/material';
 
@@ -14,7 +14,6 @@ const ReturnDetailsModal = ({ open, onClose, returnData }) => {
 
   const formatCurrency = (amount) => `₱${(amount || 0).toFixed(2)}`;
 
-  // --- NEW: Function to get chip style based on outcome ---
   const getOutcomeChipProps = (outcome) => {
     switch (outcome) {
       case 'Restocked':
@@ -29,40 +28,71 @@ const ReturnDetailsModal = ({ open, onClose, returnData }) => {
         return { label: outcome || 'N/A', color: 'default' };
     }
   };
-  // --- END NEW ---
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Return Transaction Details</DialogTitle>
-      <DialogContent>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      fullWidth 
+      maxWidth="sm"
+      // We replace the default Paper with a motion.div for animation
+      PaperComponent={motion.div}
+      PaperProps={{
+        // Animation Props
+        initial: { y: 50, opacity: 0 },
+        animate: { y: 0, opacity: 1 },
+        exit: { y: 50, opacity: 0 },
+        transition: { duration: 0.3 },
+        
+        // --- FIX: Styling Props to restore the "Card" look ---
+        sx: {
+          backgroundColor: 'background.paper', // Restores the white background
+          backgroundImage: 'none', // Prevents dark mode overlay issues if needed
+          boxShadow: 24, // Restores the shadow depth
+          borderRadius: 2, // Restores rounded corners
+          overflow: 'hidden' // keeps content inside rounded corners
+        }
+      }}
+    >
+      <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>
+        Return Transaction Details
+      </DialogTitle>
+      
+      <DialogContent sx={{ mt: 2 }}>
         <Box>
           <Grid container spacing={2} sx={{ mb: 2 }}>
             <Grid item xs={12} sm={6}>
-              <Typography variant="body2"><strong>Return ID:</strong> {returnData._id}</Typography>
-              <Typography variant="body2"><strong>Original Sale ID:</strong> {returnData.originalSale?._id || 'N/A'}</Typography>
+              <Typography variant="body2" color="text.secondary">Return ID:</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{returnData._id}</Typography>
+              
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Original Sale ID:</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{returnData.originalSale?._id || 'N/A'}</Typography>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Typography variant="body2"><strong>Return Date:</strong> {new Date(returnData.createdAt).toLocaleString()}</Typography>
-              <Typography variant="body2"><strong>Processed By:</strong> {returnData.recordedBy?.fullName || 'N/A'}</Typography>
+              <Typography variant="body2" color="text.secondary">Return Date:</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{new Date(returnData.createdAt).toLocaleString()}</Typography>
+              
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Processed By:</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{returnData.recordedBy?.fullName || 'N/A'}</Typography>
             </Grid>
           </Grid>
 
           <Divider sx={{ my: 2 }} />
 
-          {/* --- MODIFIED: Display Outcome using Chip --- */}
-          <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
             <Typography variant="body1" component="span" sx={{ fontWeight: 'bold', mr: 1 }}>Return Outcome:</Typography>
             <Chip size="small" {...getOutcomeChipProps(returnData.outcome)} />
           </Box>
-          {/* --- END MODIFICATION --- */}
 
           <Typography variant="body1" gutterBottom><strong>Reason for Return:</strong></Typography>
-          <Typography variant="body2" sx={{ mb: 2, p: 1, border: '1px solid #eee', borderRadius: 1 }}>{returnData.reason}</Typography>
+          <Paper variant="outlined" sx={{ mb: 2, p: 2, backgroundColor: '#f9f9f9' }}>
+            <Typography variant="body2">{returnData.reason}</Typography>
+          </Paper>
 
           <Typography variant="h6" gutterBottom>Returned Items</Typography>
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
-              <TableHead>
+              <TableHead sx={{ bgcolor: 'grey.100' }}>
                 <TableRow>
                   <TableCell>Product</TableCell>
                   <TableCell align="right">Quantity</TableCell>
@@ -77,11 +107,10 @@ const ReturnDetailsModal = ({ open, onClose, returnData }) => {
                     <TableCell align="right">{formatCurrency(item.priceAtTime * item.quantity)}</TableCell>
                   </TableRow>
                 ))}
-                {/* --- Display returned services if any --- */}
                 {returnData.servicesReturned?.map(serviceItem => (
                   <TableRow key={serviceItem.service?._id || serviceItem._id}>
                     <TableCell>{serviceItem.service?.name || 'N/A'} (Service)</TableCell>
-                    <TableCell align="right">1</TableCell> {/* Services are usually quantity 1 */}
+                    <TableCell align="right">1</TableCell> 
                     <TableCell align="right">{formatCurrency(serviceItem.priceAtTime)}</TableCell>
                   </TableRow>
                 ))}
@@ -90,14 +119,14 @@ const ReturnDetailsModal = ({ open, onClose, returnData }) => {
           </TableContainer>
 
           <Box sx={{ mt: 2, textAlign: 'right' }}>
-            <Typography variant="h6">
+            <Typography variant="h6" color="primary.main">
               <strong>Total Refund: {formatCurrency(returnData.totalRefundAmount)}</strong>
             </Typography>
           </Box>
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose} variant="contained">Close</Button>
       </DialogActions>
     </Dialog>
   );

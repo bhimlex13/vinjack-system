@@ -2,14 +2,17 @@
 import React, { useState } from 'react';
 import { createStockAdjustment } from '../api/adjustmentApi';
 import { toast } from 'react-toastify';
+import { motion } from 'framer-motion';
 
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
-  ToggleButtonGroup, ToggleButton, Box, Typography, CircularProgress, Alert
+  ToggleButtonGroup, ToggleButton, Box, Typography, Alert
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
+
+import LoadingSpinner from './LoadingSpinner';
 
 const StockAdjustmentModal = ({ product, onClose, onSuccess }) => {
   const [adjustmentType, setAdjustmentType] = useState('decrease');
@@ -55,7 +58,26 @@ const StockAdjustmentModal = ({ product, onClose, onSuccess }) => {
   };
 
   return (
-    <Dialog open={true} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog 
+      open={true} 
+      onClose={onClose} 
+      fullWidth 
+      maxWidth="sm"
+      PaperComponent={motion.div}
+      PaperProps={{
+        initial: { y: 50, opacity: 0 },
+        animate: { y: 0, opacity: 1 },
+        exit: { y: 50, opacity: 0 },
+        transition: { duration: 0.3 },
+        // --- FIX: Added sx to restore background ---
+        sx: { 
+          overflow: 'hidden',
+          backgroundColor: 'background.paper', 
+          boxShadow: 24,
+          borderRadius: 2
+        } 
+      }}
+    >
       <DialogTitle>
         Adjust Stock for: <Typography component="span" variant="h6" color="primary">{product.name}</Typography>
       </DialogTitle>
@@ -99,8 +121,8 @@ const StockAdjustmentModal = ({ product, onClose, onSuccess }) => {
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={onClose} disabled={loading}>Cancel</Button>
-        <Button onClick={handleSubmit} variant="contained" disabled={loading}>
-          {loading ? <CircularProgress size={24} /> : 'Submit Adjustment'}
+        <Button onClick={handleSubmit} variant="contained" disabled={loading} startIcon={loading ? null : (adjustmentType === 'increase' ? <AddIcon /> : <RemoveIcon />)}>
+          {loading ? <LoadingSpinner text="" /> : 'Submit Adjustment'} 
         </Button>
       </DialogActions>
     </Dialog>
