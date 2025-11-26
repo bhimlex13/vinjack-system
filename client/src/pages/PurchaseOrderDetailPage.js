@@ -7,10 +7,12 @@ import {
   uploadCountersignedAgreement 
 } from '../api/purchaseOrderApi';
 import ConfirmationContext from '../context/ConfirmationContext';
+import AuthContext from '../context/AuthContext'; // --- NEW: Import AuthContext ---
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf'; 
 import autoTable from 'jspdf-autotable'; 
 import { motion, AnimatePresence } from 'framer-motion';
+// REMOVED: import socket from '../api/socket'; 
 
 import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
 import ReceiveStockModal from '../components/ReceiveStockModal';
@@ -22,17 +24,14 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
   Dialog, DialogContent, DialogActions, Chip, Link as MuiLink, IconButton,
   Tooltip, Card, CardContent, CardActions, Collapse,
-  // --- NEW IMPORTS ---
   Stepper, Step, StepLabel
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import InfoIcon from '@mui/icons-material/Info';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import LinkIcon from '@mui/icons-material/Link';
-import ImageIcon from '@mui/icons-material/Image';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'; 
@@ -119,6 +118,9 @@ const PurchaseOrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { confirm } = useContext(ConfirmationContext);
+  // --- NEW: Get socket from AuthContext ---
+  const { socket } = useContext(AuthContext);
+  
   const [po, setPo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -155,7 +157,8 @@ const PurchaseOrderDetailPage = () => {
 
   const fetchPo = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only trigger full loading if data isn't there yet
+      if (!po) setLoading(true);
       const data = await getPurchaseOrderById(id);
       setPo(data);
       setError(null);
@@ -165,11 +168,30 @@ const PurchaseOrderDetailPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, po]);
 
   useEffect(() => {
     fetchPo();
-  }, [fetchPo]);
+
+    // --- NEW: Real-Time Listener with AuthContext Socket ---
+    if (!socket) return;
+
+    const handleRealTimeUpdate = (data) => {
+        // Only refresh if the updated PO matches the one we are viewing
+        if (data.poId === id) {
+            console.log('Current PO Updated by Supplier. Refreshing...');
+            toast.info('This PO has just been updated by the supplier.');
+            fetchPo();
+        }
+    };
+
+    socket.on('po_supplier_update', handleRealTimeUpdate);
+
+    return () => {
+        socket.off('po_supplier_update', handleRealTimeUpdate);
+    };
+    // eslint-disable-next-line
+  }, [fetchPo, id, socket]); // Add socket
 
   const handleApprove = async () => {
     const isConfirmed = await confirm('Approve Changes?', 'This will finalize costs and quantities.');
@@ -191,13 +213,6 @@ const PurchaseOrderDetailPage = () => {
     window.print();
     document.body.innerHTML = originalContents;
     window.location.reload();
-  };
-
-  const handleDownloadAgreement = () => {
-    if (!po) return;
-    const doc = new jsPDF();
-    doc.text("CONSIGNMENT AGREEMENT", 20, 20);
-    doc.save(`Consignment_Agreement_${po.poNumber}.pdf`);
   };
 
   const handleUploadSuccess = (updatedPo) => {
@@ -281,7 +296,6 @@ const PurchaseOrderDetailPage = () => {
     }
   };
 
-  // --- NEW: Helper to determine active step ---
   const getActiveStep = () => {
     if (!po) return 0;
     if (po.status === 'Pending') return 0;
@@ -297,7 +311,6 @@ const PurchaseOrderDetailPage = () => {
     'Owner Countersign & Approval',
     'Delivery & Receiving'
   ];
-  // -----------------------------------------
 
   if (loading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
@@ -323,12 +336,10 @@ const PurchaseOrderDetailPage = () => {
   };
 
   const supplierLink = po?.supplierResponseToken ? `${window.location.origin}/supplier/po/${po.supplierResponseToken}` : null;
-  const receiptImageUrl = po?.deliveryReceiptUrl;
   const signedAgreementUrl = po?.signedAgreementUrl;
   const countersignedUrl = po?.countersignedAgreementUrl; 
   
   const isReceivingAllowed = ['Approved', 'Partially Received', 'Agreement Uploaded - Awaiting Delivery'].includes(po.status);
-  const cannotReceiveReason = 'Order is not in an "Approved" or "Partially Received" state.';
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -495,7 +506,6 @@ const PurchaseOrderDetailPage = () => {
                 {/* --- SYSTEM CONSIGNMENT APPROVAL FLOW --- */}
                 {po.status === 'Awaiting Approval' && po.poType === 'Consignment' && po.consignmentMethod === 'System' && (
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%', justifyContent: 'flex-end' }}>
-                        {/* Removed the text guide here as requested */}
                         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                             <Button
                                 component="label"
