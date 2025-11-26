@@ -15,6 +15,7 @@ const {
   sendPOCompletionNotification
 } = require('../utils/emailService');
 const { uploadFileToGCS, generateSignedUrl, downloadFileFromGCS } = require('../utils/gcsStorage');
+const { createNotification } = require('../utils/notificationManager'); // --- IMPORTED NOTIFICATION MANAGER ---
 
 
 // --- Helper: Get Next Sequence Number ---
@@ -200,9 +201,6 @@ const getPurchaseOrderByToken = async (req, res) => {
       return res.status(404).json({ message: 'Purchase Order link is invalid or has expired.' });
     }
     
-    // NOTE: We do NOT block access based on status here anymore.
-    // We allow the frontend to load the PO so it can show the "Review Submitted" status tracker.
-
     // Generate signed URL for Supplier Signed Doc
     if (purchaseOrder.signedAgreementUrl && purchaseOrder.signedAgreementUrl.includes('consignment-agreements/')) {
         const signedUrl = await generateSignedUrl(purchaseOrder.signedAgreementUrl);
@@ -229,11 +227,13 @@ const getPurchaseOrderByToken = async (req, res) => {
 
 // --- 4. UPDATE BY SUPPLIER (Submit Review/Upload) ---
 const updateBySupplier = async (req, res) => {
+  const io = req.app.get('socketio'); // Get Socket.IO instance
   try {
     const { token } = req.params;
     const { items, supplierNotes, signedAgreementUrl } = req.body;
 
-    const po = await PurchaseOrder.findOne({ supplierResponseToken: token });
+    // Find PO and populate supplier for the name
+    const po = await PurchaseOrder.findOne({ supplierResponseToken: token }).populate('supplier', 'name');
     if (!po) return res.status(404).json({ message: 'Purchase Order not found.' });
     
     // Strict check: Suppliers can only update if status is 'Pending'.
@@ -281,6 +281,38 @@ const updateBySupplier = async (req, res) => {
     po.history.push({ status: 'Awaiting Approval', notes: supplierNotes || 'Reviewed by supplier.', updatedBy: 'Supplier' });
 
     await po.save();
+
+    // --- 1. REAL-TIME NOTIFICATION: Create In-App Notification for Admins ---
+    const notifMessage = `Supplier ${po.supplier.name} has updated PO #${po.poNumber}. Please review the changes.`;
+    
+    // --- FIXED: CHANGED 'alert' to 'REQUEST_STATUS' ---
+    await createNotification({
+        recipientRole: 'Super Admin', // Notify Super Admin
+        message: notifMessage,
+        type: 'REQUEST_STATUS', 
+        link: `/purchase-orders/${po._id}`
+    });
+    await createNotification({
+        recipientRole: 'Admin', // Notify Admin
+        message: notifMessage,
+        type: 'REQUEST_STATUS',
+        link: `/purchase-orders/${po._id}`
+    });
+
+    // --- 2. REAL-TIME SOCKET: Emit Event for Pop-Up Modal ---
+    if (io) {
+        io.emit('po_supplier_update', {
+            poId: po._id,
+            poNumber: po.poNumber,
+            supplierName: po.supplier.name,
+            message: notifMessage,
+            timestamp: new Date()
+        });
+        
+        // Also emit general notification update to refresh bells
+        io.emit('notification_update', { message: 'New PO Update' }); 
+    }
+
     res.json({ message: 'Purchase Order updated successfully. The buyer has been notified.' });
 
   } catch (error) {
@@ -292,6 +324,7 @@ const updateBySupplier = async (req, res) => {
 
 // --- 5. APPROVE SUPPLIER CHANGES (Standard Flow) ---
 const approveSupplierChanges = async (req, res) => {
+  const io = req.app.get('socketio');
   try {
     const po = await PurchaseOrder.findById(req.params.id).populate('supplier', 'name email');
     if (!po) return res.status(404).json({ message: 'Purchase Order not found.' });
@@ -318,8 +351,6 @@ const approveSupplierChanges = async (req, res) => {
     po.totalAmount = finalTotalAmount;
     
     // Status update
-    // Note: For System Consignment, true approval happens at 'uploadCountersignedAgreement'.
-    // This function handles Standard POs or manual overrides.
     po.status = 'Approved';
 
     po.history.push({ status: po.status, notes: 'Supplier changes approved by user.', updatedBy: req.user.name });
@@ -339,6 +370,15 @@ const approveSupplierChanges = async (req, res) => {
         });
     }
 
+    // --- REAL-TIME: Notify if Supplier is watching (Room based) ---
+    // Assuming frontend supplier joins room `po_${token}`
+    if(io && po.supplierResponseToken) {
+        io.emit(`po_update_${po.supplierResponseToken}`, {
+            status: 'Approved',
+            message: 'Your submission has been approved by the buyer.'
+        });
+    }
+
     const populatedPO = await PurchaseOrder.findById(updatedPurchaseOrder._id)
       .populate('supplier', 'name')
       .populate('items.product', 'name itemCode unit');
@@ -354,6 +394,7 @@ const approveSupplierChanges = async (req, res) => {
 
 // --- 6. UPLOAD COUNTERSIGNED AGREEMENT (System Consignment Final Step) ---
 const uploadCountersignedAgreement = async (req, res) => {
+  const io = req.app.get('socketio');
   try {
     const { id } = req.params;
     const { countersignedAgreementUrl } = req.body; 
@@ -390,6 +431,14 @@ const uploadCountersignedAgreement = async (req, res) => {
     if (po.supplier?.email) {
         sendPOApprovalNotification(po.supplier.email, po.supplier.name, po.poNumber, pdfBuffer)
             .catch(err => console.error('Failed to send approval email:', err));
+    }
+
+    // --- REAL-TIME: Notify Supplier ---
+    if(io && po.supplierResponseToken) {
+        io.emit(`po_update_${po.supplierResponseToken}`, {
+            status: 'Approved',
+            message: 'The agreement has been countersigned. You can now deliver the items.'
+        });
     }
     
     // Respond with updated object (generate signed urls so frontend can display)
@@ -543,10 +592,11 @@ const receivePurchaseOrder = async (req, res) => {
             }
         }
 
-        sendPOCompletionNotification(po.supplier.email, po.supplier.name, po.poNumber, pdfBuffer)
+        // --- MODIFIED: Pass the dynamic status ---
+        sendPOCompletionNotification(po.supplier.email, po.supplier.name, po.poNumber, pdfBuffer, updatedPO.status)
             .catch(err => console.error("Failed to send completion email:", err));
+        // ----------------------------------------
     }
-    // ----------------------------------------
 
     logAction(req.user, 'RECEIVE_PO_STOCK', `Received stock for PO #${po.poNumber}. Status: ${updatedPO.status}`, { entityType: 'PurchaseOrder', entityId: updatedPO._id });
 

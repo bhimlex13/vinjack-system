@@ -149,14 +149,14 @@ const sendManualConsignmentNotification = async (supplierEmail, supplierName, po
   }
 };
 
-// --- UPDATED: Approval Notification with Visual Status ---
+// --- UPDATED: Approval Notification (Fixed Alignment) ---
 const sendPOApprovalNotification = async (recipientEmail, supplierName, poNumber, pdfBuffer) => {
     const mailOptions = {
         from: `"VinJack System" <${process.env.EMAIL_USER}>`,
         to: recipientEmail,
         subject: `Purchase Order ${poNumber} Approved & Countersigned`,
         html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="font-family: Arial, sans-serif; max-width: 600px;"> 
                 <h2 style="color: #2e7d32;">Purchase Order Approved</h2>
                 <p>Hello ${supplierName},</p>
                 <p>Your submission for Purchase Order <strong>${poNumber}</strong> has been <strong>APPROVED</strong> by VinJack Motorworks.</p>
@@ -201,17 +201,40 @@ const sendPOApprovalNotification = async (recipientEmail, supplierName, poNumber
     }
 };
 
-// --- UPDATED: Completion Notification with Visual Status ---
-const sendPOCompletionNotification = async (recipientEmail, supplierName, poNumber, pdfBuffer) => {
+// --- UPDATED: Completion Notification (Handling Partial & Completed) ---
+const sendPOCompletionNotification = async (recipientEmail, supplierName, poNumber, pdfBuffer, status = 'Completed') => {
+    const isPartial = status === 'Partially Received';
+    
+    // Dynamic Content based on Status
+    const subjectLine = isPartial 
+        ? `Stock Update - Consignment PO ${poNumber} Partially Received`
+        : `Stock Received - Consignment PO ${poNumber} Completed`;
+
+    const headerText = isPartial 
+        ? `Stock Partially Received` 
+        : `Stock Received & Completed`;
+    
+    const headerColor = isPartial ? '#f57c00' : '#2e7d32'; // Orange for Partial, Green for Complete
+
+    const bodyMessage = isPartial 
+        ? `This email is to notify you that we have received <strong>partial stock</strong> for Consignment Order <strong>${poNumber}</strong>.`
+        : `This email is to notify you that we have successfully received <strong>all stock</strong> for Consignment Order <strong>${poNumber}</strong>.`;
+
+    // Visual Status Logic
+    // Icon 4: Checkmark if Completed, Dot/Hourglass if Partial
+    const statusIcon = isPartial ? '&#9679;' : '&#10004;'; // Circle vs Check
+    const statusColor = isPartial ? '#f57c00' : '#2e7d32';
+    const statusLabel = isPartial ? 'In Progress' : 'Completed';
+
     const mailOptions = {
         from: `"VinJack System" <${process.env.EMAIL_USER}>`,
         to: recipientEmail,
-        subject: `Stock Received - Consignment PO ${poNumber} Completed`,
+        subject: subjectLine,
         html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #2e7d32;">Stock Received & Completed</h2>
+            <div style="font-family: Arial, sans-serif; max-width: 600px;">
+                <h2 style="color: ${headerColor};">${headerText}</h2>
                 <p>Hello ${supplierName},</p>
-                <p>This email is to notify you that we have successfully received the stock for Consignment Order <strong>${poNumber}</strong>.</p>
+                <p>${bodyMessage}</p>
                 
                 <div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-radius: 8px;">
                     <h3 style="margin-top: 0; color: #333; font-size: 14px;">Current Status:</h3>
@@ -220,13 +243,13 @@ const sendPOCompletionNotification = async (recipientEmail, supplierName, poNumb
                             <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
                             <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
                             <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
-                            <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
+                            <td style="width: 25%; color: ${statusColor}; font-size: 16px; padding-bottom: 5px;">${statusIcon}</td>
                         </tr>
                         <tr>
                             <td style="color: #2e7d32;">Issued</td>
                             <td style="color: #2e7d32;">Signed</td>
                             <td style="color: #2e7d32;">Countersigned</td>
-                            <td style="color: #2e7d32; font-weight: bold; border-top: 2px solid #2e7d32;">Delivery & Receiving</td>
+                            <td style="color: ${statusColor}; font-weight: bold; border-top: 2px solid ${statusColor};">${statusLabel}</td>
                         </tr>
                     </table>
                 </div>
@@ -247,9 +270,9 @@ const sendPOCompletionNotification = async (recipientEmail, supplierName, poNumb
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`PO Completion email sent to ${recipientEmail}`);
+        console.log(`PO Notification (${status}) sent to ${recipientEmail}`);
     } catch (error) {
-        console.error(`Error sending PO Completion email:`, error);
+        console.error(`Error sending PO notification email:`, error);
     }
 };
 

@@ -1,12 +1,13 @@
 // client/src/components/Navbar.js
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
+// REMOVED: import socket from '../api/socket'; 
+import POAlertModal from './POAlertModal'; 
 
 // MUI Imports
 import {
   AppBar as MuiAppBar, Toolbar, IconButton, Typography, Box, Badge, Menu, MenuItem, Tooltip, Divider,
-  // --- NEW: Import Avatar ---
   Avatar
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
@@ -18,7 +19,6 @@ import Logout from '@mui/icons-material/Logout';
 
 const drawerWidth = 250;
 
-// Custom styled AppBar to handle width transitions with the Sidebar
 const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== 'open',
 })(({ theme, open }) => ({
@@ -41,11 +41,37 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
   const [userMenuAnchorEl, setUserMenuAnchorEl] = useState(null);
   const [notificationsAnchorEl, setNotificationsAnchorEl] = useState(null);
   
-  const { user, logout, notifications, markNotificationsAsRead } = useContext(AuthContext);
+  const [poAlertOpen, setPoAlertOpen] = useState(false);
+  const [poAlertData, setPoAlertData] = useState(null);
+
+  // --- MODIFIED: Get 'socket' from context instead of importing it ---
+  const { user, logout, notifications, markNotificationsAsRead, socket } = useContext(AuthContext);
+  
   const location = useLocation();
   const navigate = useNavigate();
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  // --- UPDATED LISTENER ---
+  useEffect(() => {
+    // Ensure we have a user AND a valid socket connection before listening
+    if (!user || !socket) return;
+
+    const handlePOUpdate = (data) => {
+      console.log('Real-time PO Update Received:', data);
+      setPoAlertData(data);
+      setPoAlertOpen(true);
+    };
+
+    // Register Listener on the SHARED socket
+    socket.on('po_supplier_update', handlePOUpdate);
+
+    // Cleanup Listener on Unmount
+    return () => {
+      socket.off('po_supplier_update', handlePOUpdate);
+    };
+  }, [user, socket]); // Add socket to dependencies
+  // -----------------------
 
   const handleUserMenuOpen = (event) => setUserMenuAnchorEl(event.currentTarget);
   const handleUserMenuClose = () => setUserMenuAnchorEl(null);
@@ -112,7 +138,6 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
         </Box>
       </Toolbar>
 
-      {/* Notifications Menu */}
       <Menu
         anchorEl={notificationsAnchorEl}
         open={Boolean(notificationsAnchorEl)}
@@ -129,7 +154,6 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
                 handleNotificationsClose();
                 if(notif.link) navigate(notif.link);
               }}
-              // --- MODIFIED: Added display: flex to align items ---
               sx={{ 
                 whiteSpace: 'normal', 
                 fontWeight: !notif.isRead ? 'bold' : 'normal',
@@ -139,7 +163,6 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
                 py: 1.5,
               }}
             >
-              {/* --- NEW: Add Avatar if image exists --- */}
               {notif.image && (
                 <Avatar 
                   variant="rounded"
@@ -148,7 +171,6 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
                   sx={{ width: 48, height: 48, flexShrink: 0 }}
                 />
               )}
-              {/* --- END NEW --- */}
 
               <Box>
                 <Typography variant="body2">{notif.message}</Typography>
@@ -163,7 +185,6 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
         )}
       </Menu>
 
-      {/* User Account Menu */}
       <Menu
         anchorEl={userMenuAnchorEl}
         open={Boolean(userMenuAnchorEl)}
@@ -180,6 +201,13 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
           <Logout fontSize="small" sx={{ mr: 1.5 }} /> Logout
         </MenuItem>
       </Menu>
+
+      <POAlertModal 
+        open={poAlertOpen} 
+        onClose={() => setPoAlertOpen(false)} 
+        notificationData={poAlertData} 
+      />
+
     </AppBar>
   );
 };

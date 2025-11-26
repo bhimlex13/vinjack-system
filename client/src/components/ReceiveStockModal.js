@@ -1,9 +1,9 @@
 // client/src/components/ReceiveStockModal.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { receivePurchaseOrder } from '../api/purchaseOrderApi';
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable'; // Add autoTable import if needed for labels (often required with jsPDF)
+import autoTable from 'jspdf-autotable'; 
 
 // MUI Imports
 import {
@@ -19,14 +19,11 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 
-// --- REMOVED: resizeImage function (removes canvas usage and PDF logic) ---
-
 const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
   const [receivedItems, setReceivedItems] = useState([]);
   
   const [base64Image, setBase64Image] = useState(null);
   const [selectedFileName, setSelectedFileName] = useState('');
-  // Removed: [isImageProcessing, setIsImageProcessing]
   const [imageError, setImageError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -34,83 +31,99 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
   const [itemsForLabels, setItemsForLabels] = useState([]);
 
   const [expandedProduct, setExpandedProduct] = useState(null);
+  
+  // Track the PO ID to prevent resetting state on background updates
+  const loadedPoIdRef = useRef(null);
 
   useEffect(() => {
-    if (poData?.items) {
-      const itemsToReceive = poData.items.map(item => ({
-        productId: item.product._id,
-        itemCode: item.product.itemCode,
-        productName: item.product.name,
-        quantityOrdered: item.quantity,
-        quantityAlreadyReceived: item.quantityReceived || 0,
-        quantityToReceive: '',
-        isSerialized: item.product.isSerialized || false,
-        serialNumbers: []
-      }));
-      setReceivedItems(itemsToReceive);
+    // Only run initialization if:
+    // 1. The modal is OPEN
+    // 2. We have PO data
+    // 3. We haven't loaded this specific PO ID yet (prevents reset on background refresh)
+    if (open && poData?.items) {
+        if (loadedPoIdRef.current !== poData._id) {
+            const itemsToReceive = poData.items.map(item => ({
+                productId: item.product._id,
+                itemCode: item.product.itemCode,
+                productName: item.product.name,
+                quantityOrdered: item.quantity,
+                quantityAlreadyReceived: item.quantityReceived || 0,
+                quantityToReceive: '', // Start empty
+                isSerialized: item.product.isSerialized || false,
+                serialNumbers: []
+            }));
+            setReceivedItems(itemsToReceive);
+            
+            // Reset other states
+            setBase64Image(null);
+            setSelectedFileName('');
+            setImageError('');
+            setShowLabelStep(false);
+            setItemsForLabels([]);
+            setExpandedProduct(null);
+            
+            // Mark this PO as loaded
+            loadedPoIdRef.current = poData._id;
+        }
     }
-    setBase64Image(null);
-    setSelectedFileName('');
-    // Removed: setIsImageProcessing(false);
-    setImageError('');
-    setShowLabelStep(false);
-    setItemsForLabels([]);
-    setExpandedProduct(null);
-  }, [poData]);
-  
-  // State for tracking which input field is focused/active
-  const [activeInput, setActiveInput] = useState(null);
-
-  // --- MODIFIED: Fix Quantity Input and Cursor Position ---
-  const handleQuantityInputFocus = (productId, currentValue) => {
-    // If the current value is exactly the string '0', set the input to an empty string on focus.
-    // This allows the user to type '20' instead of '020'.
-    if (currentValue === '0' || currentValue === 0) {
-      handleQuantityChange(productId, '');
+    
+    // If modal closes, reset the ref so it can reload next time
+    if (!open) {
+        loadedPoIdRef.current = null;
+        setReceivedItems([]); // Optional: clear state on close
     }
-    setActiveInput(productId);
-  };
-  
-  const handleQuantityInputBlur = (productId, currentValue) => {
-      // If the user leaves the field empty after focus, set it back to 0 or ''
-      if (currentValue === '') {
-          handleQuantityChange(productId, 0); // Optionally set to 0 or leave as '' depending on UX preference
-      }
-      setActiveInput(null);
-  };
+  }, [open, poData]);
   
   const handleQuantityChange = (productId, value) => {
-    // If the value is empty, don't validate max/min, just set it
-    if (value === '') {
-        setReceivedItems(prevItems => prevItems.map(item => 
-          item.productId === productId ? { ...item, quantityToReceive: '' } : item
-        ));
-        return;
-    }
-    
-    // Ensure input is a number
-    const numericValue = Number(value);
-    
-    if (isNaN(numericValue)) return;
-
-    const maxReceivable = receivedItems.find(i => i.productId === productId).quantityOrdered - receivedItems.find(i => i.productId === productId).quantityAlreadyReceived;
-    const newQty = Math.max(0, Math.min(numericValue, maxReceivable));
+    // Allow positive numbers and empty string
+    // Note: input type="number" might return empty string for invalid chars, which is fine here
+    if (value !== '' && parseInt(value) < 0) return;
 
     setReceivedItems(prevItems => prevItems.map(item => {
       if (item.productId === productId) {
-        const currentSerials = item.serialNumbers || [];
-        // Ensure newSerials array size matches newQty, padding with '' or slicing excess
-        const newSerials = currentSerials.slice(0, newQty);
-        
-        while (newSerials.length < newQty) {
-            newSerials.push('');
-        }
-        return { ...item, quantityToReceive: newQty, serialNumbers: newSerials };
+        return { ...item, quantityToReceive: value };
       }
       return item;
     }));
   };
-  // --- END MODIFIED: Fix Quantity Input and Cursor Position ---
+
+  const handleInputBlur = (productId) => {
+    setReceivedItems(prevItems => prevItems.map(item => {
+      if (item.productId === productId) {
+        let val = parseInt(item.quantityToReceive, 10);
+        const maxReceivable = item.quantityOrdered - item.quantityAlreadyReceived;
+
+        if (isNaN(val) || val < 0) val = 0;
+        // Validation: Don't allow receiving more than ordered (optional constraint)
+        if (val > maxReceivable) {
+            // Optional: Toast warning
+            // toast.warning(`Max receive amount is ${maxReceivable}`);
+            val = maxReceivable;
+        }
+
+        // Adjust serial numbers array size based on new quantity
+        const currentSerials = item.serialNumbers || [];
+        let newSerials = [...currentSerials];
+        
+        if (val > newSerials.length) {
+            // Grow array
+            while (newSerials.length < val) {
+                newSerials.push('');
+            }
+        } else if (val < newSerials.length) {
+            // Shrink array
+            newSerials = newSerials.slice(0, val);
+        }
+
+        return { 
+            ...item, 
+            quantityToReceive: val === 0 ? '' : val.toString(), 
+            serialNumbers: newSerials 
+        };
+      }
+      return item;
+    }));
+  };
 
   const handleSerialChange = (productId, index, value) => {
     setReceivedItems(prevItems => prevItems.map(item => {
@@ -127,24 +140,20 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
     setExpandedProduct(expandedProduct === productId ? null : productId);
   };
 
-  // --- MODIFIED: Receipt Upload (Image Only, simplified Base64) ---
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // --- MODIFIED: Removed PDF and simplified type check ---
       const allowedTypes = ['image/jpeg', 'image/png'];
       if (!allowedTypes.includes(file.type)) {
         setImageError('Invalid file type. Please upload JPG or PNG.');
         return;
       }
-      // --- END MODIFIED ---
       
       if (file.size > 5 * 1024 * 1024) { // 5MB Limit
         setImageError('File is too large (max 5MB).');
         return;
       }
       
-      // Removed: setIsImageProcessing(true);
       setImageError('');
       setSelectedFileName(file.name);
       
@@ -153,18 +162,14 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
       reader.onloadend = () => {
           setBase64Image(reader.result);
           toast.info("Image file ready for upload.");
-          // Removed: setIsImageProcessing(false);
       };
       reader.onerror = (err) => {
           setImageError("Failed to read file.");
           setBase64Image(null);
-          // Removed: setIsImageProcessing(false);
       }
     }
   };
-  // --- END MODIFIED: Receipt Upload (Image Only, simplified Base64) ---
 
-  // --- MODIFIED: Added autoTable import for label printing ---
   const handlePrintLabels = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [50, 30] });
     let isFirstPage = true;
@@ -204,7 +209,6 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
 
     doc.save(`labels_PO-${poData.poNumber}.pdf`);
   };
-  // --- END MODIFIED: Added autoTable import for label printing ---
 
   const handleSubmit = async () => {
     const itemsWithQuantity = receivedItems
@@ -242,7 +246,6 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
       const response = await receivePurchaseOrder(poData._id, payloadItems, base64Image);
       toast.success(response.message);
       
-      // --- UPDATED LOGIC: Defer parent refresh ---
       if (poData.poType === 'Consignment') {
         const labelsToPrint = itemsWithQuantity.map(item => ({
             name: item.productName,
@@ -252,12 +255,11 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
         }));
         
         setItemsForLabels(labelsToPrint);
-        setShowLabelStep(true); // Modal stays open for label print step
+        setShowLabelStep(true);
       } else {
-        onSuccess(); // Standard PO refreshes parent immediately
+        onSuccess();
         onClose();
       }
-      // --- END UPDATED LOGIC ---
 
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to receive stock.');
@@ -266,14 +268,12 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
     }
   };
   
-  // --- NEW: Final closure handler ---
   const handleFinalClose = () => {
-      onSuccess(); // Refresh parent to show final PO status (e.g., 'Completed')
-      onClose(); // Close the modal
+      onSuccess();
+      onClose();
   }
-  // --- END NEW ---
 
-  const isDisabled = isSubmitting; // Removed isImageProcessing since no resizing is happening now
+  const isDisabled = isSubmitting;
 
   return (
     <Dialog open={open} onClose={isDisabled ? () => {} : onClose} maxWidth="md" fullWidth>
@@ -311,17 +311,14 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
                         <TableCell align="center">{item.quantityAlreadyReceived}</TableCell>
                         <TableCell align="center">
                           <TextField
-                            type="number"
+                            type="number" // Restored type="number" for up/down spinners
                             size="small"
                             value={item.quantityToReceive}
                             onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
-                            // --- MODIFIED: Add Focus/Blur handlers ---
-                            onFocus={(e) => handleQuantityInputFocus(item.productId, e.target.value)}
-                            onBlur={(e) => handleQuantityInputBlur(item.productId, e.target.value)}
-                            // --- END MODIFIED ---
-                            inputProps={{ min: 0, max: item.quantityOrdered - item.quantityAlreadyReceived }}
+                            onBlur={() => handleInputBlur(item.productId)}
                             sx={{ maxWidth: 80 }}
                             disabled={isDisabled}
+                            // Removed pattern, not needed for type="number"
                           />
                         </TableCell>
                         <TableCell align="center">
@@ -378,7 +375,6 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
                 <input
                   type="file"
                   hidden
-                  // --- MODIFIED: Only accept images ---
                   accept="image/jpeg,image/png"
                   onChange={handleFileSelect}
                 />

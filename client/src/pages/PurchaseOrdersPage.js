@@ -1,10 +1,12 @@
 // client/src/pages/PurchaseOrdersPage.js
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react'; // --- ADDED: useContext ---
 import { useNavigate } from 'react-router-dom';
 import { getPurchaseOrders, getSuppliers } from '../api/purchaseOrderApi';
 import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 import { toast } from 'react-toastify'; 
-import { motion } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion } from 'framer-motion'; 
+import AuthContext from '../context/AuthContext'; // --- NEW: Import AuthContext ---
+// REMOVED: import socket from '../api/socket'; 
 
 // MUI Imports
 import {
@@ -19,7 +21,6 @@ import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SearchIcon from '@mui/icons-material/Search';
 
-// --- NEW IMPORT ---
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const StatusChip = ({ status }) => {
@@ -42,6 +43,9 @@ const PurchaseOrdersPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  
+  // --- NEW: Get socket from AuthContext ---
+  const { socket } = useContext(AuthContext); 
   
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,8 +75,8 @@ const PurchaseOrdersPage = () => {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
-      setIsFilterLoading(true); 
+      // Only show full loading spinner on initial load, not on silent refreshes
+      if (purchaseOrders.length === 0) setLoading(true);
       
       const [poData, suppliersData] = await Promise.all([
         getPurchaseOrders(),
@@ -80,13 +84,17 @@ const PurchaseOrdersPage = () => {
       ]);
       
       setPurchaseOrders(poData);
-      setSuppliersList(suppliersData.filter(s => s.status === 'Approved')); 
+      // Only update supplier list if it's empty (optimization)
+      if (suppliersList.length === 0) {
+          setSuppliersList(suppliersData.filter(s => s.status === 'Approved'));
+      }
       
       setError(null);
     } catch (err) {
       const errorMsg = 'Failed to fetch page data. Please try again later.';
       setError(errorMsg);
-      toast.error(errorMsg);
+      // Only toast if it's a user-initiated action, otherwise it might spam on socket errors
+      if(loading) toast.error(errorMsg);
       console.error(err);
     } finally {
       setLoading(false);
@@ -96,7 +104,24 @@ const PurchaseOrdersPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, []); 
+
+    // --- NEW: Real-time Listener using Context Socket ---
+    if (!socket) return;
+
+    const handleRealTimeUpdate = (data) => {
+      console.log('Real-time Update: Refreshing List...', data);
+      // Re-fetch data to ensure list shows new status (e.g., "Awaiting Approval")
+      fetchData();
+    };
+
+    socket.on('po_supplier_update', handleRealTimeUpdate);
+
+    // Cleanup
+    return () => {
+      socket.off('po_supplier_update', handleRealTimeUpdate);
+    };
+    // eslint-disable-next-line
+  }, [socket]); // Add socket dependency
   
   const handleDatePreset = (preset) => {
     const now = new Date();
