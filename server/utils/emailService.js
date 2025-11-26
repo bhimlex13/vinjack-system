@@ -11,7 +11,6 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendVerificationEmail = async (recipientEmail, code) => {
-  // ... (existing function, no changes)
   const mailOptions = {
     from: `"VinJack System" <${process.env.EMAIL_USER}>`,
     to: recipientEmail,
@@ -34,7 +33,6 @@ const sendVerificationEmail = async (recipientEmail, code) => {
 
 
 const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
-  // ... (existing function, no changes)
   if (!lowStockItems || lowStockItems.length === 0) {
     console.log('No low stock items to report. Email not sent.');
     return;
@@ -62,15 +60,13 @@ const sendLowStockEmail = async (lowStockItems, recipientEmail) => {
     console.log(`Low stock alert email sent successfully to ${recipientEmail}.`);
   } catch (error) {
     console.error(`Error sending low stock email to ${recipientEmail}:`, error);
-    // Log error, but don't stop the calling process
   }
 };
 
 
 const sendPoLink = async (supplierEmail, supplierName, poNumber, token) => {
-  // ... (existing function, no changes)
   // Construct the link using the client URL from environment variables
-  const link = `${process.env.CLIENT_URL}/supplier/po/${token}`; // Ensure CLIENT_URL is in your .env
+  const link = `${process.env.CLIENT_URL}/supplier/po/${token}`; 
 
   const mailOptions = {
     from: `"Vinjack System" <${process.env.EMAIL_USER}>`,
@@ -100,39 +96,166 @@ const sendPoLink = async (supplierEmail, supplierName, poNumber, token) => {
     console.log(`PO email sent successfully to ${supplierEmail}`);
   } catch (error) {
     console.error(`Error sending PO link email to ${supplierEmail}:`, error);
-    // Log the error but don't stop PO creation
   }
 };
 
-const sendPOApprovalNotification = async (recipientEmail, supplierName, poNumber) => {
-    // ... (existing function, no changes)
+// Notification for Manual Consignment (With Attachment)
+const sendManualConsignmentNotification = async (supplierEmail, supplierName, poNumber, items, pdfBuffer) => {
+  
+  const itemsHtml = items.map(item => 
+    `<tr>
+      <td style="border: 1px solid #ddd; padding: 8px;">${item.product?.name || 'Item'}</td>
+      <td style="border: 1px solid #ddd; padding: 8px;">${item.quantity}</td>
+      <td style="border: 1px solid #ddd; padding: 8px;">₱${item.cost}</td>
+    </tr>`
+  ).join('');
+
+  const mailOptions = {
+    from: `"VinJack System" <${process.env.EMAIL_USER}>`,
+    to: supplierEmail,
+    subject: `Consignment Agreement Received: ${poNumber}`,
+    html: `
+      <p>Hello ${supplierName},</p>
+      <p>We have processed the manual consignment agreement for PO <strong>${poNumber}</strong>.</p>
+      <p>The items have been encoded into our system and the signed agreement you provided is attached to this email for your records.</p>
+      
+      <h3>Consignment Items:</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr style="background-color: #f2f2f2;">
+          <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Item</th>
+          <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Qty</th>
+          <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Unit Cost</th>
+        </tr>
+        ${itemsHtml}
+      </table>
+
+      <p>Thank you,</p>
+      <p>VinJack Motorworks</p>
+    `,
+    attachments: [
+        {
+            filename: `Consignment_Agreement_${poNumber}.pdf`,
+            content: pdfBuffer, 
+            contentType: 'application/pdf'
+        }
+    ]
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Manual consignment email (with attachment) sent to ${supplierEmail}`);
+  } catch (error) {
+    console.error(`Error sending manual consignment email:`, error);
+  }
+};
+
+// --- UPDATED: Approval Notification with Visual Status ---
+const sendPOApprovalNotification = async (recipientEmail, supplierName, poNumber, pdfBuffer) => {
     const mailOptions = {
         from: `"VinJack System" <${process.env.EMAIL_USER}>`,
         to: recipientEmail,
-        subject: `Purchase Order ${poNumber} Approved by VinJack Motorworks`,
+        subject: `Purchase Order ${poNumber} Approved & Countersigned`,
         html: `
-            <p>Hello ${supplierName},</p>
-            <p>This email confirms that your submitted review for Purchase Order <strong>${poNumber}</strong> has been <strong>approved</strong> by VinJack Motorworks.</p>
-            <p>We will proceed with the order based on the agreed quantities and costs.</p>
-            <p>Thank you for your prompt response.</p>
-            <p>Sincerely,</p>
-            <p>VinJack Motorworks</p>
-        `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2e7d32;">Purchase Order Approved</h2>
+                <p>Hello ${supplierName},</p>
+                <p>Your submission for Purchase Order <strong>${poNumber}</strong> has been <strong>APPROVED</strong> by VinJack Motorworks.</p>
+                
+                <div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-radius: 8px;">
+                    <h3 style="margin-top: 0; color: #333; font-size: 14px;">Current Status:</h3>
+                    <table width="100%" style="font-size: 12px; text-align: center; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
+                            <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
+                            <td style="width: 25%; color: #1976d2; font-size: 16px; padding-bottom: 5px;">&#9679;</td>
+                            <td style="width: 25%; color: #999; font-size: 16px; padding-bottom: 5px;">&#9675;</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #2e7d32;">Issued</td>
+                            <td style="color: #2e7d32;">Signed</td>
+                            <td style="color: #1976d2; font-weight: bold; border-top: 2px solid #1976d2;">Countersigned</td>
+                            <td style="color: #999;">Delivery</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <p>Attached is the final agreement, countersigned by the owner.</p>
+                <p>We are now ready to receive the stock.</p>
+                <p>Sincerely,<br/>VinJack Motorworks</p>
+            </div>
+        `,
+        attachments: pdfBuffer ? [
+            {
+                filename: `Countersigned_Agreement_${poNumber}.pdf`,
+                content: pdfBuffer,
+                contentType: 'application/pdf'
+            }
+        ] : []
     };
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`PO Approval notification sent successfully to ${recipientEmail} for PO ${poNumber}`);
+        console.log(`PO Approval (Countersigned) email sent to ${recipientEmail}`);
     } catch (error) {
-        console.error(`Error sending PO Approval email to ${recipientEmail} for PO ${poNumber}:`, error);
+        console.error(`Error sending PO Approval email:`, error);
     }
 };
 
-// --- NEW FUNCTION: Send Daily Sales Report ---
+// --- UPDATED: Completion Notification with Visual Status ---
+const sendPOCompletionNotification = async (recipientEmail, supplierName, poNumber, pdfBuffer) => {
+    const mailOptions = {
+        from: `"VinJack System" <${process.env.EMAIL_USER}>`,
+        to: recipientEmail,
+        subject: `Stock Received - Consignment PO ${poNumber} Completed`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2e7d32;">Stock Received & Completed</h2>
+                <p>Hello ${supplierName},</p>
+                <p>This email is to notify you that we have successfully received the stock for Consignment Order <strong>${poNumber}</strong>.</p>
+                
+                <div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-radius: 8px;">
+                    <h3 style="margin-top: 0; color: #333; font-size: 14px;">Current Status:</h3>
+                    <table width="100%" style="font-size: 12px; text-align: center; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
+                            <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
+                            <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
+                            <td style="width: 25%; color: #2e7d32; padding-bottom: 5px;">&#10004;</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #2e7d32;">Issued</td>
+                            <td style="color: #2e7d32;">Signed</td>
+                            <td style="color: #2e7d32;">Countersigned</td>
+                            <td style="color: #2e7d32; font-weight: bold; border-top: 2px solid #2e7d32;">Delivery & Receiving</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <p>The inventory has been updated in our system.</p>
+                <p>Attached is the final signed agreement for your records.</p>
+                <p>Sincerely,<br/>VinJack Motorworks</p>
+            </div>
+        `,
+        attachments: pdfBuffer ? [
+            {
+                filename: `Final_Agreement_${poNumber}.pdf`,
+                content: pdfBuffer,
+                contentType: 'application/pdf'
+            }
+        ] : []
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`PO Completion email sent to ${recipientEmail}`);
+    } catch (error) {
+        console.error(`Error sending PO Completion email:`, error);
+    }
+};
+
 const sendDailySalesReport = async ({ reportData, recipientEmail, reportDateStr }) => {
   const { totalRevenue, totalProfit, totalSales, totalItemsSold, topSellingProducts } = reportData;
 
-  // Format top selling products into an HTML table
   const productsHtml = topSellingProducts.length > 0
     ? topSellingProducts.map(item => `
         <tr>
@@ -197,7 +320,6 @@ const sendDailySalesReport = async ({ reportData, recipientEmail, reportDateStr 
     console.error(`Error sending daily sales report to ${recipientEmail}:`, error);
   }
 };
-// --- END NEW FUNCTION ---
 
 
 module.exports = {
@@ -205,5 +327,7 @@ module.exports = {
     sendVerificationEmail,
     sendPoLink,
     sendPOApprovalNotification,
-    sendDailySalesReport // --- EXPORT NEW FUNCTION ---
+    sendDailySalesReport,
+    sendManualConsignmentNotification,
+    sendPOCompletionNotification
 };

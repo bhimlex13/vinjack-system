@@ -11,7 +11,8 @@ const {
   getPurchaseOrderByToken,
   updateBySupplier,
   approveSupplierChanges,
-  uploadSignedAgreement // --- NEW: Import ---
+  uploadSignedAgreement,
+  uploadCountersignedAgreement // --- NEW IMPORT ---
 } = require('../controllers/purchaseOrderController');
 const { protect, checkPermission } = require('../middleware/authMiddleware');
 
@@ -25,9 +26,12 @@ const canManagePOs = checkPermission('canManagePurchaseOrders');
 // Protected route for the buyer to approve changes
 router.post('/:id/approve', protect, canManagePOs, approveSupplierChanges);
 
-// --- NEW: Route for uploading signed consignment agreement ---
+// Route for uploading signed consignment agreement (Supplier Signed)
 router.post('/:id/upload-agreement', protect, canManagePOs, uploadSignedAgreement);
-// --- END NEW ---
+
+// --- NEW: Route for Countersigned Agreement (Owner Signed) ---
+router.post('/:id/upload-countersigned', protect, canManagePOs, uploadCountersignedAgreement);
+// -------------------------------------------------------------
 
 // Existing Routes
 router.route('/')

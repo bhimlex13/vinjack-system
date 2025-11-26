@@ -14,13 +14,10 @@ export const getPurchaseOrderById = async (id) => {
 };
 
 // Create a new purchase order
-// --- UPDATED: This now sends the full purchaseOrderData object ---
 export const createPurchaseOrder = async (purchaseOrderData) => {
-  // purchaseOrderData now includes poType
   const response = await api.post('/purchase-orders', purchaseOrderData);
   return response.data;
 };
-// --- END UPDATED ---
 
 // Update a purchase order
 export const updatePurchaseOrder = async (id, purchaseOrderData) => {
@@ -28,16 +25,14 @@ export const updatePurchaseOrder = async (id, purchaseOrderData) => {
   return response.data;
 };
 
-// --- MODIFIED: Renamed to deliveryReceiptUrl for clarity ---
 export const receivePurchaseOrder = async (id, items, deliveryReceiptUrl) => {
   const payload = {
     items: items,
-    deliveryReceiptUrl: deliveryReceiptUrl // The Base64 string (or null)
+    deliveryReceiptUrl: deliveryReceiptUrl 
   };
   const response = await api.post(`/purchase-orders/${id}/receive`, payload);
   return response.data;
 };
-// --- END MODIFICATION ---
 
 // Cancel a purchase order
 export const cancelPurchaseOrder = async (id) => {
@@ -45,7 +40,7 @@ export const cancelPurchaseOrder = async (id) => {
   return response.data;
 };
 
-// Fetch all suppliers (for the dropdown in the form)
+// Fetch all suppliers
 export const getSuppliers = async () => {
     const response = await api.get('/suppliers');
     return response.data;
@@ -63,16 +58,23 @@ export const updateBySupplier = async (token, supplierData) => {
   return response.data;
 };
 
-// Approve a PO after supplier has reviewed it
+// Approve a PO (Standard or Manual Consignment)
 export const approveSupplierChanges = async (id) => {
   const response = await api.post(`/purchase-orders/${id}/approve`);
   return response.data;
 };
 
-// --- NEW: Function to upload the signed agreement ---
+// Upload initial agreement (Manual Flow)
 export const uploadSignedAgreement = async (id, signedAgreementUrl) => {
-  const payload = { signedAgreementUrl }; // URL or Base64 string
+  const payload = { signedAgreementUrl }; 
   const response = await api.post(`/purchase-orders/${id}/upload-agreement`, payload);
+  return response.data;
+};
+
+// --- NEW: Upload Countersigned Agreement (System Consignment Final Step) ---
+export const uploadCountersignedAgreement = async (id, countersignedAgreementUrl) => {
+  const payload = { countersignedAgreementUrl };
+  const response = await api.post(`/purchase-orders/${id}/upload-countersigned`, payload);
   return response.data;
 };
 // --- END NEW ---
