@@ -5,17 +5,18 @@ import { getSuppliers, createPurchaseOrder } from '../api/purchaseOrderApi';
 import { getProductsBySupplier } from '../api/productApi';
 import { toast } from 'react-toastify';
 import ConfirmationContext from '../context/ConfirmationContext';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion';
 
 import {
   Container, Typography, Box, Paper, Grid, TextField, Button, Autocomplete,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton,
-  Alert, FormControl, InputLabel, Select, MenuItem
+  Alert, FormControl, InputLabel, Select, MenuItem, 
+  RadioGroup, FormControlLabel, Radio, FormLabel
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 
-// --- NEW IMPORT ---
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const CreatePurchaseOrderPage = () => {
@@ -25,6 +26,18 @@ const CreatePurchaseOrderPage = () => {
   // Form State
   const [supplier, setSupplier] = useState(null);
   const [poType, setPoType] = useState('Purchase'); 
+  
+  // Consignment State
+  const [consignmentMethod, setConsignmentMethod] = useState('System'); 
+  const [termsAndConditions, setTermsAndConditions] = useState(
+    "1. The Consignor agrees to place the items listed below with the Consignee for sale on a consignment basis.\n" +
+    "2. Ownership of the items remains with the Consignor until they are sold to a customer.\n" +
+    "3. The Consignee agrees to pay the Consignor the 'Unit Cost' indicated below only upon the successful sale.\n" +
+    "4. The Consignee assumes responsibility for the safekeeping of the items while in their possession.\n" +
+    "5. Unsold items may be returned to the Consignor if they remain unsold after 60 days from the date of delivery."
+  ); 
+  const [signedAgreementFile, setSignedAgreementFile] = useState(null); 
+
   const [items, setItems] = useState([]);
   const [notes, setNotes] = useState('');
 
@@ -88,7 +101,12 @@ const CreatePurchaseOrderPage = () => {
     }
 
     setSupplier(newValue);
-    setPoType(newValue?.defaultPaymentTerms === 'Consignment' ? 'Consignment' : 'Purchase');
+    // Default based on supplier preference
+    const defaultType = newValue?.defaultPaymentTerms === 'Consignment' ? 'Consignment' : 'Purchase';
+    setPoType(defaultType);
+    setConsignmentMethod('System'); 
+    setSignedAgreementFile(null);
+
     setItems([]);
     setSupplierProducts([]);
     setSelectedProduct(null);
@@ -109,9 +127,31 @@ const CreatePurchaseOrderPage = () => {
     }
   };
 
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
+        toast.error('Please upload a PDF or an Image file.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) { 
+        toast.error('File size must be less than 5MB.');
+        return;
+      }
+      setSignedAgreementFile(file);
+    }
+  };
+
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
   const handleAddItem = () => {
-    // --- VALIDATION ---
     if (!selectedProduct) {
         toast.warn('Please select a product.');
         return;
@@ -124,7 +164,6 @@ const CreatePurchaseOrderPage = () => {
         toast.warn('Cost cannot be negative.');
         return;
     }
-    // ------------------
 
     if (items.some(item => item.product._id === selectedProduct._id)) {
       toast.warn(`${selectedProduct.name} is already in the purchase order.`);
@@ -164,9 +203,24 @@ const CreatePurchaseOrderPage = () => {
         return;
     }
 
+    if (poType === 'Consignment') {
+        if (consignmentMethod === 'Manual' && !signedAgreementFile) {
+            toast.error('Please upload the signed consignment agreement.');
+            return;
+        }
+        if (consignmentMethod === 'System' && !termsAndConditions.trim()) {
+            toast.error('Terms and Conditions are required for System Consignment.');
+            return;
+        }
+    }
+
     let confirmationMessage = '';
     if (poType === 'Consignment') {
-      confirmationMessage = `This will create a CONSIGNMENT order for ${supplier.name}. You must print and upload the agreement before receiving stock. Proceed?`;
+        if (consignmentMethod === 'Manual') {
+            confirmationMessage = `Create MANUAL Consignment Order? The uploaded agreement will be sent to ${supplier.name}.`;
+        } else {
+            confirmationMessage = `Create SYSTEM Consignment Order? A link to sign will be sent to ${supplier.name}.`;
+        }
     } else {
       confirmationMessage = supplier.email
         ? `This will create a PURCHASE order and send an email with the review link to ${supplier.name} (${supplier.email}). Proceed?`
@@ -176,30 +230,39 @@ const CreatePurchaseOrderPage = () => {
     const isConfirmed = await confirm('Confirm Purchase Order Creation', confirmationMessage);
     if (!isConfirmed) return;
 
-    const purchaseOrderData = {
-        supplier: supplier._id,
-        poType: poType,
-        items: items.map(item => ({
-            product: item.product._id,
-            quantity: item.quantity,
-            unitCost: item.cost,
-        })),
-        notes,
-    };
+    setLoading(true); 
 
     try {
-        setLoading(true);
+        let signedAgreementUrl = '';
+        if (poType === 'Consignment' && consignmentMethod === 'Manual' && signedAgreementFile) {
+            signedAgreementUrl = await convertToBase64(signedAgreementFile);
+        }
+
+        const purchaseOrderData = {
+            supplier: supplier._id,
+            poType: poType,
+            consignmentMethod: poType === 'Consignment' ? consignmentMethod : 'System',
+            termsAndConditions: poType === 'Consignment' && consignmentMethod === 'System' ? termsAndConditions : '',
+            signedAgreementUrl: signedAgreementUrl,
+            items: items.map(item => ({
+                product: item.product._id,
+                quantity: item.quantity,
+                unitCost: item.cost,
+            })),
+            notes,
+        };
+
         const newPO = await createPurchaseOrder(purchaseOrderData);
         toast.success(`Purchase Order ${newPO.poNumber} created!`);
         navigate(`/purchase-orders/${newPO._id}`);
     } catch (err) {
         toast.error(err.response?.data?.message || 'Failed to create Purchase Order.');
         console.error(err);
+    } finally {
         setLoading(false);
     }
   };
 
-  // --- LOADING SPINNER ---
   if (loading && !suppliersList.length) {
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
@@ -218,7 +281,11 @@ const CreatePurchaseOrderPage = () => {
         </Typography>
         <Paper sx={{ p: 3 }}>
             <Grid container spacing={3}>
-            <Grid item size={{ xs: 12, md: 8 }}>
+            {/* UPDATED: Step 1 changes width dynamically. 
+                If supplier is selected, it takes 6 columns (half).
+                If not, it takes 12 columns (full).
+            */}
+            <Grid item size={{ xs: 12, md: supplier ? 6 : 12 }}>
                 <Typography variant="h6" gutterBottom>Step 1: Select Supplier</Typography>
                 <Autocomplete
                 options={suppliersList}
@@ -229,22 +296,109 @@ const CreatePurchaseOrderPage = () => {
                 renderInput={(params) => <TextField {...params} label="Select Supplier" variant="outlined" />}
                 />
             </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
-                <Typography variant="h6" gutterBottom>Step 2: Order Type</Typography>
-                <FormControl fullWidth>
-                <InputLabel>Order Type</InputLabel>
-                <Select
-                    value={poType}
-                    label="Order Type"
-                    onChange={(e) => setPoType(e.target.value)}
-                    disabled={!supplier}
-                >
-                    <MenuItem value="Purchase">Purchase</MenuItem>
-                    <MenuItem value="Consignment">Consignment</MenuItem>
-                </Select>
-                </FormControl>
-            </Grid>
 
+            {/* UPDATED: Step 2 only renders if supplier is selected */}
+            <AnimatePresence>
+                {supplier && (
+                    <Grid item size={{ xs: 12, md: 6 }} component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
+                        <Typography variant="h6" gutterBottom>Step 2: Order Type</Typography>
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} md={poType === 'Consignment' ? 6 : 12}>
+                                <FormControl fullWidth>
+                                <InputLabel>Order Type</InputLabel>
+                                <Select
+                                    value={poType}
+                                    label="Order Type"
+                                    onChange={(e) => setPoType(e.target.value)}
+                                    disabled={!supplier}
+                                >
+                                    <MenuItem value="Purchase">Purchase</MenuItem>
+                                    <MenuItem value="Consignment">Consignment</MenuItem>
+                                </Select>
+                                </FormControl>
+                            </Grid>
+                            
+                            {poType === 'Consignment' && (
+                                <Grid item xs={12} md={6}>
+                                    <FormControl component="fieldset">
+                                        <FormLabel component="legend">Method</FormLabel>
+                                        <RadioGroup
+                                            row
+                                            value={consignmentMethod}
+                                            onChange={(e) => setConsignmentMethod(e.target.value)}
+                                        >
+                                            <FormControlLabel value="System" control={<Radio />} label="System Generated" />
+                                            <FormControlLabel value="Manual" control={<Radio />} label="Upload Signed PDF" />
+                                        </RadioGroup>
+                                    </FormControl>
+                                </Grid>
+                            )}
+                        </Grid>
+                    </Grid>
+                )}
+            </AnimatePresence>
+
+            {/* Dynamic Inputs for Consignment (Terms or Upload) */}
+            {supplier && poType === 'Consignment' && (
+                <Grid item size={{ xs: 12 }}>
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                    >
+                        <Paper variant="outlined" sx={{ p: 2, mb: 2, backgroundColor: '#fcfcfc' }}>
+                            {consignmentMethod === 'System' ? (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                                        Terms and Conditions (For System PDF)
+                                    </Typography>
+                                    <TextField
+                                        fullWidth
+                                        multiline
+                                        rows={4}
+                                        variant="outlined"
+                                        value={termsAndConditions}
+                                        onChange={(e) => setTermsAndConditions(e.target.value)}
+                                        placeholder="Enter terms..."
+                                        // --- UPDATED: Enable Resizing ---
+                                        sx={{
+                                            '& .MuiInputBase-root': {
+                                                padding: 1.5
+                                            },
+                                            '& textarea': {
+                                                resize: 'vertical', // Allows user to resize vertically
+                                                minHeight: '100px'
+                                            }
+                                        }}
+                                        // -------------------------------
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                                        Upload Signed Consignment Agreement
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Button
+                                            component="label"
+                                            variant="outlined"
+                                            startIcon={<UploadFileIcon />}
+                                        >
+                                            Select File
+                                            <input type="file" hidden accept="application/pdf,image/*" onChange={handleFileUpload} />
+                                        </Button>
+                                        <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                                            {signedAgreementFile ? signedAgreementFile.name : 'No file chosen'}
+                                        </Typography>
+                                    </Box>
+                                </>
+                            )}
+                        </Paper>
+                    </motion.div>
+                </Grid>
+            )}
+
+            {/* Step 3: Items (Shows only after Step 1 is done) */}
             {supplier && (
                 <motion.div 
                     initial={{ opacity: 0 }} 
@@ -252,7 +406,7 @@ const CreatePurchaseOrderPage = () => {
                     transition={{ duration: 0.5 }}
                     style={{ width: '100%' }}
                 >
-                    <Grid container spacing={3} sx={{ width: '100%', ml: 0 }}> {/* Added grid container wrapper to fix spacing issues */}
+                    <Grid container spacing={3} sx={{ width: '100%', ml: 0 }}>
                         <Grid item size={{ xs: 12 }}>
                             <Typography variant="h6">Step 3: Add Items</Typography>
                         </Grid>
@@ -283,7 +437,7 @@ const CreatePurchaseOrderPage = () => {
                                         ...params.InputProps,
                                         endAdornment: (
                                         <>
-                                            {isProductLoading ? <LoadingSpinner text="" /> : null} {/* Mini spinner */}
+                                            {isProductLoading ? <LoadingSpinner text="" /> : null}
                                             {params.InputProps.endAdornment}
                                         </>
                                         ),

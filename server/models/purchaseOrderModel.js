@@ -17,9 +17,8 @@ const purchaseOrderItemSchema = new mongoose.Schema({
   isAvailable: { type: Boolean, default: true },
   quantityReceived: { type: Number, default: 0 },
   
-  // --- NEW: Store Serial Numbers for this specific batch ---
+  // Store Serial Numbers for this specific batch
   serialNumbers: [{ type: String }] 
-  // --- END NEW ---
 
 }, { _id: false });
 
@@ -35,6 +34,19 @@ const purchaseOrderSchema = new mongoose.Schema({
     enum: ['Purchase', 'Consignment'],
     default: 'Purchase',
     required: true
+  },
+
+  // Distinguish the flow
+  consignmentMethod: {
+    type: String,
+    enum: ['System', 'Manual'], 
+    default: 'System'
+  },
+  
+  // Store custom terms for System-generated agreements
+  termsAndConditions: {
+    type: String,
+    default: ''
   },
 
   status: {
@@ -59,7 +71,14 @@ const purchaseOrderSchema = new mongoose.Schema({
   
   deliveryReceiptUrl: { type: String },
 
+  // The Supplier's Signed PDF
   signedAgreementUrl: { 
+    type: String, 
+    trim: true 
+  },
+
+  // The Owner's Countersigned PDF (Final)
+  countersignedAgreementUrl: { 
     type: String, 
     trim: true 
   }

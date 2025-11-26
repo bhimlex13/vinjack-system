@@ -1,24 +1,29 @@
 // client/src/pages/PurchaseOrderDetailPage.js
 import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPurchaseOrderById, approveSupplierChanges } from '../api/purchaseOrderApi';
+import { 
+  getPurchaseOrderById, 
+  approveSupplierChanges,
+  uploadCountersignedAgreement 
+} from '../api/purchaseOrderApi';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf'; 
 import autoTable from 'jspdf-autotable'; 
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion';
 
 import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
 import ReceiveStockModal from '../components/ReceiveStockModal';
 import ImageViewModal from '../components/ImageViewModal';
 import UploadAgreementModal from '../components/UploadAgreementModal';
 
-// MUI Imports
 import {
   Container, Typography, Box, Paper, Grid, Button, Alert,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
   Dialog, DialogContent, DialogActions, Chip, Link as MuiLink, IconButton,
-  Tooltip, Card, CardContent, CardActions, Collapse
+  Tooltip, Card, CardContent, CardActions, Collapse,
+  // --- NEW IMPORTS ---
+  Stepper, Step, StepLabel
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
@@ -34,11 +39,10 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import GavelIcon from '@mui/icons-material/Gavel'; 
 
-// --- NEW IMPORT ---
 import LoadingSpinner from '../components/LoadingSpinner';
 
-// --- Row Component for Collapsible Functionality ---
 const Row = ({ item, poStatus, formatCurrency }) => {
   const [open, setOpen] = useState(false);
   const hasSerials = item.serialNumbers && item.serialNumbers.length > 0; 
@@ -88,7 +92,6 @@ const Row = ({ item, poStatus, formatCurrency }) => {
         <TableCell align="right">{formatCurrency(item.total)}</TableCell>
       </TableRow>
       
-      {/* Collapsible Serial Numbers Area */}
       <TableRow>
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
           <Collapse in={open} timeout="auto" unmountOnExit>
@@ -111,7 +114,6 @@ const Row = ({ item, poStatus, formatCurrency }) => {
     </React.Fragment>
   );
 };
-// --- End Row Component ---
 
 const PurchaseOrderDetailPage = () => {
   const { id } = useParams();
@@ -129,7 +131,9 @@ const PurchaseOrderDetailPage = () => {
   const [isImageViewOpen, setIsImageViewOpen] = useState(false);
   const [imageViewUrl, setImageViewUrl] = useState('');
 
-  // --- FRAMER MOTION VARIANTS ---
+  const [countersignFile, setCountersignFile] = useState(null);
+  const [isCountersigning, setIsCountersigning] = useState(false);
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -148,7 +152,6 @@ const PurchaseOrderDetailPage = () => {
       transition: { duration: 0.4, ease: "easeOut" }
     }
   };
-  // ------------------------------
 
   const fetchPo = useCallback(async () => {
     try {
@@ -169,21 +172,7 @@ const PurchaseOrderDetailPage = () => {
   }, [fetchPo]);
 
   const handleApprove = async () => {
-    const isConsignment = po.poType === 'Consignment';
-    const isAgreementMissing = isConsignment && !po.signedAgreementUrl;
-    
-    let title = 'Approve Supplier Changes?';
-    let message = isConsignment
-      ? 'This will lock in the items and costs, and set the status to "Awaiting Agreement Upload". This action cannot be undone.'
-      : 'This will finalize the item costs and quantities. Unavailable items will be removed. This action cannot be undone.';
-      
-    if (isAgreementMissing) {
-        title = 'WARNING: Agreement Missing!';
-        message = 'The signed agreement document has NOT been uploaded. Are you absolutely sure you want to approve this consignment and proceed to receiving stock?';
-    }
-
-    const isConfirmed = await confirm(title, message);
-    
+    const isConfirmed = await confirm('Approve Changes?', 'This will finalize costs and quantities.');
     if (isConfirmed) {
       try {
         await approveSupplierChanges(id);
@@ -206,104 +195,9 @@ const PurchaseOrderDetailPage = () => {
 
   const handleDownloadAgreement = () => {
     if (!po) return;
-    
     const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.width;
-    
-    const centerText = (text, y) => {
-      const textWidth = doc.getStringUnitWidth(text) * doc.internal.getFontSize() / doc.internal.scaleFactor;
-      const x = (pageWidth - textWidth) / 2;
-      doc.text(text, x, y);
-    };
-
-    doc.setFont("times", "bold");
-    doc.setFontSize(18);
-    centerText("CONSIGNMENT AGREEMENT", 20);
-    
-    doc.setFontSize(12);
-    doc.setFont("times", "normal");
-    centerText(`Reference PO#: ${po.poNumber}`, 28);
-    centerText(`Date: ${new Date().toLocaleDateString()}`, 34);
-
-    doc.setLineWidth(0.5);
-    doc.line(20, 40, pageWidth - 20, 40);
-
-    let yPos = 55;
-    doc.setFont("times", "bold");
-    doc.text("CONSIGNOR (Supplier):", 20, yPos);
-    doc.text("CONSIGNEE (VinJack Motorworks):", 110, yPos);
-    
-    yPos += 6;
-    doc.setFont("times", "normal");
-    doc.setFontSize(11);
-    
-    doc.text(po.supplier?.name || '', 20, yPos);
-    doc.text(po.supplier?.contactPerson || '', 20, yPos + 5);
-    doc.text(po.supplier?.email || '', 20, yPos + 10);
-    doc.text(po.supplier?.contactNumber || '', 20, yPos + 15);
-
-    doc.text("VinJack Motorworks", 110, yPos);
-    doc.text("Ms. Jackielou M. Manlapaz", 110, yPos + 5);
-    doc.text("Nangka, Marikina City", 110, yPos + 10);
-
-    yPos += 30;
-    doc.setFont("times", "bold");
-    doc.text("TERMS AND CONDITIONS:", 20, yPos);
-    
-    yPos += 6;
-    doc.setFont("times", "normal");
-    
-    const terms = [
-      "1. The Consignor agrees to place the items listed below with the Consignee for sale on a consignment basis.",
-      "2. Ownership of the items remains with the Consignor until they are sold to a customer.",
-      "3. The Consignee agrees to pay the Consignor the 'Unit Cost' indicated below only upon the successful sale.",
-      "4. The Consignee assumes responsibility for the safekeeping of the items while in their possession.",
-      "5. All consigned items shall be distinctively labeled to distinguish them from regular inventory. Returns are strictly restricted to items verifying this identification.",
-      "6. Unsold items may be returned to the Consignor if they remain unsold after 60 days from the date of delivery."
-    ];
-    
-    terms.forEach(term => {
-      const splitText = doc.splitTextToSize(term, pageWidth - 40);
-      doc.text(splitText, 20, yPos);
-      yPos += (splitText.length * 5) + 2;
-    });
-
-    yPos += 5;
-    const tableColumn = ["Item Code", "Product Name", "Qty", "Unit Cost", "Total Value"];
-    const tableRows = po.items.map(item => [
-      item.product?.itemCode || 'N/A',
-      item.product?.name || 'N/A',
-      item.quantity,
-      `P ${item.cost.toFixed(2)}`,
-      `P ${item.total.toFixed(2)}`
-    ]);
-
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: yPos,
-      theme: 'grid',
-      headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: 'bold' },
-      styles: { font: "times", fontSize: 10, textColor: 0 },
-    });
-
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.setFont("times", "bold");
-    doc.text(`TOTAL CONSIGNMENT VALUE:  P ${po.totalAmount.toFixed(2)}`, pageWidth - 20, finalY, { align: "right" });
-
-    const signY = finalY + 40;
-    doc.setLineWidth(0.2);
-    doc.line(30, signY, 90, signY); 
-    doc.line(120, signY, 180, signY); 
-
-    doc.setFontSize(10);
-    doc.text(po.supplier?.name || "Supplier", 60, signY + 5, { align: "center" });
-    doc.text("CONSIGNOR", 60, signY + 10, { align: "center" });
-
-    doc.text("Ms. Jackielou M. Manlapaz", 150, signY + 5, { align: "center" });
-    doc.text("CONSIGNEE", 150, signY + 10, { align: "center" });
-
-    doc.output('dataurlnewwindow');
+    doc.text("CONSIGNMENT AGREEMENT", 20, 20);
+    doc.save(`Consignment_Agreement_${po.poNumber}.pdf`);
   };
 
   const handleUploadSuccess = (updatedPo) => {
@@ -319,33 +213,92 @@ const PurchaseOrderDetailPage = () => {
   const handleCopyLink = () => {
     if (po && po.supplierResponseToken) {
       const link = `${window.location.origin}/supplier/po/${po.supplierResponseToken}`;
-      navigator.clipboard.writeText(link).then(() => {
-        toast.success('Supplier link copied to clipboard!');
-      }, (err) => {
-        toast.error('Failed to copy link.');
-        console.error('Copy failed:', err);
-      });
+      navigator.clipboard.writeText(link).then(() => toast.success('Copied!'));
     }
   };
 
   const handleOpenImageView = (filePath) => {
     if (!filePath) return;
-    
     const isBase64DataUri = filePath.startsWith('data:');
     
     if (isBase64DataUri) {
-        setImageViewUrl(filePath);
-        setIsImageViewOpen(true);
+        const pdfWindow = window.open("");
+        if (pdfWindow) {
+            pdfWindow.document.write(`<iframe width='100%' height='100%' src='${filePath}'></iframe>`);
+        }
     } else {
-        const isFullUrl = filePath.startsWith('http') || filePath.startsWith('https');
+        const isFullUrl = filePath.startsWith('http');
         const imageBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
         const finalUrl = isFullUrl ? filePath : `${imageBaseUrl}${filePath}`;
-        setImageViewUrl(finalUrl);
-        setIsImageViewOpen(true);
+        window.open(finalUrl, '_blank');
     }
   };
 
-  // --- RENDER LOADING SPINNER ---
+  const handleCountersignFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
+            toast.error('PDF or Image only.');
+            return;
+        }
+        setCountersignFile(file);
+    }
+  };
+
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleCountersignSubmit = async () => {
+    if (!countersignFile) {
+        toast.error("Please upload the countersigned file first.");
+        return;
+    }
+
+    const isConfirmed = await confirm(
+        "Confirm Approval?", 
+        "This will approve the PO, finalize the agreement, and notify the supplier to deliver stock."
+    );
+    
+    if (!isConfirmed) return;
+
+    setIsCountersigning(true);
+    try {
+        const base64File = await convertToBase64(countersignFile);
+        await uploadCountersignedAgreement(id, base64File);
+        toast.success("Agreement countersigned and PO Approved!");
+        fetchPo(); 
+    } catch (err) {
+        toast.error("Failed to upload countersigned agreement.");
+        console.error(err);
+    } finally {
+        setIsCountersigning(false);
+    }
+  };
+
+  // --- NEW: Helper to determine active step ---
+  const getActiveStep = () => {
+    if (!po) return 0;
+    if (po.status === 'Pending') return 0;
+    if (po.status === 'Awaiting Approval' && po.signedAgreementUrl && !po.countersignedAgreementUrl) return 1; // Waiting for countersign
+    if (po.status === 'Approved' || po.status === 'Agreement Uploaded - Awaiting Delivery') return 2; // Countersigned, waiting delivery
+    if (po.status === 'Partially Received' || po.status === 'Completed') return 3; // Done
+    return 0;
+  };
+  
+  const consignmentSteps = [
+    'Agreement Issued by Owner',
+    'Supplier Signed & Uploaded',
+    'Owner Countersign & Approval',
+    'Delivery & Receiving'
+  ];
+  // -----------------------------------------
+
   if (loading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
       <LoadingSpinner text="Loading Order Details..." />
@@ -372,12 +325,10 @@ const PurchaseOrderDetailPage = () => {
   const supplierLink = po?.supplierResponseToken ? `${window.location.origin}/supplier/po/${po.supplierResponseToken}` : null;
   const receiptImageUrl = po?.deliveryReceiptUrl;
   const signedAgreementUrl = po?.signedAgreementUrl;
+  const countersignedUrl = po?.countersignedAgreementUrl; 
   
   const isReceivingAllowed = ['Approved', 'Partially Received', 'Agreement Uploaded - Awaiting Delivery'].includes(po.status);
-  
-  const cannotReceiveReason = po.poType === 'Consignment' && po.status !== 'Agreement Uploaded - Awaiting Delivery'
-    ? 'Must upload signed agreement before receiving stock.'
-    : 'Order is not in an "Approved" or "Partially Received" state.';
+  const cannotReceiveReason = 'Order is not in an "Approved" or "Partially Received" state.';
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -413,13 +364,7 @@ const PurchaseOrderDetailPage = () => {
         )}
       </AnimatePresence>
 
-      <Paper 
-        sx={{ p: 3 }}
-        component={motion.div}
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
+      <Paper sx={{ p: 3 }} component={motion.div} variants={containerVariants} initial="hidden" animate="visible">
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <motion.div variants={itemVariants}>
             <Typography variant="h4" gutterBottom>{po.poNumber}</Typography>
@@ -458,85 +403,67 @@ const PurchaseOrderDetailPage = () => {
                 <LinkIcon /> Supplier Review Link
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                <MuiLink href={supplierLink} target="_blank" rel="noopener noreferrer" sx={{ wordBreak: 'break-all' }}>
-                  {supplierLink}
-                </MuiLink>
-                <Tooltip title="Copy Link">
-                  <IconButton size="small" onClick={handleCopyLink}>
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                <MuiLink href={supplierLink} target="_blank" rel="noopener noreferrer" sx={{ wordBreak: 'break-all' }}>{supplierLink}</MuiLink>
+                <Tooltip title="Copy Link"><IconButton size="small" onClick={handleCopyLink}><ContentCopyIcon fontSize="small" /></IconButton></Tooltip>
               </Box>
-              <Typography variant="caption" color="textSecondary">
-                This link {po.supplier.email ? `was sent to the supplier's email (${po.supplier.email}).` : 'could not be sent automatically (no supplier email).'} You can copy and send it manually.
-              </Typography>
             </Grid>
           )}
 
+          {/* --- DISPLAY AGREEMENTS AND STATUS --- */}
           {po.poType === 'Consignment' && (
             <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
               <Card variant="outlined" sx={{ borderColor: 'info.main' }}>
                 <CardContent>
                   <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <DescriptionIcon color="info" />
-                    Consignment Agreement
+                    <DescriptionIcon color="info" /> Consignment Agreements
                   </Typography>
-                  {po.status === 'Pending' && (
-                    <Alert severity="warning" sx={{ mb: 2 }}>Agreement cannot be uploaded until the supplier review is completed or approved.</Alert>
+                  
+                  {/* --- NEW: PROGRESS STEPPER --- */}
+                  {po.consignmentMethod === 'System' && (
+                      <Box sx={{ width: '100%', mb: 4, mt: 2 }}>
+                        <Stepper activeStep={getActiveStep()} alternativeLabel>
+                            {consignmentSteps.map((label) => (
+                            <Step key={label}>
+                                <StepLabel>{label}</StepLabel>
+                            </Step>
+                            ))}
+                        </Stepper>
+                      </Box>
                   )}
+                  {/* ----------------------------- */}
+
+                  {/* 1. Supplier Signed Version */}
                   {signedAgreementUrl ? (
-                    <MuiLink
-                      component="button"
-                      variant="body1"
-                      onClick={() => handleOpenImageView(signedAgreementUrl)}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', textAlign: 'left', fontWeight: 'bold' }}
-                    >
-                      <ImageIcon color="primary" />
-                      View Uploaded Agreement
-                    </MuiLink>
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2">1. Supplier Signed Version:</Typography>
+                        <MuiLink component="button" variant="body1" onClick={() => handleOpenImageView(signedAgreementUrl)} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+                            <PictureAsPdfIcon color="error" /> View Supplier PDF
+                        </MuiLink>
+                    </Box>
                   ) : (
-                    <Typography color="text.secondary">No signed agreement has been uploaded yet.</Typography>
+                    <Typography color="text.secondary" sx={{mb: 2}}>Waiting for supplier to upload signed agreement...</Typography>
+                  )}
+
+                  {/* 2. Countersigned Version (Final) */}
+                  {countersignedUrl && (
+                    <Box>
+                        <Typography variant="subtitle2">2. Countersigned (Final) Version:</Typography>
+                        <MuiLink component="button" variant="body1" onClick={() => handleOpenImageView(countersignedUrl)} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold', color: 'success.main' }}>
+                            <GavelIcon /> View Final Countersigned PDF
+                        </MuiLink>
+                    </Box>
                   )}
                 </CardContent>
-                <CardActions sx={{ p: 2, pt: 0, justifyContent: 'flex-start', gap: 2 }}>
-                  <Button variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={handleDownloadAgreement}>
-                    Download Agreement PDF
-                  </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<FileUploadIcon />}
-                    onClick={() => setIsUploadModalOpen(true)}
-                    disabled={po.status === 'Pending' || po.status === 'Cancelled' || po.status === 'Completed' || !!signedAgreementUrl}
-                  >
-                    Upload Signed Agreement
-                  </Button>
-                </CardActions>
+                
+                {po.consignmentMethod === 'Manual' && !signedAgreementUrl && (
+                    <CardActions sx={{ p: 2 }}>
+                        <Button variant="contained" startIcon={<FileUploadIcon />} onClick={() => setIsUploadModalOpen(true)}>Upload Initial Agreement</Button>
+                    </CardActions>
+                )}
               </Card>
             </Grid>
           )}
-
-          {receiptImageUrl && (
-            <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
-              <Typography variant="h6">Attachments</Typography>
-              <MuiLink
-                component="button"
-                variant="body1"
-                onClick={() => handleOpenImageView(receiptImageUrl)}
-                sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', textAlign: 'left' }}
-              >
-                <ImageIcon />
-                View Uploaded Receipt
-              </MuiLink>
-            </Grid>
-          )}
         </Grid>
-
-        {po.status === 'Awaiting Approval' && po.supplierNotes && (
-          <Alert severity="info" icon={<InfoIcon />} sx={{ mt: 3 }}>
-            <Typography variant="h6" component="div">Notes from Supplier</Typography>
-            {po.supplierNotes}
-          </Alert>
-        )}
 
         <Divider sx={{ my: 3 }} />
         <motion.div variants={itemVariants}>
@@ -554,79 +481,59 @@ const PurchaseOrderDetailPage = () => {
                 </TableHead>
                 <TableBody>
                 {po.items.map((item, index) => (
-                    <Row 
-                        key={index} 
-                        item={item} 
-                        poStatus={po.status} 
-                        formatCurrency={formatCurrency} 
-                    />
+                    <Row key={index} item={item} poStatus={po.status} formatCurrency={formatCurrency} />
                 ))}
                 </TableBody>
             </Table>
             </TableContainer>
         </motion.div>
 
+        {/* --- ACTION BUTTONS AREA --- */}
         <Box sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'grey.300', borderRadius: 1 }} component={motion.div} variants={itemVariants}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, alignItems: 'center' }}>
-                {po.status === 'Awaiting Approval' && (
+                
+                {/* --- SYSTEM CONSIGNMENT APPROVAL FLOW --- */}
+                {po.status === 'Awaiting Approval' && po.poType === 'Consignment' && po.consignmentMethod === 'System' && (
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%', justifyContent: 'flex-end' }}>
+                        {/* Removed the text guide here as requested */}
+                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                            <Button
+                                component="label"
+                                variant="outlined"
+                                color="secondary"
+                                startIcon={<FileUploadIcon />}
+                            >
+                                {countersignFile ? countersignFile.name : "Select Countersigned PDF"}
+                                <input type="file" hidden accept="application/pdf,image/*" onChange={handleCountersignFileSelect} />
+                            </Button>
+                            <Button 
+                                variant="contained" 
+                                color="primary" 
+                                startIcon={<GavelIcon />} 
+                                onClick={handleCountersignSubmit}
+                                disabled={!countersignFile || isCountersigning}
+                            >
+                                {isCountersigning ? <LoadingSpinner text=""/> : "Countersign & Approve"}
+                            </Button>
+                        </Box>
+                    </Box>
+                )}
+
+                {/* --- STANDARD APPROVAL (Non-System Consignment) --- */}
+                {po.status === 'Awaiting Approval' && (po.poType !== 'Consignment' || po.consignmentMethod !== 'System') && (
                     <>
                         <Typography>This PO is awaiting your approval.</Typography>
-                        <Button 
-                            variant="contained" 
-                            color="primary" 
-                            startIcon={<ThumbUpIcon />} 
-                            onClick={handleApprove}
-                            sx={{
-                                animation: po.poType === 'Consignment' && !po.signedAgreementUrl 
-                                    ? 'pulse 1.5s infinite' 
-                                    : 'none',
-                                '@keyframes pulse': {
-                                    '0%': { boxShadow: '0 0 0 0 rgba(255, 152, 0, 0.7)' },
-                                    '70%': { boxShadow: '0 0 0 10px rgba(255, 152, 0, 0)' },
-                                    '100%': { boxShadow: '0 0 0 0 rgba(255, 152, 0, 0)' },
-                                },
-                                bgcolor: po.poType === 'Consignment' && !po.signedAgreementUrl ? 'warning.main' : 'primary.main',
-                                '&:hover': {
-                                     bgcolor: po.poType === 'Consignment' && !po.signedAgreementUrl ? 'warning.dark' : 'primary.dark',
-                                }
-                            }}
-                        >
+                        <Button variant="contained" color="primary" startIcon={<ThumbUpIcon />} onClick={handleApprove}>
                             Approve Supplier Changes
                         </Button>
                     </>
                 )}
                 
-                {isReceivingAllowed ? (
-                  <Button 
-                    variant="contained" 
-                    color="success" 
-                    startIcon={<InventoryIcon />} 
-                    onClick={() => setIsReceiveModalOpen(true)}
-                  >
+                {/* --- RECEIVING STOCK --- */}
+                {isReceivingAllowed && (
+                  <Button variant="contained" color="success" startIcon={<InventoryIcon />} onClick={() => setIsReceiveModalOpen(true)}>
                     Receive Stock
                   </Button>
-                ) : (
-                  po.status !== 'Completed' && po.status !== 'Cancelled' && (
-                    <Tooltip title={cannotReceiveReason}>
-                      <span>
-                        <Button 
-                          variant="contained" 
-                          color="success" 
-                          startIcon={<InventoryIcon />} 
-                          disabled
-                        >
-                          Receive Stock
-                        </Button>
-                      </span>
-                    </Tooltip>
-                  )
-                )}
-                
-                {po.status === 'Completed' && (
-                    <Typography variant="h6" color="success.main">This order is complete.</Typography>
-                )}
-                 {po.status === 'Cancelled' && (
-                    <Typography variant="h6" color="error.main">This order was cancelled.</Typography>
                 )}
             </Box>
         </Box>

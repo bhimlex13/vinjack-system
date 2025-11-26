@@ -4,17 +4,24 @@ import { useParams } from 'react-router-dom';
 import { getPurchaseOrderByToken, updateBySupplier } from '../api/purchaseOrderApi';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion'; 
 
-// MUI Imports
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable'; 
+
 import {
   Container, Typography, Box, Paper, Grid, TextField, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   CircularProgress, Alert, Checkbox, FormControlLabel, Dialog, DialogTitle,
-  DialogContent, DialogActions, List, ListItem, ListItemText, 
+  DialogContent, DialogActions, List, ListItem, ListItemText, Divider, Tooltip,
+  Step, Stepper, StepLabel, StepContent
 } from '@mui/material';
+import UploadFileIcon from '@mui/icons-material/UploadFile'; 
+import DownloadIcon from '@mui/icons-material/Download';     
+import HelpIcon from '@mui/icons-material/Help';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import GavelIcon from '@mui/icons-material/Gavel';
 
-// --- NEW IMPORT ---
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const SupplierPOReviewPage = () => {
@@ -23,14 +30,23 @@ const SupplierPOReviewPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  
+  // 'submitted' tracks purely the local action of clicking submit.
+  // We also use po.status to determine if it was ALREADY submitted previously.
+  const [submittedLocal, setSubmittedLocal] = useState(false);
 
   const [items, setItems] = useState([]);
   const [supplierNotes, setSupplierNotes] = useState('');
   
+  const [signedAgreementFile, setSignedAgreementFile] = useState(null);
+
+  // Default Guide to FALSE, only open if pending
+  const [isGuideOpen, setIsGuideOpen] = useState(false); 
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false); 
+  const [pdfDownloaded, setPdfDownloaded] = useState(false); 
+
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
-  // --- FRAMER MOTION VARIANTS ---
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -39,7 +55,6 @@ const SupplierPOReviewPage = () => {
       transition: { duration: 0.5, ease: "easeOut" }
     }
   };
-  // ------------------------------
 
   useEffect(() => {
     const fetchPO = async () => {
@@ -47,15 +62,25 @@ const SupplierPOReviewPage = () => {
         setLoading(true);
         const poData = await getPurchaseOrderByToken(token);
         setPo(poData);
+        
+        // Initialize items
         const initialItems = poData.items.map(item => ({
           ...item,
           supplierUpdatedCost: item.cost,
           isAvailable: true,
         }));
         setItems(initialItems);
+
+        // Open guide ONLY if status is Pending
+        if (poData.status === 'Pending') {
+            setIsGuideOpen(true);
+        }
+
         setError(null);
       } catch (err) {
-        setError(err.response?.data?.message || 'Failed to load the Purchase Order. The link may be invalid or expired.');
+        // Even if backend throws 409, we can handle it, but our backend now returns data.
+        // If generic error:
+        setError(err.response?.data?.message || 'Failed to load the Purchase Order.');
         console.error(err);
       } finally {
         setLoading(false);
@@ -65,15 +90,115 @@ const SupplierPOReviewPage = () => {
   }, [token]);
 
   const handleItemChange = (productId, field, value) => {
+    if (detailsConfirmed) setDetailsConfirmed(false);
+    if (pdfDownloaded) setPdfDownloaded(false);
+
     setItems(items.map(item =>
       item.product._id === productId ? { ...item, [field]: value } : item
     ));
   };
-  
+
+  const generateAgreementPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("CONSIGNMENT AGREEMENT", 105, 20, null, null, "center");
+    doc.setFontSize(10);
+    doc.text(`Reference PO#: ${po.poNumber}`, 105, 28, null, null, "center");
+    
+    const dateIssued = new Date(po.orderDate).toLocaleDateString();
+    const dateAccepted = new Date().toLocaleDateString();
+    doc.text(`Date Issued: ${dateIssued}`, 105, 34, null, null, "center");
+    doc.text(`Date Accepted: ${dateAccepted}`, 105, 39, null, null, "center");
+
+    let yPos = 50; 
+    doc.setFontSize(11);
+    doc.text("CONSIGNOR (Supplier):", 14, yPos);
+    doc.setFontSize(10);
+    doc.text(po.supplier.name, 14, yPos + 7);
+
+    doc.setFontSize(11);
+    doc.text("CONSIGNEE (VinJack Motorworks):", 120, yPos);
+    doc.setFontSize(10);
+    doc.text("VinJack Motorworks", 120, yPos + 7);
+    doc.text("Nangka, Marikina City", 120, yPos + 12);
+
+    yPos += 25;
+    doc.setFontSize(11);
+    doc.text("TERMS AND CONDITIONS:", 14, yPos);
+    doc.setFontSize(10);
+    const splitTerms = doc.splitTextToSize(po.termsAndConditions || "Standard consignment terms apply.", 180);
+    doc.text(splitTerms, 14, yPos + 7);
+
+    let finalY = (yPos + 7) + (splitTerms.length * 5) + 10;
+
+    const tableColumn = ["Item Code", "Product Name", "Qty", "Unit Cost", "Total Value"];
+    const tableRows = [];
+    let grandTotal = 0;
+    items.forEach(item => {
+        if(item.isAvailable) {
+            const cost = item.supplierUpdatedCost;
+            const total = item.quantity * cost;
+            grandTotal += total;
+            tableRows.push([item.product.itemCode, item.product.name, item.quantity, `P ${cost.toFixed(2)}`, `P ${total.toFixed(2)}`]);
+        }
+    });
+
+    autoTable(doc, { head: [tableColumn], body: tableRows, startY: finalY, theme: 'grid', headStyles: { fillColor: [220, 220, 220], textColor: 20, fontStyle: 'bold' } });
+    finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(11);
+    doc.text(`TOTAL CONSIGNMENT VALUE: P ${grandTotal.toFixed(2)}`, 195, finalY, null, null, "right");
+
+    finalY += 30;
+    doc.text("__________________________", 14, finalY);
+    doc.text("Signature over Printed Name", 14, finalY + 5);
+    doc.text("(Consignor / Supplier)", 14, finalY + 10);
+    doc.text("__________________________", 130, finalY);
+    doc.text("Signature over Printed Name", 130, finalY + 5);
+    doc.text("(Consignee / Owner)", 130, finalY + 10);
+
+    doc.save(`Consignment_Agreement_${po.poNumber}.pdf`);
+    setPdfDownloaded(true);
+    toast.info("Agreement downloaded. Please sign and upload it to proceed.");
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
+        toast.error('Please upload a PDF or an Image file.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) { 
+        toast.error('File size must be less than 5MB.');
+        return;
+      }
+      setSignedAgreementFile(file);
+    }
+  };
+
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleFinalSubmit = async () => {
+    if (po.poType === 'Consignment' && po.consignmentMethod === 'System' && !signedAgreementFile) {
+        toast.error("Please upload the signed consignment agreement before submitting.");
+        setIsConfirmModalOpen(false);
+        return;
+    }
+
     setIsConfirmModalOpen(false); 
     setSubmitting(true);
     try {
+      let signedAgreementUrl = '';
+      if (signedAgreementFile) {
+          signedAgreementUrl = await convertToBase64(signedAgreementFile);
+      }
       const submissionData = {
         items: items.map(item => ({
           product: item.product._id,
@@ -81,13 +206,18 @@ const SupplierPOReviewPage = () => {
           isAvailable: item.isAvailable,
         })),
         supplierNotes: supplierNotes,
+        signedAgreementUrl: signedAgreementUrl 
       };
+
       await updateBySupplier(token, submissionData);
-      setSubmitted(true);
+      setSubmittedLocal(true);
+      
+      // Reload to fetch updated status and show status tracker
+      setTimeout(() => window.location.reload(), 1000);
+
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to submit review.');
       console.error(err);
-    } finally {
       setSubmitting(false);
     }
   };
@@ -98,94 +228,165 @@ const SupplierPOReviewPage = () => {
     return { priceChanges, unavailableItems };
   }, [items]);
 
-  if (loading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <LoadingSpinner text="Loading Order..." />
-    </Box>
-  );
-
-  if (error) return <Container sx={{mt: 5}}><Alert severity="error">{error}</Alert></Container>;
+  // --- HELPER: Determine Status Step ---
+  const getActiveStep = () => {
+    if (!po) return 0;
+    if (po.status === 'Pending') return 1;
+    if (po.status === 'Awaiting Approval') return 2;
+    if (po.status === 'Approved' || po.status === 'Agreement Uploaded - Awaiting Delivery') return 3; 
+    if (po.status === 'Partially Received' || po.status === 'Completed') return 4; 
+    return 0;
+  };
   
-  if (submitted) {
+  const steps = [
+      'Agreement Issued by Owner',
+      'Review & Upload Signed Agreement',
+      'Owner Countersign & Approval',
+      'Delivery & Receiving'
+  ];
+
+  const isSystemConsignment = po?.poType === 'Consignment' && po?.consignmentMethod === 'System';
+  const isDownloadDisabled = isSystemConsignment && !detailsConfirmed;
+  const isUploadDisabled = isSystemConsignment && (!detailsConfirmed || !pdfDownloaded);
+  const isSubmitDisabled = submitting || (isSystemConsignment && !signedAgreementFile);
+  const submitTooltip = isSystemConsignment && !signedAgreementFile ? "You must upload the signed agreement before submitting." : "";
+
+  // --- RENDER LOADING ---
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><LoadingSpinner text="Loading Order..." /></Box>;
+  if (error) return <Container sx={{mt: 5}}><Alert severity="error">{error}</Alert></Container>;
+  if (!po) return null;
+
+  // --- DETERMINE VIEW MODE ---
+  // If status is NOT Pending, OR we just submitted locally -> Show Status View
+  const isReadOnlyMode = po.status !== 'Pending' || submittedLocal;
+
+  if (isReadOnlyMode) {
     return (
-      <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper 
-          sx={{ p: 4, textAlign: 'center' }}
-          component={motion.div}
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-        >
-          <Typography variant="h4" gutterBottom>Thank You!</Typography>
-          <Typography>Your response has been submitted successfully.</Typography>
+      <Container maxWidth="md" sx={{ mt: 8, mb: 8 }}>
+        <Paper sx={{ p: 4 }} component={motion.div} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <CheckCircleIcon color="success" sx={{ fontSize: 70, mb: 2 }} />
+            <Typography variant="h4" gutterBottom>Review Submitted</Typography>
+            <Typography color="textSecondary">
+                Your agreement has been submitted. Track the status below.
+            </Typography>
+          </Box>
+
+          <Divider sx={{ mb: 4 }} />
+
+          <Box sx={{ width: '100%', mb: 5 }}>
+            <Stepper activeStep={getActiveStep()} alternativeLabel> 
+              {steps.map((label) => (
+                <Step key={label}>
+                  <StepLabel>{label}</StepLabel>
+                </Step>
+              ))}
+            </Stepper>
+          </Box>
+
+          {items.length > 0 ? (
+            <>
+                <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>Submission Summary</Typography>
+                <TableContainer component={Paper} variant="outlined" sx={{ mb: 4 }}>
+                    <Table size="small">
+                    <TableHead>
+                        <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableCell>Product</TableCell>
+                        <TableCell align="right">Qty</TableCell>
+                        <TableCell align="right">Agreed Cost</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {/* For read-only view, use the data from the PO directly if available, or fallback to items state */}
+                        {po.items.map((item) => {
+                            // If PO is already updated (Awaiting Approval+), item.cost IS the agreed cost.
+                            // If we just submitted, items state has the new values.
+                            // We prefer 'items' state if we just submitted local, otherwise PO data.
+                            const displayCost = submittedLocal 
+                                ? items.find(i => i.product._id === item.product._id)?.supplierUpdatedCost 
+                                : item.cost;
+                                
+                            return (
+                                <TableRow key={item.product._id}>
+                                    <TableCell>{item.product.name}</TableCell>
+                                    <TableCell align="right">{item.quantity}</TableCell>
+                                    <TableCell align="right">₱{Number(displayCost).toFixed(2)}</TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                    </Table>
+                </TableContainer>
+
+                {po.termsAndConditions && (
+                    <>
+                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <GavelIcon fontSize="small"/> Agreed Terms & Conditions
+                        </Typography>
+                        <Paper variant="outlined" sx={{ p: 2, backgroundColor: '#fafafa', maxHeight: 200, overflowY: 'auto' }}>
+                            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
+                                {po.termsAndConditions}
+                            </Typography>
+                        </Paper>
+                    </>
+                )}
+            </>
+          ) : (
+            <Alert severity="info">Details are archived.</Alert>
+          )}
+
         </Paper>
       </Container>
     );
   }
 
+  // --- EDITABLE FORM VIEW (Only if Status is Pending) ---
   return (
     <>
       <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
 
+      <Dialog open={isGuideOpen} onClose={() => setIsGuideOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <HelpIcon color="primary" /> Supplier Instructions
+        </DialogTitle>
+        <DialogContent>
+            <Typography variant="body1" gutterBottom>Welcome to the VinJack Consignment Portal. Please follow these steps:</Typography>
+            <List>
+                <ListItem><ListItemText primary="1. Review Items" secondary="Update costs if needed." /></ListItem>
+                <Divider component="li" />
+                <ListItem><ListItemText primary="2. Confirm Details" secondary="Check the confirm box." /></ListItem>
+                <Divider component="li" />
+                <ListItem><ListItemText primary="3. Download Agreement" secondary="Download PDF." /></ListItem>
+                <Divider component="li" />
+                <ListItem><ListItemText primary="4. Sign & Upload" secondary="Upload signed PDF." /></ListItem>
+                <Divider component="li" />
+                <ListItem><ListItemText primary="5. Submit" secondary="Send to owner." /></ListItem>
+            </List>
+        </DialogContent>
+        <DialogActions><Button onClick={() => setIsGuideOpen(false)} variant="contained">I Understand</Button></DialogActions>
+      </Dialog>
+
       <AnimatePresence>
         {isConfirmModalOpen && (
-          <Dialog 
-            open={isConfirmModalOpen} 
-            onClose={() => setIsConfirmModalOpen(false)} 
-            maxWidth="sm" 
-            fullWidth
-            PaperComponent={motion.div}
-            PaperProps={{
-              initial: { y: 50, opacity: 0 },
-              animate: { y: 0, opacity: 1 },
-              exit: { y: 50, opacity: 0 },
-              transition: { duration: 0.3 },
-              sx: { backgroundColor: 'background.paper', boxShadow: 24, borderRadius: 2 }
-            }}
-          >
+          <Dialog open={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} maxWidth="sm" fullWidth>
             <DialogTitle>Confirm Your Review</DialogTitle>
             <DialogContent>
-              <Typography variant="body1" gutterBottom>Please review the summary of your changes before submitting.</Typography>
-              
+              <Typography variant="body1" gutterBottom>Please review the summary before submitting.</Typography>
               {summaryData.priceChanges.length > 0 && (
                 <Box sx={{ mt: 2 }}>
-                  <Typography variant="h6" gutterBottom>Price Adjustments:</Typography>
+                  <Typography variant="h6">Price Adjustments:</Typography>
                   <List dense>
                     {summaryData.priceChanges.map(item => (
                       <ListItem key={item.product._id}>
-                        <ListItemText 
-                          primary={item.product.name} 
-                          secondary={`Changed from ₱${item.cost.toFixed(2)} to ₱${item.supplierUpdatedCost.toFixed(2)}`} 
-                        />
+                        <ListItemText primary={item.product.name} secondary={`₱${item.cost} -> ₱${item.supplierUpdatedCost}`} />
                       </ListItem>
                     ))}
                   </List>
                 </Box>
               )}
-
-              {summaryData.unavailableItems.length > 0 && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="h6" gutterBottom>Unavailable Items:</Typography>
-                  <List dense>
-                    {summaryData.unavailableItems.map(item => (
-                      <ListItem key={item.product._id}>
-                        <ListItemText primary={item.product.name} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
+              {(summaryData.priceChanges.length === 0 && summaryData.unavailableItems.length === 0) && (
+                <Typography sx={{ mt: 2 }}>No changes made to items.</Typography>
               )}
-
-              {supplierNotes && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="h6" gutterBottom>Your Notes:</Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{supplierNotes}</Typography>
-                </Box>
-              )}
-
-              {(summaryData.priceChanges.length === 0 && summaryData.unavailableItems.length === 0 && !supplierNotes) && (
-                <Typography sx={{ mt: 2 }}>No changes were made. You are confirming the order as is.</Typography>
-              )}
-
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setIsConfirmModalOpen(false)}>Cancel</Button>
@@ -197,19 +398,17 @@ const SupplierPOReviewPage = () => {
         )}
       </AnimatePresence>
 
-
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Paper 
-          sx={{ p: 3 }}
-          component={motion.div}
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <Typography variant="h4" gutterBottom>Purchase Order Review</Typography>
+        <Paper sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h4" gutterBottom>Purchase Order Review</Typography>
+            <Button startIcon={<HelpIcon />} onClick={() => setIsGuideOpen(true)}>Help / Guide</Button>
+          </Box>
+          
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={6}><Typography><strong>PO Number:</strong> {po.poNumber}</Typography></Grid>
             <Grid item xs={6}><Typography><strong>From:</strong> {po.supplier.name}</Typography></Grid>
+            <Grid item xs={12}><Typography><strong>Type:</strong> {po.poType}</Typography></Grid>
           </Grid>
 
           <TableContainer component={Paper} variant="outlined">
@@ -225,10 +424,7 @@ const SupplierPOReviewPage = () => {
               </TableHead>
               <TableBody>
                 {items.map((item) => (
-                  <TableRow 
-                    key={item.product._id}
-                    sx={!item.isAvailable ? { backgroundColor: '#fafafa', '& > *': { color: 'text.disabled' } } : {}}
-                  >
+                  <TableRow key={item.product._id} sx={!item.isAvailable ? { backgroundColor: '#fafafa', '& > *': { color: 'text.disabled' } } : {}}>
                     <TableCell>{item.product.name} ({item.product.itemCode})</TableCell>
                     <TableCell align="center">{item.quantity}</TableCell>
                     <TableCell align="center">₱{item.cost.toFixed(2)}</TableCell>
@@ -260,24 +456,41 @@ const SupplierPOReviewPage = () => {
             </Table>
           </TableContainer>
 
-          <TextField
-            label="Notes for Buyer (Optional)"
-            multiline
-            rows={4}
-            value={supplierNotes}
-            onChange={(e) => setSupplierNotes(e.target.value)}
-            fullWidth
-            sx={{ mt: 3 }}
-          />
+          {po.poType === 'Consignment' && po.consignmentMethod === 'System' && (
+            <Box sx={{ mt: 4, p: 3, border: '1px solid #ddd', borderRadius: 2, backgroundColor: '#f8f9fa' }}>
+                <Typography variant="h6" gutterBottom>Consignment Agreement Actions</Typography>
+                <Stepper activeStep={!detailsConfirmed ? 0 : !pdfDownloaded ? 1 : !signedAgreementFile ? 2 : 3} orientation="vertical">
+                    <Step active={true}> 
+                        <StepLabel>Confirm Item Details</StepLabel>
+                        <StepContent>
+                            <FormControlLabel control={<Checkbox checked={detailsConfirmed} onChange={(e) => setDetailsConfirmed(e.target.checked)} color="primary" />} label={<Typography variant="body2">I confirm that the item prices and quantities listed above are correct and final.</Typography>} />
+                        </StepContent>
+                    </Step>
+                    <Step active={detailsConfirmed}>
+                        <StepLabel>Download Agreement</StepLabel>
+                        <StepContent>
+                            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={generateAgreementPDF} disabled={isDownloadDisabled} sx={{ mt: 1 }}>Download Agreement PDF</Button>
+                        </StepContent>
+                    </Step>
+                    <Step active={pdfDownloaded}>
+                        <StepLabel>Upload Signed Document</StepLabel>
+                        <StepContent>
+                            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Button component="label" variant="contained" color="secondary" startIcon={<UploadFileIcon />} disabled={isUploadDisabled}>Upload Signed PDF<input type="file" hidden accept="application/pdf,image/*" onChange={handleFileUpload} /></Button>
+                                <Typography variant="body2" sx={{ fontStyle: 'italic' }}>{signedAgreementFile ? signedAgreementFile.name : 'No file selected'}</Typography>
+                            </Box>
+                        </StepContent>
+                    </Step>
+                </Stepper>
+            </Box>
+          )}
+
+          <TextField label="Notes for Buyer (Optional)" multiline rows={4} value={supplierNotes} onChange={(e) => setSupplierNotes(e.target.value)} fullWidth sx={{ mt: 3 }} />
 
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-            <Button
-              variant="contained"
-              onClick={() => setIsConfirmModalOpen(true)}
-              disabled={submitting}
-            >
-              Submit Review
-            </Button>
+            <Tooltip title={submitTooltip} arrow>
+                <span><Button variant="contained" onClick={() => setIsConfirmModalOpen(true)} disabled={isSubmitDisabled} size="large">Submit Review</Button></span>
+            </Tooltip>
           </Box>
         </Paper>
       </Container>
