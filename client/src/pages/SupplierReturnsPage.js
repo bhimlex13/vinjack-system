@@ -4,32 +4,40 @@ import api from '../api/axios';
 import { toast } from 'react-toastify';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { getSupplierCompletedOrders } from '../api/supplierApi';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion'; 
+// --- MODIFIED: Date Imports ---
+import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
+// --- END MODIFICATION ---
 
 import {
   Container, Typography, Button, Box, Paper, Dialog, DialogTitle,
   DialogContent, DialogActions, Grid, TextField, Autocomplete,
   IconButton, CircularProgress, Tooltip, FormControl, InputLabel, Select, MenuItem,
   Checkbox, FormControlLabel, Chip,
-  List, 
-  ListItem, 
-  Divider,
   FormHelperText,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  ButtonGroup // --- MODIFIED: Added ButtonGroup ---
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'; 
 
-// --- NEW IMPORT ---
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const SupplierReturnsPage = () => {
+  const today = new Date().toISOString().split('T')[0]; // --- NEW ---
+
   const [returns, setReturns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { confirm } = useContext(ConfirmationContext);
+
+  // --- MODIFIED: Date Filter State ---
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  const [datePreset, setDatePreset] = useState('today');
+  // --- END MODIFICATION ---
 
   // Modal State
   const [modalLoading, setModalLoading] = useState(false);
@@ -49,7 +57,6 @@ const SupplierReturnsPage = () => {
   const [wasConsigned, setWasConsigned] = useState(false);
   const [maxQuantity, setMaxQuantity] = useState(Infinity);
 
-  // --- FRAMER MOTION VARIANTS ---
   const pageVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -58,7 +65,6 @@ const SupplierReturnsPage = () => {
       transition: { duration: 0.4, ease: "easeOut" }
     }
   };
-  // ------------------------------
 
   const fetchReturns = useCallback(async () => {
     setIsLoading(true);
@@ -75,6 +81,51 @@ const SupplierReturnsPage = () => {
   useEffect(() => {
     fetchReturns();
   }, [fetchReturns]);
+
+  // --- MODIFIED: Date Preset Handler ---
+  const handleDatePreset = (preset) => {
+    const now = new Date();
+    let start = now;
+    let end = now;
+    setDatePreset(preset);
+
+    if (preset === 'today') {
+      start = startOfDay(now);
+      end = endOfDay(now);
+    } else if (preset === 'week') {
+      start = startOfWeek(now);
+      end = endOfDay(now);
+    } else if (preset === 'month') {
+      start = startOfMonth(now);
+      end = endOfDay(now);
+    } else if (preset === 'year') {
+      start = startOfYear(now);
+      end = endOfDay(now);
+    } else if (preset === 'all') {
+      start = new Date(0); // Epoch start
+      end = endOfDay(now);
+    }
+
+    setStartDate(format(start, 'yyyy-MM-dd'));
+    setEndDate(format(end, 'yyyy-MM-dd'));
+  };
+  // --- END MODIFICATION ---
+
+  // --- MODIFIED: Filter Returns by Date ---
+  const filteredReturns = useMemo(() => {
+    return returns.filter(row => {
+      const rowDate = new Date(row.returnDate || row.createdAt);
+      
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      return rowDate >= start && rowDate <= end;
+    });
+  }, [returns, startDate, endDate]);
+  // --- END MODIFICATION ---
 
   const fetchModalData = async () => {
     setModalLoading(true);
@@ -298,7 +349,6 @@ const SupplierReturnsPage = () => {
     },
   ];
 
-  // --- RENDER LOADING SPINNER ---
   if (isLoading && returns.length === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
@@ -539,6 +589,7 @@ const SupplierReturnsPage = () => {
 
       {/* --- MAIN PAGE CONTENT --- */}
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
+        
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
             Supplier Returns
@@ -548,9 +599,31 @@ const SupplierReturnsPage = () => {
           </Button>
         </Box>
 
+        {/* --- MODIFIED: Date Filter Paper --- */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item size={{ xs: 12 }}>
+              <ButtonGroup fullWidth variant="outlined" aria-label="date range presets">
+                <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
+                <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
+                <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
+                <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
+                <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
+              </ButtonGroup>
+            </Grid>
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+            </Grid>
+          </Grid>
+        </Paper>
+        {/* --- END MODIFICATION --- */}
+
         <Paper sx={{ height: '75vh', width: ' 100%' }}>
           <DataGrid
-            rows={returns}
+            rows={filteredReturns} // --- MODIFIED: Using filteredReturns ---
             columns={columns}
             loading={isLoading}
             getRowId={(row) => row._id}

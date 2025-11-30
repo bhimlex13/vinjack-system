@@ -6,20 +6,25 @@ import api from '../api/axios';
 import ReceiptModal from '../components/ReceiptModal';
 import ReturnDetailsModal from '../components/ReturnDetailsModal';
 import UserDetailsModal from '../components/UserDetailsModal';
-// --- NEW: Import the Purchase Order modal ---
 import PurchaseOrderDetailModal from '../components/PurchaseOrderDetailModal';
+
+// --- MODIFIED: Imports for Date Logic ---
+import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
+// --- END MODIFICATION ---
 
 // MUI Imports
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Chip, CircularProgress, TablePagination, IconButton,
   Tooltip, Dialog, DialogTitle, DialogContent, Alert, Grid, TextField,
-  FormControl, InputLabel, Select, MenuItem, InputAdornment
+  FormControl, InputLabel, Select, MenuItem, InputAdornment, Button, ButtonGroup // --- MODIFIED: Added Button & ButtonGroup ---
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SearchIcon from '@mui/icons-material/Search';
 
 const AuditLogPage = () => {
+  const today = new Date().toISOString().split('T')[0]; // --- NEW ---
+
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -30,6 +35,12 @@ const AuditLogPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterUser, setFilterUser] = useState('');
   const [filterAction, setFilterAction] = useState('');
+
+  // --- MODIFIED: Date Filter State ---
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  const [datePreset, setDatePreset] = useState('today');
+  // --- END MODIFICATION ---
 
   // Data for filter dropdowns
   const [users, setUsers] = useState([]);
@@ -93,6 +104,12 @@ const AuditLogPage = () => {
           page: page + 1,
           limit: rowsPerPage,
         });
+        
+        // --- MODIFIED: Append Date Filters ---
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        // --- END MODIFICATION ---
+
         if (searchTerm) params.append('search', searchTerm);
         if (filterUser) params.append('userId', filterUser);
         if (filterAction) params.append('action', filterAction);
@@ -110,13 +127,42 @@ const AuditLogPage = () => {
       }
     };
     fetchLogs();
-  }, [page, rowsPerPage, searchTerm, filterUser, filterAction]);
+  }, [page, rowsPerPage, searchTerm, filterUser, filterAction, startDate, endDate]); // Added date dependencies
+
+  // --- MODIFIED: Handle Date Presets ---
+  const handleDatePreset = (preset) => {
+    const now = new Date();
+    let start = now;
+    let end = now;
+    setDatePreset(preset);
+
+    if (preset === 'today') {
+      start = startOfDay(now);
+      end = endOfDay(now);
+    } else if (preset === 'week') {
+      start = startOfWeek(now);
+      end = endOfDay(now);
+    } else if (preset === 'month') {
+      start = startOfMonth(now);
+      end = endOfDay(now);
+    } else if (preset === 'year') {
+      start = startOfYear(now);
+      end = endOfDay(now);
+    } else if (preset === 'all') {
+      start = new Date(0); // Epoch start
+      end = endOfDay(now);
+    }
+
+    setStartDate(format(start, 'yyyy-MM-dd'));
+    setEndDate(format(end, 'yyyy-MM-dd'));
+    setPage(0); // Reset to first page
+  };
+  // --- END MODIFICATION ---
 
   // Effect to fetch specific details when a log is selected
   useEffect(() => {
     if (!selectedLog) return;
 
-    // Define endpoints for *special* modals
     const entityEndpoints = {
       'Sale': `/sales/${selectedLog.entityId}`,
       'Return': `/returns/${selectedLog.entityId}`,
@@ -126,13 +172,11 @@ const AuditLogPage = () => {
 
     const endpoint = entityEndpoints[selectedLog.entityType];
 
-    // If no entityId OR it's not a type with a special modal, just show generic details.
     if (!selectedLog.entityType || !selectedLog.entityId || !endpoint) {
       setDetailData({ genericDetails: selectedLog.details });
       return;
     }
     
-    // It IS a special type, so fetch its details
     const fetchDetails = async () => {
       setIsDetailLoading(true);
       setDetailError('');
@@ -154,7 +198,7 @@ const AuditLogPage = () => {
 
   const handleFilterChange = (setter) => (event) => {
     setter(event.target.value);
-    setPage(0); // Reset to first page when filter changes
+    setPage(0); 
   };
 
   const handleSearchChange = (event) => {
@@ -185,24 +229,24 @@ const AuditLogPage = () => {
   const getActionChipStyles = (action) => {
     const baseStyles = { fontWeight: 500 };
     if (action.includes('DELETE') || action.includes('CANCEL') || action.includes('REJECT')) {
-      return { ...baseStyles, backgroundColor: '#ffebee', color: '#c62828' }; // Light Red
+      return { ...baseStyles, backgroundColor: '#ffebee', color: '#c62828' }; 
     }
     if (action.includes('CREATE') || action.includes('LOGIN')) { 
-      return { ...baseStyles, backgroundColor: '#e3f2fd', color: '#1565c0' }; // Light Blue
+      return { ...baseStyles, backgroundColor: '#e3f2fd', color: '#1565c0' }; 
     }
     if (action.includes('SALE') || action.includes('RECEIVE')) {
-      return { ...baseStyles, backgroundColor: '#e0f2f1', color: '#00695c' }; // Mint Green
+      return { ...baseStyles, backgroundColor: '#e0f2f1', color: '#00695c' }; 
     }
     if (action.includes('RETURN') || action.includes('ADJUSTMENT')) {
-      return { ...baseStyles, backgroundColor: '#fff8e1', color: '#ff8f00' }; // Light Amber
+      return { ...baseStyles, backgroundColor: '#fff8e1', color: '#ff8f00' }; 
     }
     if (action.includes('UPDATE') || action.includes('CHANGE') || action.includes('APPROVE') || action.includes('SYNC')) {
-      return { ...baseStyles, backgroundColor: '#e0f7fa', color: '#00838f' }; // Light Cyan
+      return { ...baseStyles, backgroundColor: '#e0f7fa', color: '#00838f' }; 
     }
     if (action.includes('FAILED') || action.includes('LOGOUT')) { 
-      return { ...baseStyles, backgroundColor: '#fbe9e7', color: '#d84315' }; // Light Deep Orange
+      return { ...baseStyles, backgroundColor: '#fbe9e7', color: '#d84315' }; 
     }
-    return { ...baseStyles, backgroundColor: '#f5f5f5', color: '#424242' }; // Light Grey
+    return { ...baseStyles, backgroundColor: '#f5f5f5', color: '#424242' }; 
   };
 
   const renderDetailsModal = () => {
@@ -236,12 +280,8 @@ const AuditLogPage = () => {
         return <ReturnDetailsModal returnData={detailData} open={true} onClose={handleCloseModal} />;
       case 'User':
         return <UserDetailsModal userData={detailData} open={true} onClose={handleCloseModal} />;
-      
-      // --- NEW: Added case for PurchaseOrder ---
       case 'PurchaseOrder':
         return <PurchaseOrderDetailModal poData={detailData} open={true} onClose={handleCloseModal} />;
-      // --- END NEW ---
-      
       default:
         let detailsToShow = 'No specific details to display.';
         if (detailData?.genericDetails) {
@@ -277,14 +317,35 @@ const AuditLogPage = () => {
       {/* --- Filter Bar --- */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item size={{ xs: 12, md: 6 }}>
+          
+          {/* --- MODIFIED: Added Date Presets Row --- */}
+          <Grid item size={{ xs: 12 }}>
+            <ButtonGroup fullWidth variant="outlined" aria-label="date range presets">
+              <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
+              <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
+              <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
+              <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
+              <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
+            </ButtonGroup>
+          </Grid>
+          {/* --- END MODIFICATION --- */}
+
+          {/* --- MODIFIED: Adjusted Grid Sizes for 5 items (2 dates, 1 search, 2 dropdowns) --- */}
+          <Grid item size={{ xs: 12, md: 2.5 }}>
+            <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(0); }} InputLabelProps={{ shrink: true }} size="small" />
+          </Grid>
+          <Grid item size={{ xs: 12, md: 2.5 }}>
+            <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(0); }} InputLabelProps={{ shrink: true }} size="small" />
+          </Grid>
+
+          <Grid item size={{ xs: 12, md: 3 }}>
             <TextField
               fullWidth label="Search in Details" variant="outlined" size="small"
               value={searchTerm} onChange={handleSearchChange}
               InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>), }}
             />
           </Grid>
-          <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item size={{ xs: 12, sm: 6, md: 2 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Filter by User</InputLabel>
               <Select value={filterUser} label="Filter by User" onChange={handleFilterChange(setFilterUser)}>
@@ -293,7 +354,7 @@ const AuditLogPage = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
+          <Grid item size={{ xs: 12, sm: 6, md: 2 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Filter by Action</InputLabel>
               <Select value={filterAction} label="Filter by Action" onChange={handleFilterChange(setFilterAction)}>
@@ -302,6 +363,7 @@ const AuditLogPage = () => {
               </Select>
             </FormControl>
           </Grid>
+          {/* --- END MODIFICATION --- */}
         </Grid>
       </Paper>
       

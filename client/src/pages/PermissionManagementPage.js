@@ -1,6 +1,5 @@
 // client/src/pages/PermissionManagementPage.js
-import React, { useState, useEffect, useCallback, useContext }
-  from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
 import {
@@ -11,7 +10,7 @@ import {
 import SaveIcon from '@mui/icons-material/Save';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 
-import ConfirmationContext from '../context/ConfirmationContext';
+import AdminConfirmPasswordModal from '../components/AdminConfirmPasswordModal';
 
 const groupPermissions = (permissions) => {
   if (!permissions) return {};
@@ -29,7 +28,9 @@ const PermissionManagementPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [currentTab, setCurrentTab] = useState('Admin');
   
-  const { confirm } = useContext(ConfirmationContext);
+  // State for security modal
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // 'SAVE' or 'RESET'
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -99,45 +100,44 @@ const PermissionManagementPage = () => {
     }
   };
 
-  const handleSavePermissions = async () => {
-    setIsSaving(true);
-    try {
-      const permsToSave = currentTab === 'Admin' ? Array.from(adminPermissions) : Array.from(salespersonPermissions);
-      
-      await api.put(`/permissions/${currentTab}`, {
-        allowedPermissions: permsToSave
-      });
-      
-      toast.success(`'${currentTab}' role permissions have been updated.`);
-    } catch (error) {
-      console.error(`Failed to save ${currentTab} permissions`, error);
-      toast.error(error.response?.data?.message || 'Failed to save permissions.');
-    } finally {
-      setIsSaving(false);
-    }
+  // --- ACTION HANDLERS ---
+
+  // 1. Initiate Save
+  const handleInitiateSave = () => {
+    setPendingAction('SAVE');
+    setIsConfirmOpen(true);
   };
 
-  const handleSeedPermissions = async () => {
+  // 2. Initiate Reset
+  const handleInitiateReset = () => {
+    setPendingAction('RESET');
+    setIsConfirmOpen(true);
+  };
+
+  // 3. Confirm Action with Password
+  const handleConfirmAction = async (adminPassword) => {
+    setIsSaving(true);
     try {
-      const result = await confirm({
-        title: 'Confirm Reset',
-        description: 'Are you sure you want to reset all permissions? This will restore both Admin and Salesperson roles to their original default settings.'
-      });
-      
-      if (!result) return; 
-
-      setIsLoading(true); 
-      await api.post('/permissions/seed'); 
-      toast.success('Permissions successfully reset to default.');
-      await fetchData(); 
-
+      if (pendingAction === 'SAVE') {
+        const permsToSave = currentTab === 'Admin' ? Array.from(adminPermissions) : Array.from(salespersonPermissions);
+        await api.put(`/permissions/${currentTab}`, {
+          allowedPermissions: permsToSave,
+          adminPassword // Pass password to backend
+        });
+        toast.success(`'${currentTab}' role permissions have been updated.`);
+      } else if (pendingAction === 'RESET') {
+        await api.post('/permissions/seed', {
+          adminPassword // Pass password to backend
+        });
+        toast.success('Permissions successfully reset to default.');
+        await fetchData(); // Refresh data after reset
+      }
     } catch (error) {
-       console.error("Failed to seed permissions", error);
-       if (error && error.response) {
-         toast.error(error.response?.data?.message || 'Failed to reset permissions.');
-       }
+      console.error(`Failed to execute ${pendingAction}`, error);
+      toast.error(error.response?.data?.message || 'Action failed.');
     } finally {
-       setIsLoading(false);
+      setIsSaving(false);
+      setPendingAction(null);
     }
   };
 
@@ -146,6 +146,13 @@ const PermissionManagementPage = () => {
 
   return (
     <Box>
+      {/* --- Security Modal --- */}
+      <AdminConfirmPasswordModal
+        open={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleConfirmAction}
+      />
+
       <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 2 }}>
         Role Permission Management
       </Typography>
@@ -159,7 +166,7 @@ const PermissionManagementPage = () => {
             variant="outlined"
             color="warning"
             startIcon={<RestartAltIcon />}
-            onClick={handleSeedPermissions}
+            onClick={handleInitiateReset} // Opens modal now
             disabled={isLoading || isSaving}
             sx={{ mt: { xs: 2, md: 0 } }}
           >
@@ -211,11 +218,9 @@ const PermissionManagementPage = () => {
             size="large"
             startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
             disabled={isLoading || isSaving}
-            onClick={handleSavePermissions}
+            onClick={handleInitiateSave} // Opens modal
           >
-            {/* --- THIS IS THE CHANGE --- */}
-            Save
-            {/* --- END CHANGE --- */}
+            Save {currentTab} Permissions
           </Button>
         </Box>
 

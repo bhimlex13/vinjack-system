@@ -1,8 +1,7 @@
 // client/src/pages/SettingsPage.js
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
-import { requestProfileUpdate, verifyOwnerUpdate } from '../api/userApi';
 import { triggerManualBackupToGCS, restoreBackup, listGCSBackups } from '../api/settingsApi';
 import { toast } from 'react-toastify';
 
@@ -18,7 +17,6 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  Alert,
   FormControlLabel,
   Switch,
   TextField,
@@ -29,21 +27,16 @@ import {
   DialogTitle,
   Divider,
   CircularProgress,
-  InputAdornment,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
   FormHelperText,
-  IconButton,
-  Stack
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import EmailIcon from '@mui/icons-material/Email';
 import BadgeIcon from '@mui/icons-material/Badge';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import RestoreIcon from '@mui/icons-material/Restore';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -55,21 +48,9 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 
 const SettingsPage = () => {
   const { user, logout } = useContext(AuthContext);
-  // Profile state
+  
+  // Profile state (Read-Only)
   const [profile, setProfile] = useState({ fullName: '', username: '', email: '' });
-  const [originalProfile, setOriginalProfile] = useState({});
-  const [pendingChanges, setPendingChanges] = useState(null);
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [updateFormData, setUpdateFormData] = useState({});
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [changesSummary, setChangesSummary] = useState([]);
-  const [updateMessage, setUpdateMessage] = useState('');
-  const [updateError, setUpdateError] = useState('');
-  const [requiresVerification, setRequiresVerification] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [timer, setTimer] = useState(180);
-  const timerId = useRef(null);
 
   // Notification state
   const [personalSettings, setPersonalSettings] = useState({
@@ -122,10 +103,6 @@ const SettingsPage = () => {
              email: responses[1].data.email || ''
            };
            setProfile(userProfile);
-           setOriginalProfile(userProfile);
-           if (responses[1].data.hasPendingChanges) {
-             setPendingChanges(responses[1].data.pendingChanges);
-           }
          }
          if (user.role === 'Super Admin' && responses[2]?.data) {
            setBackupSettings(responses[2].data);
@@ -149,21 +126,6 @@ const SettingsPage = () => {
         localStorage.removeItem('restoreCompleted');
     }
   }, []);
-
-  // Timer logic
-   useEffect(() => {
-     if (requiresVerification && timer > 0) {
-       timerId.current = setInterval(() => setTimer(prev => prev - 1), 1000);
-     } else {
-       clearInterval(timerId.current);
-       if (timer <= 0 && requiresVerification) {
-         setUpdateError("Time has expired. Please request a new code.");
-       }
-     }
-     return () => clearInterval(timerId.current);
-   }, [requiresVerification, timer]);
-
-   const formatTime = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
   // Fetch GCS Backup List
   useEffect(() => {
@@ -337,91 +299,6 @@ const SettingsPage = () => {
     }
   };
 
-  // Profile Update Logic
-  const openUpdateModal = () => {
-    setUpdateFormData({
-      fullName: profile.fullName, username: profile.username, email: profile.email,
-      oldPassword: '', newPassword: '', confirmPassword: ''
-    });
-    setUpdateError('');
-    setShowUpdateModal(true);
-  };
-  const closeUpdateModal = () => {
-    setShowUpdateModal(false);
-    setUpdateError('');
-    setUpdateMessage('');
-    setRequiresVerification(false);
-    setVerificationCode('');
-    setTimer(180);
-    clearInterval(timerId.current);
-  };
-  const openConfirmModal = (e) => {
-    e.preventDefault();
-    setUpdateError('');
-    const changes = [];
-    if (updateFormData.fullName && updateFormData.fullName !== originalProfile.fullName) changes.push({ field: 'Full Name', oldValue: originalProfile.fullName, newValue: updateFormData.fullName });
-    if (updateFormData.username && updateFormData.username !== originalProfile.username) changes.push({ field: 'Username', oldValue: originalProfile.username, newValue: updateFormData.username });
-    if (updateFormData.email && updateFormData.email !== originalProfile.email) changes.push({ field: 'Email', oldValue: originalProfile.email, newValue: updateFormData.email });
-    if (updateFormData.newPassword) {
-      if (!updateFormData.oldPassword) { setUpdateError('Old password is required to change password.'); return; }
-      if (updateFormData.newPassword !== updateFormData.confirmPassword) { setUpdateError('New passwords do not match.'); return; }
-      if (updateFormData.newPassword.length < 6) { setUpdateError('New password must be at least 6 characters long.'); return; }
-      changes.push({ field: 'Password', oldValue: '********', newValue: '********' });
-    }
-    if (changes.length === 0) { setUpdateError('No changes detected to submit.'); return; }
-    setChangesSummary(changes);
-    setShowConfirmModal(true);
-  };
-  const confirmProfileUpdate = async () => {
-    setUpdateError(''); setUpdateMessage('');
-    setIsBackupSaving(true);
-    try {
-      const response = await requestProfileUpdate(updateFormData);
-      setShowConfirmModal(false);
-      if (response.data.requiresVerification) {
-        setRequiresVerification(true);
-        setUpdateMessage(response.data.message);
-        setTimer(180);
-      } else {
-        setUpdateMessage(response.data.message);
-        if (user.role !== 'Super Admin') {
-            setPendingChanges({ /* Store relevant pending changes if needed */ });
-        }
-        setShowSuccessModal(true);
-      }
-    } catch (err) {
-      setUpdateError(err.response?.data?.message || 'Failed to request profile update.');
-      setShowConfirmModal(false);
-    } finally {
-        setIsBackupSaving(false);
-    }
-  };
-  const handleVerificationSubmit = async (e) => {
-    e.preventDefault(); setUpdateError('');
-    setIsBackupSaving(true);
-    try {
-      const response = await verifyOwnerUpdate(verificationCode);
-      setUpdateMessage(response.data.message);
-      const updatedProfile = {
-          fullName: updateFormData.fullName || profile.fullName,
-          username: updateFormData.username || profile.username,
-          email: updateFormData.email || profile.email
-      };
-      setProfile(updatedProfile);
-      setOriginalProfile(updatedProfile);
-      setPendingChanges(null);
-      setShowSuccessModal(true);
-    } catch (err) {
-      setUpdateError(err.response?.data?.message || 'Verification failed.');
-    } finally {
-        setIsBackupSaving(false);
-    }
-   };
-   const handleCloseSuccessModal = () => {
-       setShowSuccessModal(false);
-       closeUpdateModal();
-   };
-
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
@@ -430,29 +307,27 @@ const SettingsPage = () => {
 
       <Grid container spacing={3}>
 
-        {/* --- SYNTAX FIX: Reverted to size={{...}} --- */}
+        {/* --- Profile Section (READ ONLY) --- */}
         <Grid item size={{ xs: 12 }} >
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                     <AccountCircleIcon color="action" sx={{ mr: 1 }} />
                     <Typography variant="h6" component="h3">My Profile</Typography>
                 </Box>
-                {pendingChanges && user.role !== 'Super Admin' && <Alert severity="info" sx={{ mb: 2 }}>You have pending profile changes awaiting owner approval.</Alert>}
                 <List dense sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
                   <ListItem><ListItemIcon><BadgeIcon /></ListItemIcon><ListItemText primary="Full Name" secondary={profile.fullName} /></ListItem>
                   <ListItem><ListItemIcon><AccountCircleIcon /></ListItemIcon><ListItemText primary="Username" secondary={profile.username} /></ListItem>
                   <ListItem><ListItemIcon><EmailIcon /></ListItemIcon><ListItemText primary="Email" secondary={profile.email} /></ListItem>
                   <ListItem><ListItemIcon><VpnKeyIcon /></ListItemIcon><ListItemText primary="Password" secondary="********" /></ListItem>
                 </List>
-                <Box sx={{ mt: 'auto', pt: 2, flexShrink: 0 }}>
-                    <Button variant="contained" onClick={openUpdateModal} disabled={!!pendingChanges && user.role !== 'Super Admin'}>
-                        Request Profile Update
-                    </Button>
-                </Box>
+                {/* REMOVED: Edit Button */}
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
+                    Note: To update profile details or change password, please contact the Administrator or the Owner.
+                </Typography>
             </Paper>
         </Grid>
 
-        {/* --- SYNTAX FIX: Reverted to size={{...}} --- */}
+        {/* --- Notifications Section --- */}
         <Grid item size={{ xs: 12 }}>
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
@@ -497,13 +372,13 @@ const SettingsPage = () => {
 
                     <Divider sx={{ my: 2 }} />
 
-                    {/* NEW: Daily Sales Report */}
+                    {/* Daily Sales Report */}
                     <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
                         <FormControlLabel
                           control={
                             <Switch
                               checked={personalSettings.dailySalesReportEnabled}
-                              onChange={handleDailyReportToggle} // New handler
+                              onChange={handleDailyReportToggle} 
                               name="dailySalesReportEnabled"
                               disabled={isNotificationSaving}
                             />
@@ -522,23 +397,22 @@ const SettingsPage = () => {
                             type="time"
                             value={personalSettings.dailySalesReportTime}
                             onChange={(e) => setPersonalSettings(p => ({ ...p, dailySalesReportTime: e.target.value }))}
-                            onBlur={handleDailyReportTimeBlur} // New handler
+                            onBlur={handleDailyReportTimeBlur} 
                             disabled={!personalSettings.dailySalesReportEnabled || isNotificationSaving}
                             InputLabelProps={{ shrink: true }}
-                            inputProps={{ step: 300 }} // 5 min step
+                            inputProps={{ step: 300 }} 
                             helperText="Saves on blur."
                             sx={{ mt: { xs: 1, sm: 0 }, width: '100%', maxWidth: { xs: '100%', sm: '200px' } }}
                             size="small"
                         />
                     </Box>
-                    {/* END NEW */}
 
                 </Box>
                  <Box sx={{ mt: 'auto', pt: 2, flexShrink: 0, height: '40px' }}></Box>
             </Paper>
         </Grid>
         
-        {/* --- SYNTAX FIX: Reverted to size={{...}} --- */}
+        {/* --- Backup Settings (Super Admin Only) --- */}
         {user?.role === 'Super Admin' && (
           <Grid item size={{ xs: 12 }}>
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -595,7 +469,7 @@ const SettingsPage = () => {
           </Grid>
         )}
 
-        {/* --- SYNTAX FIX: Reverted to size={{...}} --- */}
+        {/* --- Manual Backup & Restore (Super Admin Only) --- */}
         {user?.role === 'Super Admin' && (
           <Grid item size={{ xs: 12 }}>
              <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -664,75 +538,7 @@ const SettingsPage = () => {
         )}
       </Grid>
 
-      {/* Dialogs (all unchanged) */}
-      <Dialog open={showUpdateModal} onClose={closeUpdateModal} fullWidth maxWidth="sm">
-         <DialogTitle>{requiresVerification ? 'Enter Verification Code' : 'Update My Profile'}</DialogTitle>
-        {requiresVerification ? (
-          <Box component="form" onSubmit={handleVerificationSubmit}>
-            <DialogContent>
-              <DialogContentText sx={{ mb: 1 }}>{updateMessage}</DialogContentText>
-              <Typography align="center" variant="h5" sx={{ my: 2, color: timer <= 30 ? 'error.main' : 'inherit' }}>{formatTime(timer)}</Typography>
-              <TextField autoFocus required fullWidth label="Verification Code" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} InputLabelProps={{ shrink: true }} />
-              {updateError && <Alert severity="error" sx={{ mt: 2 }}>{updateError}</Alert>}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={closeUpdateModal}>Cancel</Button>
-              <Button type="submit" variant="contained" disabled={isBackupSaving}>
-                 {isBackupSaving ? <CircularProgress size={24} color="inherit"/> : 'Verify & Save'}
-              </Button>
-            </DialogActions>
-          </Box>
-        ) : (
-          <Box component="form" onSubmit={openConfirmModal}>
-            <DialogContent>
-              <TextField margin="dense" name="fullName" label="Full Name" type="text" fullWidth variant="outlined" defaultValue={profile.fullName} onChange={e => setUpdateFormData(p => ({...p, fullName: e.target.value}))}/>
-              <TextField margin="dense" name="username" label="Username" type="text" fullWidth variant="outlined" defaultValue={profile.username} onChange={e => setUpdateFormData(p => ({...p, username: e.target.value}))}/>
-              <TextField margin="dense" name="email" label="Email" type="email" fullWidth variant="outlined" defaultValue={profile.email} onChange={e => setUpdateFormData(p => ({...p, email: e.target.value}))}/>
-              <Divider sx={{ my: 2 }}><Typography variant="overline">Change Password (Optional)</Typography></Divider>
-              <TextField margin="dense" name="oldPassword" label="Old Password" type="password" fullWidth variant="outlined" onChange={e => setUpdateFormData(p => ({...p, oldPassword: e.target.value}))}/>
-              <TextField margin="dense" name="newPassword" label="New Password" type="password" fullWidth variant="outlined" onChange={e => setUpdateFormData(p => ({...p, newPassword: e.target.value}))}/>
-              <TextField margin="dense" name="confirmPassword" label="Confirm New Password" type="password" fullWidth variant="outlined" onChange={e => setUpdateFormData(p => ({...p, confirmPassword: e.target.value}))}/>
-              {updateError && <Alert severity="error" sx={{ mt: 2 }}>{updateError}</Alert>}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={closeUpdateModal}>Cancel</Button>
-              <Button type="submit" variant="contained" disabled={isBackupSaving}>
-                {isBackupSaving ? <CircularProgress size={24} color="inherit"/> : 'Review Changes'}
-              </Button>
-            </DialogActions>
-          </Box>
-        )}
-      </Dialog>
-      <Dialog open={showConfirmModal} onClose={() => setShowConfirmModal(false)}>
-        <DialogTitle>Confirm Profile Update</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Please review the changes:</DialogContentText>
-          <List dense>
-            {changesSummary.map((change, index) => (
-              <ListItem key={index}>
-                 <ListItemText primary={change.field} secondary={`"${change.oldValue}"  →  "${change.newValue}"`} />
-              </ListItem>
-            ))}
-          </List>
-          {updateError && <Alert severity="error">{updateError}</Alert>}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowConfirmModal(false)}>Cancel</Button>
-          <Button onClick={confirmProfileUpdate} autoFocus disabled={isBackupSaving}>
-            {isBackupSaving ? <CircularProgress size={24} color="inherit"/> : 'Confirm & Submit'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog open={showSuccessModal} onClose={handleCloseSuccessModal}>
-        <DialogContent sx={{ textAlign: 'center', p: 4 }}>
-          <CheckCircleOutlineIcon color="success" sx={{ fontSize: 60, mb: 2 }} />
-          <Typography variant="h5" gutterBottom>Success!</Typography>
-          <DialogContentText>{updateMessage}</DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
-          <Button onClick={handleCloseSuccessModal} variant="contained">OK</Button>
-        </DialogActions>
-      </Dialog>
+      {/* --- Restore Confirmation Modal --- */}
       <Dialog open={showRestoreConfirm} onClose={() => !isRestoring && setShowRestoreConfirm(false)} >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
           <WarningAmberIcon color="error" sx={{ mr: 1 }} />

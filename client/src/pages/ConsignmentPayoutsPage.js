@@ -4,13 +4,15 @@ import { getOwedPayables, markPayableAsPaid } from '../api/consignmentApi';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
 import PayoutHistory from '../components/reports/PayoutHistory';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion'; 
+// --- MODIFIED: Date Imports ---
+import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
+// --- END MODIFICATION ---
 
 import {
   Container, Typography, Paper, Box, Alert, Tooltip, IconButton,
   TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem,
-  Tabs, 
-  Tab   
+  Tabs, Tab, Grid, Button, ButtonGroup // --- MODIFIED: Added Grid, Button, ButtonGroup ---
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
@@ -18,7 +20,6 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PaymentIcon from '@mui/icons-material/Payment';
 import HistoryIcon from '@mui/icons-material/History';
 
-// --- NEW IMPORT ---
 import LoadingSpinner from '../components/LoadingSpinner';
 
 // Helper to format currency
@@ -51,15 +52,23 @@ function TabPanel(props) {
 }
 
 const OwedPayouts = () => {
+  const today = new Date().toISOString().split('T')[0]; // --- NEW ---
+
   const [payables, setPayables] = useState([]);
   const [allSuppliers, setAllSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
+  
+  // --- MODIFIED: Date Filter State ---
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  const [datePreset, setDatePreset] = useState('today');
+  // --- END MODIFICATION ---
+
   const { confirm } = useContext(ConfirmationContext);
 
-  // --- FRAMER MOTION VARIANTS ---
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -68,7 +77,6 @@ const OwedPayouts = () => {
       transition: { duration: 0.4, ease: "easeOut" }
     }
   };
-  // ------------------------------
 
   const fetchPayables = async () => {
     try {
@@ -98,6 +106,35 @@ const OwedPayouts = () => {
     fetchPayables();
   }, []);
 
+  // --- MODIFIED: Date Preset Handler ---
+  const handleDatePreset = (preset) => {
+    const now = new Date();
+    let start = now;
+    let end = now;
+    setDatePreset(preset);
+
+    if (preset === 'today') {
+      start = startOfDay(now);
+      end = endOfDay(now);
+    } else if (preset === 'week') {
+      start = startOfWeek(now);
+      end = endOfDay(now);
+    } else if (preset === 'month') {
+      start = startOfMonth(now);
+      end = endOfDay(now);
+    } else if (preset === 'year') {
+      start = startOfYear(now);
+      end = endOfDay(now);
+    } else if (preset === 'all') {
+      start = new Date(0); // Epoch start
+      end = endOfDay(now);
+    }
+
+    setStartDate(format(start, 'yyyy-MM-dd'));
+    setEndDate(format(end, 'yyyy-MM-dd'));
+  };
+  // --- END MODIFICATION ---
+
   const handleMarkAsPaid = async (payable) => {
     const isConfirmed = await confirm(
       'Confirm Payment',
@@ -118,15 +155,28 @@ const OwedPayouts = () => {
 
   const filteredPayables = useMemo(() => {
     return payables.filter(p => {
+      // --- MODIFIED: Add Date Logic ---
+      const saleDate = new Date(p.sale?.createdAt || p.createdAt);
+      // Create comparison dates from state (which are YYYY-MM-DD strings)
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      const dateMatch = saleDate >= start && saleDate <= end;
+      // --- END MODIFICATION ---
+
       const supplierMatch = filterSupplier ? p.supplier?._id === filterSupplier : true;
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const searchMatch = !searchTerm ||
         (p.product?.name?.toLowerCase().includes(lowerCaseSearchTerm)) ||
         (p.product?.itemCode?.toLowerCase().includes(lowerCaseSearchTerm)) ||
         (p.supplier?.name?.toLowerCase().includes(lowerCaseSearchTerm));
-      return supplierMatch && searchMatch;
+      
+      return supplierMatch && searchMatch && dateMatch;
     });
-  }, [payables, searchTerm, filterSupplier]);
+  }, [payables, searchTerm, filterSupplier, startDate, endDate]);
   
   const totalOwed = useMemo(() => {
     return filteredPayables.reduce((sum, p) => sum + p.amountOwed, 0);
@@ -186,6 +236,29 @@ const OwedPayouts = () => {
 
   return (
     <Box component={motion.div} variants={containerVariants} initial="hidden" animate="visible"> 
+      
+      {/* --- MODIFIED: Date Filter Paper --- */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item size={{ xs: 12 }}>
+            <ButtonGroup fullWidth variant="outlined" aria-label="date range presets">
+              <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
+              <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
+              <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
+              <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
+              <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
+            </ButtonGroup>
+          </Grid>
+          <Grid item size={{ xs: 12, md: 6 }}>
+            <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+          </Grid>
+          <Grid item size={{ xs: 12, md: 6 }}>
+            <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+          </Grid>
+        </Grid>
+      </Paper>
+      {/* --- END MODIFICATION --- */}
+
       {/* Filter and Search Bar */}
       <Paper sx={{ p: 2, my: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
         <TextField

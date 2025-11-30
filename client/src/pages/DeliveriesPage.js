@@ -4,24 +4,28 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { getDeliveries } from '../api/deliveryApi';
 import RecordDeliveryForm from '../components/RecordDeliveryForm';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion';
+// --- MODIFIED: Date Imports ---
+import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
+// --- END MODIFICATION ---
 
 // MUI Imports
 import { 
   Box, Button, Typography, Paper, Dialog, DialogTitle, DialogContent,
   DialogActions, Table, TableBody, TableCell, TableHead, TableRow, Chip,
   Grid, Divider, Stack, Container, TextField, InputAdornment, FormControl,
-  InputLabel, Select, MenuItem, Tooltip
+  InputLabel, Select, MenuItem, Tooltip, ButtonGroup // --- MODIFIED: Added ButtonGroup ---
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SearchIcon from '@mui/icons-material/Search';
 
-// --- NEW IMPORT ---
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const DeliveriesPage = () => {
+  const today = new Date().toISOString().split('T')[0]; // --- NEW ---
+
   const [deliveries, setDeliveries] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,9 +34,15 @@ const DeliveriesPage = () => {
   const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
+  
+  // --- MODIFIED: Date Filter State ---
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  const [datePreset, setDatePreset] = useState('today');
+  // --- END MODIFICATION ---
+
   const navigate = useNavigate();
 
-  // --- FRAMER MOTION VARIANTS ---
   const pageVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -41,7 +51,6 @@ const DeliveriesPage = () => {
       transition: { duration: 0.4, ease: "easeOut" }
     }
   };
-  // ------------------------------
 
   const fetchDeliveries = async () => {
     try {
@@ -64,8 +73,49 @@ const DeliveriesPage = () => {
     fetchDeliveries();
   }, []);
 
+  // --- MODIFIED: Date Preset Handler ---
+  const handleDatePreset = (preset) => {
+    const now = new Date();
+    let start = now;
+    let end = now;
+    setDatePreset(preset);
+
+    if (preset === 'today') {
+      start = startOfDay(now);
+      end = endOfDay(now);
+    } else if (preset === 'week') {
+      start = startOfWeek(now);
+      end = endOfDay(now);
+    } else if (preset === 'month') {
+      start = startOfMonth(now);
+      end = endOfDay(now);
+    } else if (preset === 'year') {
+      start = startOfYear(now);
+      end = endOfDay(now);
+    } else if (preset === 'all') {
+      start = new Date(0); // Epoch start
+      end = endOfDay(now);
+    }
+
+    setStartDate(format(start, 'yyyy-MM-dd'));
+    setEndDate(format(end, 'yyyy-MM-dd'));
+  };
+  // --- END MODIFICATION ---
+
   const filteredDeliveries = useMemo(() => {
     return deliveries.filter(delivery => {
+      // --- MODIFIED: Add Date Logic ---
+      const deliveryDate = new Date(delivery.deliveryDate || delivery.createdAt);
+      
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      const dateMatch = deliveryDate >= start && deliveryDate <= end;
+      // --- END MODIFICATION ---
+
       const supplierMatch = filterSupplier ? delivery.supplier?._id === filterSupplier : true;
       
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -74,9 +124,9 @@ const DeliveriesPage = () => {
         (delivery.purchaseOrder?.poNumber?.toLowerCase().includes(lowerCaseSearchTerm)) ||
         (delivery.deliveryType?.toLowerCase().includes(lowerCaseSearchTerm));
       
-      return supplierMatch && searchMatch;
+      return supplierMatch && searchMatch && dateMatch;
     });
-  }, [deliveries, searchTerm, filterSupplier]);
+  }, [deliveries, searchTerm, filterSupplier, startDate, endDate]);
 
   const handleDeliveryFormClose = () => {
     setIsDeliveryModalOpen(false);
@@ -135,7 +185,6 @@ const DeliveriesPage = () => {
 
   if (error) return <Typography color="error" sx={{ p: 3 }}>{error}</Typography>;
 
-  // --- RENDER LOADING SPINNER ---
   if (isLoading && deliveries.length === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
@@ -147,7 +196,6 @@ const DeliveriesPage = () => {
   return (
     <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
       
-      {/* --- ANIMATED HEADER & GRID --- */}
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Box>
@@ -176,6 +224,28 @@ const DeliveriesPage = () => {
               </Button>
           </Stack>
         </Box>
+
+        {/* --- MODIFIED: Date Filter Paper --- */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item size={{ xs: 12 }}>
+              <ButtonGroup fullWidth variant="outlined" aria-label="date range presets">
+                <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
+                <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
+                <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
+                <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
+                <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
+              </ButtonGroup>
+            </Grid>
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+            </Grid>
+            <Grid item size={{ xs: 12, md: 6 }}>
+              <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+            </Grid>
+          </Grid>
+        </Paper>
+        {/* --- END MODIFICATION --- */}
 
         <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
           <TextField
@@ -221,7 +291,6 @@ const DeliveriesPage = () => {
         </Paper>
       </motion.div>
 
-      {/* --- ANIMATED DETAILS MODAL --- */}
       <AnimatePresence>
         {selectedDelivery && (
           <Dialog 
@@ -295,7 +364,6 @@ const DeliveriesPage = () => {
         )}
       </AnimatePresence>
 
-      {/* --- ANIMATED FORM MODAL --- */}
       <AnimatePresence>
         {isDeliveryModalOpen && (
           <Dialog

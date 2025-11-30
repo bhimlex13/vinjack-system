@@ -1,27 +1,27 @@
 // client/src/pages/UserManagementPage.js
 import React, { useState, useEffect, useMemo, useContext, useCallback } from 'react';
 import api from '../api/axios';
-import { approveUserUpdate, rejectUserUpdate } from '../api/userApi';
 import EditUserModal from '../components/EditUserModal';
 import CreateUserModal from '../components/CreateUserModal'; 
 import CredentialsDisplayModal from '../components/CredentialsDisplayModal';
+import AdminConfirmPasswordModal from '../components/AdminConfirmPasswordModal';
 import { toast } from 'react-toastify';
 import AuthContext from '../context/AuthContext'; 
-import ConfirmationContext from '../context/ConfirmationContext'; // <-- NEW IMPORT
+import ConfirmationContext from '../context/ConfirmationContext'; 
 
 // MUI Imports
 import { 
-  Box, Button, Typography, Paper, Stack, Chip, Grid,
-  Tabs, Tab, // <-- NEW IMPORT
-  Checkbox, FormControlLabel, FormGroup, Divider, Alert, Skeleton, // <-- NEW IMPORT
-  CircularProgress // <-- NEW IMPORT
+  Box, Button, Typography, Paper, Chip, Grid,
+  Tabs, Tab, 
+  Checkbox, FormControlLabel, FormGroup, Divider, Alert, Skeleton, 
+  CircularProgress 
 } from '@mui/material'; 
 import { DataGrid } from '@mui/x-data-grid';
 import { Add as AddIcon } from '@mui/icons-material';
-import SaveIcon from '@mui/icons-material/Save'; // <-- NEW IMPORT
-import RestartAltIcon from '@mui/icons-material/RestartAlt'; // <-- NEW IMPORT
+import SaveIcon from '@mui/icons-material/Save'; 
+import RestartAltIcon from '@mui/icons-material/RestartAlt'; 
 
-// Helper function from PermissionManagementPage.js
+// Helper function
 const groupPermissions = (permissions) => {
   if (!permissions) return {};
   return permissions.reduce((acc, perm) => {
@@ -51,7 +51,6 @@ function TabPanel(props) {
 }
 
 const UserManagementPage = () => {
-  // --- STATE FROM BOTH FILES MERGED ---
   const [mainTab, setMainTab] = useState(0); // 0 = Users, 1 = Permissions
 
   // State for User Management
@@ -70,9 +69,13 @@ const UserManagementPage = () => {
   const [isPermsSaving, setIsPermsSaving] = useState(false);
   const [currentPermRoleTab, setCurrentPermRoleTab] = useState('Admin');
 
+  // State for Permission Security Modal
+  const [isPermModalOpen, setIsPermModalOpen] = useState(false);
+  const [permAction, setPermAction] = useState(null); // 'SAVE' or 'RESET'
+
   // Hooks
   const { user: currentUser } = useContext(AuthContext);
-  const confirm = useContext(ConfirmationContext);
+  const { confirm } = useContext(ConfirmationContext);
 
   // --- FUNCTIONS FOR USER MANAGEMENT ---
   const fetchUsers = useCallback(async () => {
@@ -89,12 +92,9 @@ const UserManagementPage = () => {
   }, []);
 
   useEffect(() => {
-    // Only fetch users when the component mounts
     fetchUsers();
   }, [fetchUsers]);
 
-  const profileUpdateRequests = useMemo(() => users.filter(u => u.hasPendingChanges), [users]);
-  
   const managedUsers = useMemo(() => {
     if (!currentUser) return [];
     return users.filter(u => u._id !== currentUser._id);
@@ -106,59 +106,10 @@ const UserManagementPage = () => {
     fetchUsers();
   };
   
-  const handleApiResponse = async (apiCall) => {
-    try {
-      const response = await apiCall();
-      toast.success(response.message || 'Action completed successfully!');
-      fetchUsers();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'An error occurred.');
-    }
-  };
-
   const openEditModal = (user) => {
     setEditingUser(user);
     setIsEditModalOpen(true);
   };
-
-  const requestColumns = [
-    {
-      field: 'currentInfo',
-      headerName: 'Current Info',
-      flex: 1,
-      renderCell: (params) => (
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{params.row.fullName}</Typography>
-          <Typography variant="caption" display="block">{params.row.username}</Typography>
-          <Typography variant="caption">{params.row.email}</Typography>
-        </Box>
-      )
-    },
-    {
-      field: 'requestedChanges',
-      headerName: 'Requested Changes',
-      flex: 1,
-      renderCell: (params) => (
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{params.row.pendingChanges?.fullName || params.row.fullName}</Typography>
-          <Typography variant="caption" display="block">{params.row.pendingChanges?.username || params.row.username}</Typography>
-          <Typography variant="caption">{params.row.pendingChanges?.email || params.row.email}</Typography>
-        </Box>
-      )
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 200,
-      sortable: false,
-      renderCell: (params) => (
-        <Stack direction="row" spacing={1}>
-          <Button size="small" variant="contained" color="success" onClick={() => handleApiResponse(() => approveUserUpdate(params.row._id))}>Approve</Button>
-          <Button size="small" variant="contained" color="error" onClick={() => handleApiResponse(() => rejectUserUpdate(params.row._id))}>Reject</Button>
-        </Stack>
-      )
-    }
-  ];
 
   const employeeColumns = [
     { field: 'fullName', headerName: 'Full Name', flex: 1 },
@@ -196,7 +147,6 @@ const UserManagementPage = () => {
     }
   ];
 
-  
   // --- FUNCTIONS FOR PERMISSION MANAGEMENT ---
   const fetchPermsData = useCallback(async () => {
     setIsPermsLoading(true);
@@ -218,7 +168,6 @@ const UserManagementPage = () => {
   }, []);
 
   useEffect(() => {
-    // Only fetch permissions if the permissions tab is selected
     if (mainTab === 1) {
       fetchPermsData();
     }
@@ -243,44 +192,59 @@ const UserManagementPage = () => {
     });
   };
 
-  const handleSavePermissions = async () => {
-    setIsPermsSaving(true);
-    try {
-      const permsToSave = currentPermRoleTab === 'Admin' ? Array.from(adminPermissions) : Array.from(salespersonPermissions);
-      await api.put(`/permissions/${currentPermRoleTab}`, {
-        allowedPermissions: permsToSave
-      });
-      toast.success(`'${currentPermRoleTab}' role permissions have been updated.`);
-    } catch (error) {
-      console.error(`Failed to save ${currentPermRoleTab} permissions`, error);
-      toast.error(error.response?.data?.message || 'Failed to save permissions.');
-    } finally {
-      setIsPermsSaving(false);
+  // --- NEW: Security Handlers for Permissions ---
+
+  const initiateSavePerms = () => {
+    setPermAction('SAVE');
+    setIsPermModalOpen(true);
+  };
+
+  const initiateResetPerms = async () => {
+    const isConfirmed = await confirm({
+        title: 'Confirm Reset',
+        description: 'Are you sure? This will reset Admin and Salesperson roles to default settings.'
+    });
+    
+    if (isConfirmed) {
+        setPermAction('RESET');
+        setIsPermModalOpen(true);
     }
   };
 
-  const handleSeedPermissions = async () => {
+  const handleConfirmPermAction = async (adminPassword) => {
+    setIsPermsSaving(true);
     try {
-      await confirm({
-        title: 'Confirm Reset',
-        description: 'Are you sure you want to reset all permissions? This will restore both Admin and Salesperson roles to their original default settings.'
-      });
-      setIsPermsLoading(true);
-      await api.post('/permissions/seed');
-      toast.success('Permissions successfully reset to default.');
-      await fetchPermsData();
-    } catch (error) {
-      if (error) {
-         console.error("Failed to seed permissions", error);
-         toast.error(error.response?.data?.message || 'Failed to reset permissions.');
+      if (permAction === 'SAVE') {
+        const permsToSave = currentPermRoleTab === 'Admin' ? Array.from(adminPermissions) : Array.from(salespersonPermissions);
+        await api.put(`/permissions/${currentPermRoleTab}`, {
+          allowedPermissions: permsToSave,
+          adminPassword 
+        });
+        toast.success(`'${currentPermRoleTab}' permissions updated successfully.`);
+      } else if (permAction === 'RESET') {
+        await api.post('/permissions/seed', {
+            adminPassword 
+        });
+        toast.success('Permissions reset to default.');
+        await fetchPermsData();
       }
+    } catch (error) {
+      console.error(`Failed to execute ${permAction}`, error);
+      toast.error(error.response?.data?.message || 'Action failed.');
     } finally {
-       setIsPermsLoading(false);
+      setIsPermsSaving(false);
+      setPermAction(null);
     }
   };
 
   const groupedPerms = useMemo(() => groupPermissions(allPermissions), [allPermissions]);
-  const currentPerms = useMemo(() => currentPermRoleTab === 'Admin' ? adminPermissions : salespersonPermissions, [currentPermRoleTab, adminPermissions, salespersonPermissions]);
+  
+  // Note: currentPerms is not explicitly used in render because we check the Set directly in checkboxes,
+  // but keeping logic consistent.
+  // const currentPerms = currentTab === 'Admin' ? adminPermissions : salespersonPermissions; 
+
+  // Derived state for the checkboxes to use the correct set based on the Tab
+  const activePermissionSet = currentPermRoleTab === 'Admin' ? adminPermissions : salespersonPermissions;
 
   return (
     <Box sx={{ p: 3, width: '100%' }}>
@@ -308,6 +272,13 @@ const UserManagementPage = () => {
       )}
       {newCredentials && <CredentialsDisplayModal credentials={newCredentials} onClose={() => setNewCredentials(null)} />}
 
+      {/* --- Permission Security Modal --- */}
+      <AdminConfirmPasswordModal
+        open={isPermModalOpen}
+        onClose={() => setIsPermModalOpen(false)}
+        onConfirm={handleConfirmPermAction}
+      />
+
       {/* --- PAGE HEADER --- */}
       <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 2 }}>
         User & Security Management
@@ -326,21 +297,6 @@ const UserManagementPage = () => {
         <Grid container spacing={4}>
           <Grid item size={{ xs: 12 }}>
             <Paper sx={{ p: 2 }}>
-              <Typography variant="h5" gutterBottom>Profile Update Requests</Typography>
-              <Box sx={{ height: 'auto', width: '100%' }}>
-                <DataGrid
-                  rows={profileUpdateRequests}
-                  columns={requestColumns}
-                  loading={isUsersLoading}
-                  getRowId={(row) => row._id}
-                  autoHeight
-                  rowHeight={80}
-                />
-              </Box>
-            </Paper>
-          </Grid>
-          <Grid item size={{ xs: 12 }}>
-            <Paper sx={{ p: 2, mt: 4 }}> {/* Added margin top for spacing */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Typography variant="h5">Manage Employees</Typography>
                   <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateModalOpen(true)}>
@@ -373,7 +329,7 @@ const UserManagementPage = () => {
               variant="outlined"
               color="warning"
               startIcon={<RestartAltIcon />}
-              onClick={handleSeedPermissions}
+              onClick={initiateResetPerms} 
               disabled={isPermsLoading || isPermsSaving}
               sx={{ mt: { xs: 2, md: 0 } }}
             >
@@ -384,7 +340,7 @@ const UserManagementPage = () => {
           {isPermsLoading ? (
             <Grid container spacing={3}>
               {[...Array(4)].map((_, i) => (
-                <Grid item size={{ xs: 12, md: 6, lg: 4 }} key={i}> {/* <-- KEPT OLD SYNTAX */}
+                <Grid item size={{ xs: 12, md: 6, lg: 4 }} key={i}>
                   <Skeleton variant="text" width="40%" height={40} />
                   <Skeleton variant="rectangular" width="100%" height={120} />
                 </Grid>
@@ -393,7 +349,7 @@ const UserManagementPage = () => {
           ) : (
             <Grid container spacing={3}>
               {Object.keys(groupedPerms).map((category) => (
-                <Grid item size={{ xs: 12, md: 6, lg: 4 }} key={category}> {/* <-- KEPT OLD SYNTAX */}
+                <Grid item size={{ xs: 12, md: 6, lg: 4 }} key={category}>
                   <Typography variant="h6" gutterBottom>{category}</Typography>
                   <FormGroup>
                     {groupedPerms[category].map((perm) => (
@@ -401,7 +357,7 @@ const UserManagementPage = () => {
                         key={perm.key}
                         control={
                           <Checkbox
-                            checked={currentPerms.has(perm.key)}
+                            checked={activePermissionSet.has(perm.key)}
                             onChange={handlePermissionChange}
                             name={perm.key}
                           />
@@ -422,7 +378,7 @@ const UserManagementPage = () => {
               size="large"
               startIcon={isPermsSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
               disabled={isPermsLoading || isPermsSaving}
-              onClick={handleSavePermissions}
+              onClick={initiateSavePerms} 
             >
               Save {currentPermRoleTab} Permissions
             </Button>
