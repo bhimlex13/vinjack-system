@@ -6,7 +6,7 @@ import { getCustomers } from '../api/customerApi';
 import { getUsers } from '../api/userApi';
 import { toast } from 'react-toastify';
 import ConfirmationContext from '../context/ConfirmationContext';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion';
 
 // MUI Imports
 import {
@@ -15,13 +15,12 @@ import {
   TableContainer, TableHead, TableRow, Paper, IconButton, Grid, Autocomplete,
   Divider,
   Select, MenuItem, FormControl, InputLabel,
-  Tooltip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import SearchIcon from '@mui/icons-material/Search';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
-// --- NEW IMPORT ---
 import LoadingSpinner from './LoadingSpinner';
 
 const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
@@ -220,9 +219,8 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
 
   const renderContent = () => {
     if (step === 'loading') {
-      // --- USE LOADING SPINNER ---
       return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 8 }}>
           <LoadingSpinner text="Processing..." />
         </Box>
       );
@@ -232,38 +230,40 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
       return (
         <motion.div key="search" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
           <Grid container spacing={2} sx={{ pt: 1 }}>
-            <Grid item size={{ xs: 12 }}>
+            {/* Grid V2 Syntax */}
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 label="Search by Exact Sales ID"
                 value={searchSaleId}
                 onChange={(e) => setSearchSaleId(e.target.value)}
+                variant="outlined"
               />
             </Grid>
-            <Grid item size={{ xs: 12 }}><Divider>OR</Divider></Grid>
-            <Grid item size={{ xs: 12 }}>
+            <Grid size={{ xs: 12 }}><Divider>OR FILTER BY</Divider></Grid>
+            <Grid size={{ xs: 12 }}>
               <Autocomplete
                 options={customers}
                 getOptionLabel={(option) => option.name}
                 value={searchParams.customer}
                 onChange={(e, value) => setSearchParams(prev => ({...prev, customer: value}))}
-                renderInput={(params) => <TextField {...params} label="Filter by Customer" />}
+                renderInput={(params) => <TextField {...params} label="Customer" variant="outlined" />}
               />
             </Grid>
-            <Grid item size={{ xs: 12 }}>
+            <Grid size={{ xs: 12 }}>
               <Autocomplete
                 options={users}
                 getOptionLabel={(option) => option.fullName}
                 value={searchParams.user}
                 onChange={(e, value) => setSearchParams(prev => ({...prev, user: value}))}
-                renderInput={(params) => <TextField {...params} label="Filter by Cashier" />}
+                renderInput={(params) => <TextField {...params} label="Processor / Cashier" variant="outlined" />}
               />
             </Grid>
-            <Grid item size={{ xs: 6 }}>
-              <TextField type="date" label="Start Date" value={searchParams.startDate} onChange={(e) => setSearchParams(prev => ({...prev, startDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
+            <Grid size={{ xs: 6 }}>
+              <TextField type="date" label="Start Date" value={searchParams.startDate} onChange={(e) => setSearchParams(prev => ({...prev, startDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth variant="outlined" />
             </Grid>
-            <Grid item size={{ xs: 6 }}>
-              <TextField type="date" label="End Date" value={searchParams.endDate} onChange={(e) => setSearchParams(prev => ({...prev, endDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth />
+            <Grid size={{ xs: 6 }}>
+              <TextField type="date" label="End Date" value={searchParams.endDate} onChange={(e) => setSearchParams(prev => ({...prev, endDate: e.target.value}))} InputLabelProps={{ shrink: true }} fullWidth variant="outlined" />
             </Grid>
           </Grid>
         </motion.div>
@@ -273,16 +273,25 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
     if (step === 'results') {
         return (
             <motion.div key="results" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
-              <TableContainer component={Paper} variant="outlined">
+              <TableContainer component={Paper} variant="outlined" sx={{ mt: 1 }}>
                   <Table size="small">
-                      <TableHead><TableRow><TableCell>Sale Date</TableCell><TableCell>Customer</TableCell><TableCell align="right">Total</TableCell><TableCell align="center">Action</TableCell></TableRow></TableHead>
+                      <TableHead sx={{ bgcolor: 'grey.100' }}>
+                        <TableRow>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Sale Date</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold' }}>Customer</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold' }}>Action</TableCell>
+                        </TableRow>
+                      </TableHead>
                       <TableBody>
                           {searchResults.map(sale => (
                               <TableRow key={sale._id} hover>
                                   <TableCell>{new Date(sale.createdAt).toLocaleString()}</TableCell>
                                   <TableCell>{sale.customer?.name || 'Walk-in'}</TableCell> 
                                   <TableCell align="right">₱{sale.totalAmount.toFixed(2)}</TableCell>
-                                  <TableCell align="center"><Button size="small" onClick={() => handleSelectSale(sale)}>Select</Button></TableCell>
+                                  <TableCell align="center">
+                                    <Button size="small" variant="contained" onClick={() => handleSelectSale(sale)}>Select</Button>
+                                  </TableCell>
                               </TableRow>
                           ))}
                       </TableBody>
@@ -295,11 +304,21 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
     if (step === 'process' && saleDetails) {
       return (
         <motion.div key="process" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
-          <Typography variant="body2">ID: {saleDetails._id}</Typography>
-          <Typography variant="body2" sx={{ mb: 2 }}>Customer: {saleDetails.customer?.name || 'Walk-in'}</Typography> 
+          <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
+            <Typography variant="body2"><strong>Sale ID:</strong> {saleDetails._id}</Typography>
+            <Typography variant="body2"><strong>Customer:</strong> {saleDetails.customer?.name || 'Walk-in'}</Typography>
+          </Paper>
+
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
-              <TableHead><TableRow><TableCell>Product</TableCell><TableCell align="center">Sold</TableCell><TableCell align="center">Max Return</TableCell><TableCell align="center">Return Qty</TableCell></TableRow></TableHead>
+              <TableHead sx={{ bgcolor: 'grey.100' }}>
+                <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Product</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Sold</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Max Return</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Return Qty</TableCell>
+                </TableRow>
+              </TableHead>
               <TableBody>
                 {saleDetails.items.map(item => {
                   const maxReturnable = maxReturnableQuantities[item.product?._id] ?? 0;
@@ -308,16 +327,16 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
                     <TableRow key={item.product?._id} sx={ maxReturnable === 0 ? { backgroundColor: '#f5f5f5', color: 'text.disabled' } : {}}>
                       <TableCell sx={ maxReturnable === 0 ? { color: 'inherit' } : {}}>{item.product?.name || 'Product not found'}</TableCell>
                       <TableCell align="center" sx={ maxReturnable === 0 ? { color: 'inherit' } : {}}>{item.quantity}</TableCell>
-                      <TableCell align="center" sx={ maxReturnable === 0 ? { color: 'inherit', fontWeight: 'bold' } : {fontWeight: 'bold'}}>{maxReturnable}</TableCell>
+                      <TableCell align="center" sx={ maxReturnable === 0 ? { color: 'inherit', fontWeight: 'bold' } : {fontWeight: 'bold', color: 'primary.main'}}>{maxReturnable}</TableCell>
                       <TableCell align="center">
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <IconButton size="small" onClick={() => handleQuantityChange(item.product._id, -1)} disabled={maxReturnable === 0}><RemoveIcon fontSize="small"/></IconButton>
-                            <Typography sx={{ mx: 1 }}>{currentReturnQty}</Typography>
-                            <Tooltip title={maxReturnable === 0 ? "All items already returned" : ""}>
-                              <span> 
-                                <IconButton size="small" onClick={() => handleQuantityChange(item.product._id, 1)} disabled={currentReturnQty >= maxReturnable || maxReturnable === 0}><AddIcon fontSize="small"/></IconButton>
-                              </span>
-                            </Tooltip>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #ddd', borderRadius: 4, width: 'fit-content', margin: 'auto' }}>
+                            <IconButton size="small" onClick={() => handleQuantityChange(item.product._id, -1)} disabled={maxReturnable === 0 || currentReturnQty <= 0}>
+                                <RemoveIcon fontSize="small"/>
+                            </IconButton>
+                            <Typography sx={{ mx: 1, minWidth: 20, textAlign: 'center', fontWeight: 'bold' }}>{currentReturnQty}</Typography>
+                            <IconButton size="small" onClick={() => handleQuantityChange(item.product._id, 1)} disabled={currentReturnQty >= maxReturnable || maxReturnable === 0}>
+                                <AddIcon fontSize="small"/>
+                            </IconButton>
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -326,7 +345,17 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
               </TableBody>
             </Table>
           </TableContainer>
-          <TextField label="Reason for Return *" value={reason} onChange={(e) => setReason(e.target.value)} fullWidth multiline rows={2} required sx={{ mt: 2 }}/>
+          <TextField 
+            label="Reason for Return" 
+            placeholder="e.g. Defective item, wrong item bought..." 
+            value={reason} 
+            onChange={(e) => setReason(e.target.value)} 
+            fullWidth 
+            multiline 
+            rows={2} 
+            required 
+            sx={{ mt: 2 }}
+          />
           <FormControl fullWidth sx={{ mt: 2 }}>
             <InputLabel id="return-outcome-label">Return Outcome *</InputLabel>
             <Select
@@ -349,19 +378,25 @@ const CreateReturnModal = ({ open, onClose, onReturnSuccess }) => {
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md">
-      <DialogTitle>Process New Return</DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={handleClose} 
+      fullWidth 
+      maxWidth="md"
+      PaperProps={{ sx: { borderRadius: 3 } }}
+    >
+      <DialogTitle sx={{ fontWeight: 700 }}>Process New Return</DialogTitle>
       <DialogContent>
         <AnimatePresence mode="wait">
           {renderContent()}
         </AnimatePresence>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
+      <DialogActions sx={{ p: 3 }}>
+        <Button onClick={handleClose} color="inherit">Cancel</Button>
         {step === 'search' && <Button onClick={handleSearch} variant="contained" startIcon={<SearchIcon />}>Search Sales</Button>}
-        {step === 'results' && <Button onClick={() => setStep('search')}>Back to Search</Button>}
-        {step === 'process' && <Button onClick={() => setStep('results')}>Back to Results</Button>}
-        {step === 'process' && <Button onClick={handleProcessReturn} variant="contained" color="success">Process Return</Button>}
+        {step === 'results' && <Button onClick={() => setStep('search')} startIcon={<ArrowBackIcon />}>Back to Search</Button>}
+        {step === 'process' && <Button onClick={() => setStep('results')} startIcon={<ArrowBackIcon />}>Back to Results</Button>}
+        {step === 'process' && <Button onClick={handleProcessReturn} variant="contained" color="success">Submit Return</Button>}
       </DialogActions>
     </Dialog>
   );

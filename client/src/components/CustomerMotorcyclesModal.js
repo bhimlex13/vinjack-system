@@ -3,18 +3,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getMotorcyclesByCustomer, deleteMotorcycle } from '../api/motorcycleApi';
 import MotorcycleForm from './MotorcycleForm';
 import { toast } from 'react-toastify';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion';
 
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, Button, Box, Typography, List, ListItem,
-  ListItemText, IconButton, Stack, Divider,
+  ListItemText, IconButton, Stack, Divider, useTheme
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike';
 
-// --- NEW IMPORT ---
 import LoadingSpinner from './LoadingSpinner';
 
 const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
@@ -22,6 +22,7 @@ const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingMotorcycle, setEditingMotorcycle] = useState(null);
+  const theme = useTheme();
 
   const fetchMotorcycles = useCallback(async () => {
     if (!customer) return;
@@ -66,66 +67,105 @@ const CustomerMotorcyclesModal = ({ open, onClose, customer }) => {
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-        <DialogTitle>
-          Manage Vehicles for: {customer?.name}
+      <Dialog 
+        open={open} 
+        onClose={onClose} 
+        fullWidth 
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DirectionsBikeIcon color="primary" /> 
+          Vehicles: {customer?.name}
         </DialogTitle>
-        <DialogContent>
-          {/* --- USE LOADING SPINNER AND ANIMATION --- */}
+        <Divider />
+        <DialogContent sx={{ minHeight: 300, p: 0 }}>
           {isLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
                 <LoadingSpinner text="Loading Vehicles..." />
             </Box>
           ) : (
-            <List component={motion.ul} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              {motorcycles.length === 0 && (
-                <Typography sx={{ textAlign: 'center', my: 2 }}>No vehicles registered for this customer.</Typography>
-              )}
-              <AnimatePresence>
-                {motorcycles.map(moto => (
-                  <motion.div 
-                    key={moto._id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <ListItem
-                        secondaryAction={
-                        <Stack direction="row" spacing={1}>
-                            <IconButton edge="end" aria-label="edit" onClick={() => handleOpenFormForEdit(moto)}>
-                            <EditIcon />
-                            </IconButton>
-                            <IconButton edge="end" aria-label="delete" onClick={() => handleDelete(moto._id)}>
-                            <DeleteIcon />
-                            </IconButton>
-                        </Stack>
-                        }
-                    >
-                        <ListItemText
-                        primary={`${moto.make} ${moto.model}`}
-                        secondary={`Plate: ${moto.plateNumber || 'N/A'} | Year: ${moto.year || 'N/A'} | Color: ${moto.color || 'N/A'}`}
-                        />
-                    </ListItem>
-                    <Divider />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </List>
+            <Box sx={{ p: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                    <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleOpenFormForAdd}>
+                    Add Vehicle
+                    </Button>
+                </Box>
+
+                <List component={motion.ul} initial={{ opacity: 0 }} animate={{ opacity: 1 }} disablePadding>
+                {motorcycles.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', py: 4, opacity: 0.6 }}>
+                        <DirectionsBikeIcon sx={{ fontSize: 48, mb: 1, color: 'text.disabled' }} />
+                        <Typography variant="body2">No vehicles registered yet.</Typography>
+                    </Box>
+                ) : (
+                    <AnimatePresence mode='popLayout'>
+                        {motorcycles.map(moto => (
+                        <motion.div 
+                            key={moto._id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <ListItem
+                                sx={{ 
+                                    bgcolor: 'background.paper', 
+                                    mb: 1, 
+                                    borderRadius: 2, 
+                                    border: `1px solid ${theme.palette.divider}`,
+                                    '&:hover': { bgcolor: 'action.hover' }
+                                }}
+                                secondaryAction={
+                                <Stack direction="row" spacing={0.5}>
+                                    <IconButton size="small" onClick={() => handleOpenFormForEdit(moto)} sx={{ color: 'info.main' }}>
+                                        <EditIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton size="small" onClick={() => handleDelete(moto._id)} sx={{ color: 'error.main' }}>
+                                        <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                </Stack>
+                                }
+                            >
+                                <ListItemText
+                                    primary={
+                                        <Typography variant="subtitle2" fontWeight={700}>
+                                            {moto.make} {moto.model}
+                                        </Typography>
+                                    }
+                                    secondary={
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', gap: 1 }}>
+                                            <span><strong>Plate:</strong> {moto.plateNumber || 'N/A'}</span>
+                                            {moto.year && <span>• <strong>Year:</strong> {moto.year}</span>}
+                                        </Typography>
+                                    }
+                                />
+                            </ListItem>
+                        </motion.div>
+                        ))}
+                    </AnimatePresence>
+                )}
+                </List>
+            </Box>
           )}
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenFormForAdd}>
-              Add New Motorcycle
-            </Button>
-          </Box>
         </DialogContent>
+        <Divider />
+        <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button onClick={onClose} color="inherit">Close</Button>
+        </Box>
       </Dialog>
 
       {/* Nested Modal for the Form */}
       <AnimatePresence>
         {isFormModalOpen && (
-            <Dialog open={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>{editingMotorcycle ? 'Edit Motorcycle' : 'Add New Motorcycle'}</DialogTitle>
+            <Dialog 
+                open={isFormModalOpen} 
+                onClose={() => setIsFormModalOpen(false)} 
+                maxWidth="xs" 
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 3 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>{editingMotorcycle ? 'Edit Motorcycle' : 'Add New Motorcycle'}</DialogTitle>
                 <MotorcycleForm
                     customer={customer}
                     motorcycleToEdit={editingMotorcycle}

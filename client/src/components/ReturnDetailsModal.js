@@ -16,16 +16,11 @@ const ReturnDetailsModal = ({ open, onClose, returnData }) => {
 
   const getOutcomeChipProps = (outcome) => {
     switch (outcome) {
-      case 'Restocked':
-        return { label: 'Restocked', color: 'success' };
-      case 'Replaced':
-        return { label: 'Replaced', color: 'info' };
-      case 'Refunded':
-        return { label: 'Refunded Only', color: 'warning' };
-      case 'Discarded':
-        return { label: 'Discarded', color: 'error' };
-      default:
-        return { label: outcome || 'N/A', color: 'default' };
+      case 'Restocked': return { label: 'Restocked', color: 'success' };
+      case 'Replaced': return { label: 'Replaced', color: 'info' };
+      case 'Refunded': return { label: 'Refunded Only', color: 'warning' };
+      case 'Discarded': return { label: 'Discarded', color: 'error' };
+      default: return { label: outcome || 'N/A', color: 'default' };
     }
   };
 
@@ -35,68 +30,65 @@ const ReturnDetailsModal = ({ open, onClose, returnData }) => {
       onClose={onClose} 
       fullWidth 
       maxWidth="sm"
-      // We replace the default Paper with a motion.div for animation
       PaperComponent={motion.div}
       PaperProps={{
-        // Animation Props
         initial: { y: 50, opacity: 0 },
         animate: { y: 0, opacity: 1 },
         exit: { y: 50, opacity: 0 },
         transition: { duration: 0.3 },
-        
-        // --- FIX: Styling Props to restore the "Card" look ---
-        sx: {
-          backgroundColor: 'background.paper', // Restores the white background
-          backgroundImage: 'none', // Prevents dark mode overlay issues if needed
-          boxShadow: 24, // Restores the shadow depth
-          borderRadius: 2, // Restores rounded corners
-          overflow: 'hidden' // keeps content inside rounded corners
+        sx: { 
+            borderRadius: 3, 
+            overflow: 'hidden',
+            backgroundColor: 'background.paper', // FIX: Explicitly set background color
+            boxShadow: 24, // FIX: Restore shadow depth
+            width: '100%',
+            m: 2
         }
       }}
     >
-      <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>
-        Return Transaction Details
+      <DialogTitle sx={{ bgcolor: 'grey.100', fontWeight: 700 }}>
+        Return Details
       </DialogTitle>
       
       <DialogContent sx={{ mt: 2 }}>
         <Box>
           <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">Return ID:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{returnData._id}</Typography>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Typography variant="caption" color="text.secondary">RETURN ID</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{returnData._id}</Typography>
               
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Original Sale ID:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{returnData.originalSale?._id || 'N/A'}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>ORIGINAL SALE ID</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{returnData.originalSale?._id || 'N/A'}</Typography>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">Return Date:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{new Date(returnData.createdAt).toLocaleString()}</Typography>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Typography variant="caption" color="text.secondary">DATE PROCESSED</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{new Date(returnData.createdAt).toLocaleString()}</Typography>
               
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Processed By:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{returnData.recordedBy?.fullName || 'N/A'}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>PROCESSED BY</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{returnData.recordedBy?.fullName || 'N/A'}</Typography>
             </Grid>
           </Grid>
 
           <Divider sx={{ my: 2 }} />
 
-          <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body1" component="span" sx={{ fontWeight: 'bold', mr: 1 }}>Return Outcome:</Typography>
-            <Chip size="small" {...getOutcomeChipProps(returnData.outcome)} />
+          <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Outcome:</Typography>
+            <Chip size="small" variant="filled" {...getOutcomeChipProps(returnData.outcome)} />
           </Box>
 
-          <Typography variant="body1" gutterBottom><strong>Reason for Return:</strong></Typography>
-          <Paper variant="outlined" sx={{ mb: 2, p: 2, backgroundColor: '#f9f9f9' }}>
+          <Typography variant="caption" color="text.secondary">REASON</Typography>
+          <Paper variant="outlined" sx={{ mb: 3, p: 2, backgroundColor: '#fafafa', borderRadius: 2 }}>
             <Typography variant="body2">{returnData.reason}</Typography>
           </Paper>
 
-          <Typography variant="h6" gutterBottom>Returned Items</Typography>
-          <TableContainer component={Paper} variant="outlined">
+          <Typography variant="h6" fontSize="1rem" gutterBottom fontWeight={700}>Returned Items</Typography>
+          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
             <Table size="small">
-              <TableHead sx={{ bgcolor: 'grey.100' }}>
+              <TableHead sx={{ bgcolor: 'grey.50' }}>
                 <TableRow>
-                  <TableCell>Product</TableCell>
-                  <TableCell align="right">Quantity</TableCell>
-                  <TableCell align="right">Refund Subtotal</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Qty</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Refund</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -118,15 +110,15 @@ const ReturnDetailsModal = ({ open, onClose, returnData }) => {
             </Table>
           </TableContainer>
 
-          <Box sx={{ mt: 2, textAlign: 'right' }}>
+          <Box sx={{ mt: 3, textAlign: 'right' }}>
             <Typography variant="h6" color="primary.main">
-              <strong>Total Refund: {formatCurrency(returnData.totalRefundAmount)}</strong>
+              Total Refund: <strong>{formatCurrency(returnData.totalRefundAmount)}</strong>
             </Typography>
           </Box>
         </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} variant="contained">Close</Button>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} variant="contained" sx={{ borderRadius: 2 }}>Close</Button>
       </DialogActions>
     </Dialog>
   );

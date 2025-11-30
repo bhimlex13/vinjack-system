@@ -2,13 +2,12 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-// REMOVED: import socket from '../api/socket'; 
 import POAlertModal from './POAlertModal'; 
 
 // MUI Imports
 import {
   AppBar as MuiAppBar, Toolbar, IconButton, Typography, Box, Badge, Menu, MenuItem, Tooltip, Divider,
-  Avatar
+  Avatar, useTheme, useMediaQuery
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -17,7 +16,7 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 import Settings from '@mui/icons-material/Settings';
 import Logout from '@mui/icons-material/Logout';
 
-const drawerWidth = 250;
+const drawerWidth = 260; // Match the width in Sidebar.js
 
 const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== 'open',
@@ -27,14 +26,17 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  ...(open && {
-    marginLeft: drawerWidth,
-    width: `calc(100% - ${drawerWidth}px)`,
-    transition: theme.transitions.create(['width', 'margin'], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
+  // Only shift width on Desktop (md and up)
+  [theme.breakpoints.up('md')]: {
+    ...(open && {
+      marginLeft: drawerWidth,
+      width: `calc(100% - ${drawerWidth}px)`,
+      transition: theme.transitions.create(['width', 'margin'], {
+        easing: theme.transitions.easing.sharp,
+        duration: theme.transitions.duration.enteringScreen,
+      }),
     }),
-  }),
+  },
 }));
 
 const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
@@ -44,17 +46,16 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
   const [poAlertOpen, setPoAlertOpen] = useState(false);
   const [poAlertData, setPoAlertData] = useState(null);
 
-  // --- MODIFIED: Get 'socket' from context instead of importing it ---
   const { user, logout, notifications, markNotificationsAsRead, socket } = useContext(AuthContext);
   
   const location = useLocation();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  // --- UPDATED LISTENER ---
   useEffect(() => {
-    // Ensure we have a user AND a valid socket connection before listening
     if (!user || !socket) return;
 
     const handlePOUpdate = (data) => {
@@ -63,15 +64,12 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
       setPoAlertOpen(true);
     };
 
-    // Register Listener on the SHARED socket
     socket.on('po_supplier_update', handlePOUpdate);
 
-    // Cleanup Listener on Unmount
     return () => {
       socket.off('po_supplier_update', handlePOUpdate);
     };
-  }, [user, socket]); // Add socket to dependencies
-  // -----------------------
+  }, [user, socket]); 
 
   const handleUserMenuOpen = (event) => setUserMenuAnchorEl(event.currentTarget);
   const handleUserMenuClose = () => setUserMenuAnchorEl(null);
@@ -97,6 +95,8 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
   };
 
   return (
+    // Pass 'open' as true ONLY if we are NOT collapsed.
+    // Logic: !isSidebarCollapsed means "Sidebar is Open"
     <AppBar position="absolute" open={!isSidebarCollapsed}>
       <Toolbar sx={{ pr: '24px' }}>
         <IconButton
@@ -106,11 +106,15 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
           onClick={toggleSidebar}
           sx={{
             marginRight: '36px',
-            ...( !isSidebarCollapsed && { display: 'none' }),
+            // Hide hamburger icon ONLY on Desktop when sidebar is OPEN.
+            // On Mobile, always show it (unless you want to hide it when full-screen drawer covers it, 
+            // but usually the drawer has its own close button or backdrop).
+            ...((!isSidebarCollapsed && !isMobile) && { display: 'none' }),
           }}
         >
           <MenuIcon />
         </IconButton>
+        
         <Typography
           component="h1"
           variant="h6"
@@ -138,6 +142,7 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
         </Box>
       </Toolbar>
 
+      {/* Notifications Menu */}
       <Menu
         anchorEl={notificationsAnchorEl}
         open={Boolean(notificationsAnchorEl)}
@@ -185,6 +190,7 @@ const Navbar = ({ isSidebarCollapsed, toggleSidebar }) => {
         )}
       </Menu>
 
+      {/* User Menu */}
       <Menu
         anchorEl={userMenuAnchorEl}
         open={Boolean(userMenuAnchorEl)}

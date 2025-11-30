@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
-  ToggleButtonGroup, ToggleButton, Box, Typography, Alert
+  ToggleButtonGroup, ToggleButton, Box, Typography, Alert, Grid
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -69,59 +69,76 @@ const StockAdjustmentModal = ({ product, onClose, onSuccess }) => {
         animate: { y: 0, opacity: 1 },
         exit: { y: 50, opacity: 0 },
         transition: { duration: 0.3 },
-        // --- FIX: Added sx to restore background ---
         sx: { 
           overflow: 'hidden',
-          backgroundColor: 'background.paper', 
+          backgroundColor: 'background.paper', // Fixed background
           boxShadow: 24,
           borderRadius: 2
         } 
       }}
     >
-      <DialogTitle>
-        Adjust Stock for: <Typography component="span" variant="h6" color="primary">{product.name}</Typography>
+      <DialogTitle sx={{ fontWeight: 'bold' }}>
+        Adjust Stock: <Typography component="span" variant="h6" color="primary" fontWeight="bold">{product.name}</Typography>
       </DialogTitle>
       <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-          <Typography>Current Stock: <strong>{product.quantity}</strong></Typography>
+        <Box sx={{ mt: 1 }}>
+          <Typography gutterBottom>Current Stock: <strong>{product.quantity}</strong></Typography>
           
-          <ToggleButtonGroup
-            color="primary"
-            value={adjustmentType}
-            exclusive
-            onChange={handleTypeChange}
-            fullWidth
-          >
-            <ToggleButton value="decrease" sx={{ flex: 1 }}><RemoveIcon sx={{ mr: 1 }}/> Decrease Stock</ToggleButton>
-            <ToggleButton value="increase" sx={{ flex: 1 }}><AddIcon sx={{ mr: 1 }}/> Increase Stock</ToggleButton>
-          </ToggleButtonGroup>
+          <Grid container spacing={2}>
+            {/* Standard Grid V2 Syntax */}
+            <Grid item size={{ xs: 12 }}>
+                <ToggleButtonGroup
+                    color={adjustmentType === 'increase' ? 'success' : 'error'}
+                    value={adjustmentType}
+                    exclusive
+                    onChange={handleTypeChange}
+                    fullWidth
+                    size="small"
+                >
+                    <ToggleButton value="decrease"><RemoveIcon sx={{ mr: 1 }}/> Decrease</ToggleButton>
+                    <ToggleButton value="increase"><AddIcon sx={{ mr: 1 }}/> Increase</ToggleButton>
+                </ToggleButtonGroup>
+            </Grid>
 
-          <TextField
-            autoFocus
-            label="Quantity to Adjust"
-            type="number"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            InputProps={{ inputProps: { min: 1 } }}
-            fullWidth
-          />
+            <Grid item size={{ xs: 12 }}>
+                <TextField
+                    autoFocus
+                    label="Quantity to Adjust"
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    InputProps={{ inputProps: { min: 1 } }}
+                    fullWidth
+                    variant="outlined"
+                />
+            </Grid>
 
-          <TextField
-            label="Reason for Adjustment"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            multiline
-            rows={3}
-            fullWidth
-            placeholder="e.g., Damaged goods, Inventory count correction, etc."
-          />
+            <Grid item size={{ xs: 12 }}>
+                <TextField
+                    label="Reason for Adjustment"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    multiline
+                    rows={3}
+                    fullWidth
+                    placeholder="e.g., Damaged goods, Inventory count correction..."
+                    variant="outlined"
+                />
+            </Grid>
+          </Grid>
 
-          {error && <Alert severity="error">{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
         </Box>
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} disabled={loading}>Cancel</Button>
-        <Button onClick={handleSubmit} variant="contained" disabled={loading} startIcon={loading ? null : (adjustmentType === 'increase' ? <AddIcon /> : <RemoveIcon />)}>
+        <Button onClick={onClose} disabled={loading} color="inherit">Cancel</Button>
+        <Button 
+            onClick={handleSubmit} 
+            variant="contained" 
+            color={adjustmentType === 'increase' ? 'success' : 'error'}
+            disabled={loading} 
+            startIcon={loading ? null : (adjustmentType === 'increase' ? <AddIcon /> : <RemoveIcon />)}
+        >
           {loading ? <LoadingSpinner text="" /> : 'Submit Adjustment'} 
         </Button>
       </DialogActions>

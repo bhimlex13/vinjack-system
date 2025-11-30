@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import {
   Paper, Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography,
   Table, TableBody, TableCell, TableHead, TableRow, Alert, Chip,
-  TableContainer, Link as MuiLink, TablePagination // --- NEW IMPORT ---
+  TableContainer, Link as MuiLink, TablePagination
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 
@@ -27,14 +27,10 @@ const MovementHistoryModal = ({ product, onClose }) => {
       const fetchMovements = async () => {
         try {
           setLoading(true);
-          // Reset to first page when opening new product to show latest first
           setPage(0); 
-          
           const data = await getProductMovements(product._id);
-          // Ensure data is sorted by date descending (newest first) if API doesn't guarantee it
-          // Assuming API returns date string in createdAt
+          // Ensure data is sorted by date descending (newest first)
           const sortedData = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-          
           setMovements(sortedData);
           setError(''); 
         } catch (err) {
@@ -57,7 +53,6 @@ const MovementHistoryModal = ({ product, onClose }) => {
     setPage(0);
   };
 
-  // Calculate the slice of data to display
   const paginatedMovements = movements.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
@@ -72,12 +67,11 @@ const MovementHistoryModal = ({ product, onClose }) => {
       RETURN: { label: 'Return', color: 'info' }
     };
     const style = styles[type] || { label: type, color: 'default' };
-    return <Chip label={style.label} color={style.color} size="small" />;
+    return <Chip label={style.label} color={style.color} size="small" variant="outlined" />;
   };
 
   const renderReference = (type, referenceId) => {
     if (!referenceId) return '';
-
     if (type === 'SALE') {
       return `Sale ID: ${referenceId}`; 
     }
@@ -100,58 +94,60 @@ const MovementHistoryModal = ({ product, onClose }) => {
         exit: { y: 50, opacity: 0 },
         transition: { duration: 0.3 },
         sx: { 
-          backgroundColor: 'background.paper', 
+          backgroundColor: 'background.paper',
           boxShadow: 24,
           borderRadius: 2,
           overflow: 'hidden'
         }
       }}
     >
-      <DialogTitle>
-        Movement History for: <Typography component="span" variant="h6" color="primary">{product?.name}</Typography>
+      <DialogTitle sx={{ fontWeight: 'bold', bgcolor: 'grey.100' }}>
+        Movement History: <Typography component="span" variant="h6" color="primary" fontWeight="bold">{product?.name}</Typography>
       </DialogTitle>
-      <DialogContent>
+      <DialogContent sx={{ p: 0 }}>
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
             <LoadingSpinner text="Loading history..." />
           </Box>
         ) : error ? (
-          <Alert severity="error">{error}</Alert>
+          <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
         ) : (
           <>
-            <TableContainer component={Paper} elevation={0} variant="outlined"> 
+            <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 400 }}> 
               <Table stickyHeader size="small"> 
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Change</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Stock Before</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Stock After</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Recorded By</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Notes / Reference</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Type</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Change</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Stock Before</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Stock After</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Recorded By</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Notes / Reference</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {movements.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">No movement history found for this product.</TableCell>
+                      <TableCell colSpan={7} align="center" sx={{ py: 3, color: 'text.secondary' }}>No movement history found for this product.</TableCell>
                     </TableRow>
                   ) : (
-                    // Map over paginatedMovements instead of all movements
                     paginatedMovements.map((move) => (
                       <TableRow key={move._id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                         <TableCell>{new Date(move.createdAt).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
                         <TableCell>{renderTypeChip(move.type)}</TableCell>
                         <TableCell align="center">
-                          <Typography color={move.quantityChange > 0 ? 'success.main' : 'error.main'} fontWeight="bold">
+                          <Typography color={move.quantityChange > 0 ? 'success.main' : 'error.main'} fontWeight="bold" variant="body2">
                             {move.quantityChange > 0 ? `+${move.quantityChange}` : move.quantityChange}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">{move.stockBefore}</TableCell>
-                        <TableCell align="center">{move.stockAfter}</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 'bold' }}>{move.stockAfter}</TableCell>
                         <TableCell>{move.recordedBy?.fullName || 'N/A'}</TableCell>
-                        <TableCell>{move.notes || renderReference(move.type, move.referenceId)}</TableCell>
+                        {/* --- FIXED LINE BELOW: Changed referenceId to move.referenceId --- */}
+                        <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={move.notes || move.referenceId}>
+                            {move.notes || renderReference(move.type, move.referenceId)}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -159,7 +155,6 @@ const MovementHistoryModal = ({ product, onClose }) => {
               </Table>
             </TableContainer>
             
-            {/* --- PAGINATION CONTROLS --- */}
             {movements.length > 0 && (
               <TablePagination
                 rowsPerPageOptions={[5, 10, 25]}
@@ -169,13 +164,14 @@ const MovementHistoryModal = ({ product, onClose }) => {
                 page={page}
                 onPageChange={handleChangePage}
                 onRowsPerPageChange={handleChangeRowsPerPage}
+                sx={{ borderTop: 1, borderColor: 'divider' }}
               />
             )}
           </>
         )}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} variant="contained">Close</Button>
+      <DialogActions sx={{ px: 3, py: 2, borderTop: 1, borderColor: 'divider' }}>
+        <Button onClick={onClose} variant="contained" color="primary">Close</Button>
       </DialogActions>
     </Dialog>
   );
