@@ -8,11 +8,7 @@ const {
     getAllUsers,
     updateUser,
     deleteUser,
-    requestProfileUpdate,
-    approveUserUpdate,
-    rejectUserUpdate,
     getMe,
-    verifySelfUpdateWithCode, // <-- UPDATED
     getUserDetails,
     adminResetPassword,
     logoutUser,
@@ -26,31 +22,26 @@ router.post('/login', loginUser);
 
 // --- User's own profile routes (accessible to all logged-in users) ---
 router.get('/me', protect, getMe);
-router.put('/profile', protect, requestProfileUpdate);
-router.post('/profile/verify', protect, verifySelfUpdateWithCode); // <-- UPDATED
 router.put('/force-change-password', protect, forceChangePassword);
 router.post('/logout', protect, logoutUser);
 
 // --- Dashboard Preferences Routes (Accessible by Admin and Super Admin) ---
 router.route('/dashboard-preferences')
-  .get(protect, authorize('Super Admin', 'Admin'), getDashboardPreferences) // <-- UPDATED
-  .put(protect, authorize('Super Admin', 'Admin'), saveDashboardPreferences); // <-- UPDATED
+  .get(protect, authorize('Super Admin', 'Admin'), getDashboardPreferences)
+  .put(protect, authorize('Super Admin', 'Admin'), saveDashboardPreferences);
 
 // --- Super Admin routes ---
 router.route('/')
-    .get(protect, authorize('Super Admin'), getAllUsers); // <-- UPDATED
+    .get(protect, authorize('Super Admin'), getAllUsers);
 
-router.post('/create', protect, authorize('Super Admin'), createUserByAdmin); // <-- UPDATED
+router.post('/create', protect, authorize('Super Admin'), createUserByAdmin);
 
 router.route('/:id')
-    .put(protect, authorize('Super Admin'), updateUser) // <-- UPDATED
-    .delete(protect, authorize('Super Admin'), deleteUser); // <-- UPDATED
+    .put(protect, authorize('Super Admin'), updateUser) 
+    .delete(protect, authorize('Super Admin'), deleteUser);
 
-router.get('/details/:id', protect, authorize('Super Admin'), getUserDetails); // <-- UPDATED
+router.get('/details/:id', protect, authorize('Super Admin'), getUserDetails);
 
-router.post('/:id/approve', protect, authorize('Super Admin'), approveUserUpdate); // <-- UPDATED
-router.post('/:id/reject', protect, authorize('Super Admin'), rejectUserUpdate); // <-- UPDATED
-
-router.post('/:id/admin-reset-password', protect, authorize('Super Admin'), adminResetPassword); // <-- UPDATED
+router.post('/:id/admin-reset-password', protect, authorize('Super Admin'), adminResetPassword);
 
 module.exports = router;

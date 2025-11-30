@@ -3,36 +3,53 @@ const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendVerificationEmail } = require('../utils/emailService');
-const { createNotification } = require('../utils/notificationManager');
 const logAction = require('../utils/logger');
 const { RolePermission } = require('../models/permissionModel');
-// --- NEW: Import date-fns for cooldown logic ---
 const { differenceInMinutes } = require('date-fns');
 
 // @desc    Create a new user (by a Super Admin)
 // @route   POST /api/users
 const createUserByAdmin = async (req, res) => {
   try {
-    const { fullName, email, role } = req.body;
-    if (!fullName || !email || !role) {
-      return res.status(400).json({ message: 'Please provide Full Name, Email, and Role.' });
+    const { fullName, email, role, adminPassword, username } = req.body;
+
+    // 1. Verify Super Admin Password
+    if (!adminPassword) {
+        return res.status(400).json({ message: 'Super Admin password is required.' });
+    }
+    const superAdmin = await User.findById(req.user.id);
+    const isMatch = await bcrypt.compare(adminPassword, superAdmin.password);
+    if (!isMatch) {
+        return res.status(401).json({ message: 'Incorrect Super Admin password.' });
     }
 
-    const allowedRoles = ['Admin', 'Salesperson'];
+    // 2. Validate Inputs
+    if (!fullName || !email || !role || !username) {
+      return res.status(400).json({ message: 'Please provide Full Name, Username, Email, and Role.' });
+    }
+
+    const allowedRoles = ['Super Admin', 'Admin', 'Salesperson'];
     if (!allowedRoles.includes(role)) {
-      return res.status(400).json({ message: 'Invalid role specified. Can only create Admin or Salesperson.' });
+      return res.status(400).json({ message: 'Invalid role specified.' });
     }
 
+    // 3. Check for Duplicates (Email, Username, Full Name)
     const emailExists = await User.findOne({ email });
     if (emailExists) {
-      return res.status(400).json({ message: 'Email is already in use.' });
+      return res.status(400).json({ message: 'Email address is already in use.' });
     }
-    let username = email.split('@')[0];
-    const userExists = await User.findOne({ username });
-    if (userExists) {
-      username = `${username}${crypto.randomBytes(2).toString('hex')}`;
+
+    const usernameExists = await User.findOne({ username });
+    if (usernameExists) {
+      return res.status(400).json({ message: 'Username is already taken.' });
     }
+
+    const fullNameExists = await User.findOne({ fullName });
+    if (fullNameExists) {
+      return res.status(400).json({ message: `The name "${fullName}" is already registered.` });
+    }
+
+    // 4. Create User
     const temporaryPassword = crypto.randomBytes(8).toString('hex').slice(0, 10);
     const user = await User.create({
       fullName,
@@ -43,8 +60,9 @@ const createUserByAdmin = async (req, res) => {
       status: 'active',
       mustChangePassword: true,
     });
+
     if (user) {
-      logAction(req.user, 'CREATE_USER', `Created a new user account for ${user.fullName}.`, { entityType: 'User', entityId: user._id });
+      logAction(req.user, 'CREATE_USER', `Created a new ${role} account for ${user.fullName}.`, { entityType: 'User', entityId: user._id });
       res.status(201).json({
         message: 'User created successfully. Please provide them with their credentials.',
         generatedUsername: username,
@@ -64,24 +82,19 @@ const loginUser = async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    // --- 1. Re-Check for Empty Fields (Server-Side) ---
     if (!username || !password) {
       return res.status(400).json({ message: 'Please provide both username and password.' });
     }
 
-    // --- 2. Find User (by username OR email) ---
     const isEmail = username.includes('@');
     const query = isEmail ? { email: username.toLowerCase() } : { username: username };
     const user = await User.findOne(query);
 
-    // --- 3. Handle User Not Found ---
-    // Send vague error. Do not reveal if user exists.
     if (!user) {
       logAction(null, 'LOGIN_FAILED', `Login attempt failed: User '${username}' not found.`);
       return res.status(401).json({ message: 'Invalid username or password.' });
     }
 
-    // --- 4. Implement Cooldown Logic ---
     const LOCKOUT_DURATION_MINUTES = 15;
     const MAX_FAILED_ATTEMPTS = 3;
 
@@ -94,33 +107,27 @@ const loginUser = async (req, res) => {
           const minutesRemaining = LOCKOUT_DURATION_MINUTES - minutesSinceLastAttempt;
           return res.status(403).json({ message: `Your account is temporarily locked. Please try again in ${minutesRemaining} ${minutesRemaining > 1 ? 'minutes' : 'minute'}.` });
         } else {
-          // If 15+ minutes have passed, reset the counter and let them try again.
           user.failed_attempts = 0;
           user.last_failed_attempt = null;
-          await user.save(); // Save the reset state before proceeding
+          await user.save();
         }
       }
     }
 
-    // --- 5. Check Account Status ---
     if (user.status !== 'active') {
       logAction(user, 'LOGIN_FAILED', `Login attempt failed: Account inactive for user '${username}'.`);
       return res.status(403).json({ message: 'Your account is not active. Please contact an administrator.' });
     }
 
-    // --- 6. Hash & Compare Password ---
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (isMatch) {
-      // --- 7. On Successful Login ---
-      // Reset failed attempts
       user.failed_attempts = 0;
       user.last_failed_attempt = null;
       await user.save();
 
       logAction(user, 'LOGIN', `User '${username}' logged in successfully.`, { entityType: 'User', entityId: user._id });
 
-      // Fetch permissions based on role
       let permissions = [];
       if (user.role === 'Super Admin') {
         permissions = ['SUPER_ADMIN_ALL'];
@@ -144,8 +151,6 @@ const loginUser = async (req, res) => {
       });
 
     } else {
-      // --- 8. On Failed Password ---
-      // Track failure
       user.failed_attempts += 1;
       user.last_failed_attempt = new Date();
       await user.save();
@@ -153,11 +158,9 @@ const loginUser = async (req, res) => {
       logAction(user, 'LOGIN_FAILED', `Login attempt failed: Invalid password for user '${username}'.`, { entityType: 'User', entityId: user._id });
       
       if (user.failed_attempts >= MAX_FAILED_ATTEMPTS) {
-        // If this was the 3rd failed attempt, send the lockout message *now*
         return res.status(403).json({ message: `Your account is temporarily locked. Please try again in ${LOCKOUT_DURATION_MINUTES} minutes.` });
       }
 
-      // Send Vague Error for attempts 1 and 2
       res.status(401).json({ message: 'Invalid username or password.' });
     }
 
@@ -205,166 +208,6 @@ const getMe = async (req, res) => {
   }
 };
 
-// @desc    Request a profile update (for self)
-// @route   PUT /api/users/profile/request-update
-const requestProfileUpdate = async (req, res) => {
-  const io = req.app.get('socketio');
-  try {
-    const { fullName, username, email, oldPassword, newPassword, confirmPassword } = req.body;
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    const requestedChanges = {};
-    if (fullName) requestedChanges.fullName = fullName;
-    if (username) requestedChanges.username = username;
-    if (email) requestedChanges.email = email;
-    if (newPassword) {
-      if (!oldPassword || !confirmPassword) {
-        return res.status(400).json({ message: 'All password fields are required for password change.' });
-      }
-      if (!await bcrypt.compare(oldPassword, user.password)) {
-        return res.status(400).json({ message: 'Old password is incorrect.' });
-      }
-      if (newPassword !== confirmPassword) {
-        return res.status(400).json({ message: 'New passwords do not match.' });
-      }
-      const salt = await bcrypt.genSalt(10);
-      requestedChanges.password = await bcrypt.hash(newPassword, salt);
-      logAction(req.user, 'USER_PASSWORD_CHANGE', `User requested to change their password.`, { entityType: 'User', entityId: user._id });
-    }
-    if (Object.keys(requestedChanges).length === 0) {
-      return res.status(400).json({ message: 'No changes were requested.' });
-    }
-
-    if (user.role === 'Super Admin') {
-      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-      user.verificationCode = verificationCode;
-      user.verificationCodeExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
-      user.pendingChanges = requestedChanges;
-      await user.save();
-      await sendVerificationEmail(user.email, verificationCode);
-      res.json({
-        message: 'Verification code sent to your email. Please check your inbox.',
-        requiresVerification: true
-      });
-    } else {
-      await User.findByIdAndUpdate(req.user.id, {
-        $set: {
-          pendingChanges: requestedChanges,
-          hasPendingChanges: true,
-        }
-      });
-      const newNotifications = await createNotification({
-        recipientRole: 'Super Admin',
-        message: `${user.fullName} has requested a profile update.`,
-        type: 'USER_ACTION',
-        link: '/user-management'
-      });
-      if (newNotifications && newNotifications.length) {
-          newNotifications.forEach(notification => {
-              io.to(notification.user.toString()).emit('new_notification', notification);
-          });
-      }
-      res.json({ message: 'Update request submitted successfully. Waiting for Super Admin approval.' });
-    }
-  } catch (error) {
-    console.error('Error in requestProfileUpdate:', error);
-    res.status(500).json({ message: 'Error submitting update request.', error: error.message });
-  }
-};
-
-// @desc    Verify and apply self-update with an email code
-// @route   POST /api/users/profile/verify-update
-const verifySelfUpdateWithCode = async (req, res) => {
-  try {
-    const { code } = req.body;
-    const user = await User.findById(req.user.id);
-    if (!user || !user.verificationCode || user.verificationCodeExpires < Date.now()) {
-      return res.status(400).json({ message: 'Verification code is invalid or has expired. Please try again.' });
-    }
-    if (user.verificationCode !== code) {
-      return res.status(400).json({ message: 'The verification code you entered is incorrect.' });
-    }
-    if (user.pendingChanges.fullName) user.fullName = user.pendingChanges.fullName;
-    if (user.pendingChanges.username) user.username = user.pendingChanges.username;
-    if (user.pendingChanges.email) user.email = user.pendingChanges.email;
-    if (user.pendingChanges.password) user.password = user.pendingChanges.password;
-    user.pendingChanges = undefined;
-    user.hasPendingChanges = false;
-    user.verificationCode = undefined;
-    user.verificationCodeExpires = undefined;
-    await user.save();
-    res.json({ message: 'Your profile has been updated successfully!' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error during verification.', error: error.message });
-  }
-};
-
-// @desc    Approve a pending update for another user (Super Admin only)
-// @route   PUT /api/users/approve-update/:id
-const approveUserUpdate = async (req, res) => {
-  const io = req.app.get('socketio');
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user || !user.hasPendingChanges) {
-      return res.status(400).json({ message: 'No pending changes found for this user.' });
-    }
-    logAction(req.user, 'UPDATE_USER', `Approved profile changes for user ${user.username}.`, { entityType: 'User', entityId: user._id });
-    if (user.pendingChanges.fullName) user.fullName = user.pendingChanges.fullName;
-    if (user.pendingChanges.username) user.username = user.pendingChanges.username;
-    if (user.pendingChanges.email) user.email = user.pendingChanges.email;
-    if (user.pendingChanges.password) user.password = user.pendingChanges.password;
-    user.pendingChanges = undefined;
-    user.hasPendingChanges = false;
-    const updatedUser = await user.save();
-    const newNotifications = await createNotification({
-        recipientId: updatedUser._id,
-        message: `Your profile update request has been approved.`,
-        type: 'REQUEST_STATUS',
-        link: '/settings'
-    });
-    if (newNotifications && newNotifications.length) {
-        newNotifications.forEach(notification => {
-            io.to(notification.user.toString()).emit('new_notification', notification);
-        });
-    }
-    res.json({ message: 'User profile updated successfully.', user: updatedUser });
-  } catch (error) {
-    res.status(500).json({ message: 'Error approving changes.', error: error.message });
-  }
-};
-
-// @desc    Reject a pending update for another user (Super Admin only)
-// @route   PUT /api/users/reject-update/:id
-const rejectUserUpdate = async (req, res) => {
-    const io = req.app.get('socketio');
-    try {
-        const user = await User.findById(req.params.id);
-        if (!user || !user.hasPendingChanges) {
-            return res.status(400).json({ message: 'No pending changes found for this user.' });
-        }
-        user.pendingChanges = undefined;
-        user.hasPendingChanges = false;
-        await user.save();
-        const newNotifications = await createNotification({
-            recipientId: user._id,
-            message: `Your profile update request was rejected.`,
-            type: 'REQUEST_STATUS',
-            link: '/settings'
-        });
-        if (newNotifications && newNotifications.length) {
-            newNotifications.forEach(notification => {
-                io.to(notification.user.toString()).emit('new_notification', notification);
-            });
-        }
-        logAction(req.user, 'REJECT_PROFILE_UPDATE', `Rejected profile changes for user ${user.username}.`, { entityType: 'User', entityId: user._id });
-        res.json({ message: 'Pending changes have been rejected.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error rejecting changes.', error: error.message });
-    }
-};
-
 // @desc    Get all users (Super Admin only)
 // @route   GET /api/users
 const getAllUsers = async (req, res) => {
@@ -376,37 +219,73 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-// @desc    Update a user's role or status (Super Admin only)
+// @desc    Update a user's info (Super Admin only) - REQUIRES ADMIN PASSWORD
 // @route   PUT /api/users/:id
 const updateUser = async (req, res) => {
   try {
-    const { role, status } = req.body;
+    const { 
+      role, 
+      status, 
+      fullName, 
+      username, 
+      email, 
+      adminPassword 
+    } = req.body; 
+    
+    // 1. Verify Admin Password
+    if (!adminPassword) {
+        return res.status(400).json({ message: 'Super Admin password is required to confirm changes.' });
+    }
+    const superAdmin = await User.findById(req.user.id);
+    const isMatch = await bcrypt.compare(adminPassword, superAdmin.password);
+    if (!isMatch) {
+        return res.status(401).json({ message: 'Incorrect Super Admin password. Action denied.' });
+    }
+
+    // 2. Find target user
     const user = await User.findById(req.params.id);
-
     if (!user) {
-      return res.status(4404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'User not found' });
     }
 
+    // 3. Validation Logic for Roles
     if (user.role === 'Super Admin' && user._id.toString() !== req.user.id) {
-        return res.status(403).json({ message: 'Cannot modify another Super Admin account.' });
+       // Super Admin can edit other Super Admins if needed.
     }
-    if (role === 'Super Admin' && req.user.role !== 'Super Admin') {
-        return res.status(403).json({ message: 'Not authorized to promote users to Super Admin.' });
+    
+    // 4. Duplicate Checks (Username, Email, Full Name)
+    if (username && username !== user.username) {
+        const userExists = await User.findOne({ username });
+        if (userExists) return res.status(400).json({ message: 'Username is already taken.' });
     }
-    if (user.role === 'Super Admin' && role !== 'Super Admin' && role) {
-        return res.status(403).json({ message: 'A Super Admin cannot be demoted.' });
+    if (email && email !== user.email) {
+        const emailExists = await User.findOne({ email });
+        if (emailExists) return res.status(400).json({ message: 'Email address is already in use.' });
+    }
+    if (fullName && fullName !== user.fullName) {
+        const fullNameExists = await User.findOne({ fullName });
+        if (fullNameExists) return res.status(400).json({ message: `The name "${fullName}" is already registered.` });
     }
 
+    // 5. Log Changes
     let details = [];
-    if (role && user.role !== role) details.push(`role to '${role}'`);
-    if (status && user.status !== status) details.push(`status to '${status}'`);
+    if (fullName && user.fullName !== fullName) details.push('Full Name');
+    if (username && user.username !== username) details.push('Username');
+    if (email && user.email !== email) details.push('Email');
+    if (role && user.role !== role) details.push('Role');
+    if (status && user.status !== status) details.push('Status');
 
     if (details.length > 0) {
-      logAction(req.user, 'UPDATE_USER', `Updated user ${user.fullName}'s ${details.join(' and ')}.`, { entityType: 'User', entityId: user._id });
+      logAction(req.user, 'UPDATE_USER', `Updated details (${details.join(', ')}) for user ${user.fullName}.`, { entityType: 'User', entityId: user._id });
     }
 
-    user.role = role || user.role;
-    user.status = status || user.status;
+    // 6. Apply Updates
+    if (fullName) user.fullName = fullName;
+    if (username) user.username = username;
+    if (email) user.email = email;
+    if (role) user.role = role;
+    if (status) user.status = status;
+
     const updatedUser = await user.save();
 
     res.json({
@@ -418,7 +297,8 @@ const updateUser = async (req, res) => {
       status: updatedUser.status,
     });
   } catch (error) {
-    res.status(400).json({ message: 'Error updating user' });
+    console.error("Error updating user:", error);
+    res.status(500).json({ message: 'Error updating user', error: error.message });
   }
 };
 
@@ -487,25 +367,30 @@ const adminResetPassword = async (req, res) => {
         const { adminPassword } = req.body;
         const targetUserId = req.params.id;
         const adminUser = await User.findById(req.user.id);
+        
         if (!adminUser) {
             return res.status(404).json({ message: 'Admin user not found.' });
         }
+        
+        // Check Admin Password
         const isMatch = await bcrypt.compare(adminPassword, adminUser.password);
         if (!isMatch) {
             return res.status(401).json({ message: 'Incorrect admin password. Authorization denied.' });
         }
+
         const targetUser = await User.findById(targetUserId);
         if (!targetUser) {
             return res.status(404).json({ message: 'Target user not found.' });
         }
-        if (targetUser.role === 'Super Admin') {
-            return res.status(403).json({ message: 'Cannot reset password for another Super Admin account.' });
-        }
+        // Allows resetting password for anyone including other Super Admins
+
         const temporaryPassword = crypto.randomBytes(8).toString('hex').slice(0, 10);
         targetUser.password = temporaryPassword;
         targetUser.mustChangePassword = true;
         await targetUser.save();
+        
         logAction(req.user, 'ADMIN_RESET_PASSWORD', `Reset password for user ${targetUser.fullName}.`, { entityType: 'User', entityId: targetUser._id });
+        
         res.json({
             message: 'User password has been reset.',
             username: targetUser.username,
@@ -569,10 +454,6 @@ module.exports = {
   getAllUsers,
   updateUser,
   deleteUser,
-  requestProfileUpdate,
-  verifySelfUpdateWithCode,
-  approveUserUpdate,
-  rejectUserUpdate,
   getUserDetails,
   adminResetPassword,
   logoutUser,

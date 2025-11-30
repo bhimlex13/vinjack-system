@@ -1,10 +1,10 @@
 // server/controllers/permissionController.js
 const { RolePermission, AllPermissions } = require('../models/permissionModel');
+const User = require('../models/userModel');
+const bcrypt = require('bcryptjs');
 const logAction = require('../utils/logger');
 
 // --- MASTER LIST OF ALL PERMISSIONS ---
-// This list defines every permission in the system.
-// We will "seed" this into the database.
 const MASTER_PERMISSION_LIST = [
   // General
   { key: 'canViewDashboard', description: 'Can view the main dashboard', category: 'General', defaultRoles: ['Admin', 'Salesperson'] },
@@ -39,10 +39,8 @@ const MASTER_PERMISSION_LIST = [
 const getAllPermissions = async (req, res) => {
   try {
     const allPermissions = await AllPermissions.find({}).sort({ category: 1, key: 1 });
-    // --- ADDED CHECK ---
-    // If the master list is empty, it means seeding hasn't happened.
     if (!allPermissions || allPermissions.length === 0) {
-        return res.status(404).json({ message: 'Permissions master list not found. Please seed permissions.' });
+        return res.status(404).json({ message: 'Permissions master list not found. Please reset to default.' });
     }
     res.json(allPermissions);
   } catch (error) {
@@ -64,7 +62,6 @@ const getRolePermissions = async (req, res) => {
 
     const rolePerms = await RolePermission.findOne({ role });
     if (!rolePerms) {
-      // This is the 404 error you are seeing, which is correct before seeding.
       return res.status(404).json({ message: 'Permissions for this role not found.' });
     }
     res.json(rolePerms);
@@ -74,14 +71,24 @@ const getRolePermissions = async (req, res) => {
 };
 
 /**
- * @desc    Update the list of allowed permission keys for a role
+ * @desc    Update the list of allowed permission keys for a role - REQUIRES ADMIN PASSWORD
  * @route   PUT /api/permissions/:role
  * @access  Super Admin
  */
 const updateRolePermissions = async (req, res) => {
   try {
     const { role } = req.params;
-    const { allowedPermissions } = req.body; // Expects an array of permission keys
+    const { allowedPermissions, adminPassword } = req.body; 
+
+    // 1. Verify Super Admin Password
+    if (!adminPassword) {
+        return res.status(400).json({ message: 'Super Admin password is required to confirm changes.' });
+    }
+    const superAdmin = await User.findById(req.user.id);
+    const isMatch = await bcrypt.compare(adminPassword, superAdmin.password);
+    if (!isMatch) {
+        return res.status(401).json({ message: 'Incorrect Super Admin password. Action denied.' });
+    }
 
     if (role !== 'Admin' && role !== 'Salesperson') {
       return res.status(400).json({ message: 'Invalid role.' });
@@ -105,19 +112,31 @@ const updateRolePermissions = async (req, res) => {
 };
 
 /**
- * @desc    [Admin Only] Seed the AllPermissions collection from the master list
+ * @desc    [Admin Only] Seed the AllPermissions collection from the master list - REQUIRES ADMIN PASSWORD
  * @route   POST /api/permissions/seed
  * @access  Super Admin
  */
 const seedPermissions = async (req, res) => {
   try {
-    // 1. Clear existing permissions to start fresh
+    const { adminPassword } = req.body;
+
+    // 1. Verify Super Admin Password
+    if (!adminPassword) {
+        return res.status(400).json({ message: 'Super Admin password is required to reset permissions.' });
+    }
+    const superAdmin = await User.findById(req.user.id);
+    const isMatch = await bcrypt.compare(adminPassword, superAdmin.password);
+    if (!isMatch) {
+        return res.status(401).json({ message: 'Incorrect Super Admin password. Action denied.' });
+    }
+
+    // 2. Clear existing permissions to start fresh
     await AllPermissions.deleteMany({});
     
-    // 2. Insert the master list
+    // 3. Insert the master list
     const createdPermissions = await AllPermissions.insertMany(MASTER_PERMISSION_LIST);
 
-    // 3. Set up the default roles based on the master list
+    // 4. Set up the default roles based on the master list
     const defaultAdminPerms = MASTER_PERMISSION_LIST
       .filter(p => p.defaultRoles.includes('Admin'))
       .map(p => p.key);
@@ -126,7 +145,7 @@ const seedPermissions = async (req, res) => {
       .filter(p => p.defaultRoles.includes('Salesperson'))
       .map(p => p.key);
       
-    // 4. Clear and set default RolePermission documents
+    // 5. Clear and set default RolePermission documents
     await RolePermission.deleteMany({});
     await RolePermission.create([
       { role: 'Admin', allowedPermissions: defaultAdminPerms },
@@ -152,23 +171,18 @@ const seedPermissions = async (req, res) => {
  */
 const checkPermission = (requiredPermission) => {
   return async (req, res, next) => {
-    // 1. The 'Super Admin' role bypasses all permission checks
     if (req.user.role === 'Super Admin') {
       return next();
     }
 
-    // 2. For 'Admin' and 'Salesperson', check their permissions
     if (req.user.role === 'Admin' || req.user.role === 'Salesperson') {
       try {
-        // Find the permissions document for the user's role
-        const rolePerms = await RolePermission.findOne({ role: req.user.role }).lean(); // .lean() for speed
+        const rolePerms = await RolePermission.findOne({ role: req.user.role }).lean();
 
         if (rolePerms && rolePerms.allowedPermissions.includes(requiredPermission)) {
-          // 3. User has the permission, proceed
           return next();
         }
         
-        // 4. User does not have the permission
         return res.status(403).json({ 
           message: `Forbidden: Your role ('${req.user.role}') does not have the required permission: '${requiredPermission}'.` 
         });
@@ -178,7 +192,6 @@ const checkPermission = (requiredPermission) => {
       }
     }
     
-    // 5. Fallback for any other case
     return res.status(403).json({ message: 'Forbidden. You do not have access.' });
   };
 };
