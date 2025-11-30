@@ -3,11 +3,10 @@ import React, { useState, useEffect, useContext } from 'react';
 import ConfirmationContext from '../context/ConfirmationContext'; 
 import { createMotorcycle, updateMotorcycle } from '../api/motorcycleApi';
 import { toast } from 'react-toastify';
-import { Box, TextField, Button, Stack, Alert } from '@mui/material';
-import { motion } from 'framer-motion'; // --- NEW IMPORT ---
 
-// --- NEW IMPORT ---
-import LoadingSpinner from './LoadingSpinner';
+// MUI Imports
+import { Box, TextField, Button, Stack, Alert, DialogContent, DialogActions } from '@mui/material';
+import SaveIcon from '@mui/icons-material/Save';
 
 const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) => {
   const [formData, setFormData] = useState({
@@ -34,6 +33,7 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (error) setError('');
   };
 
   const getCleanedData = () => {
@@ -43,6 +43,18 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
       plateNumber: formData.plateNumber.trim() === '' ? null : formData.plateNumber,
       vin: formData.vin.trim() === '' ? null : formData.vin,
     };
+  };
+
+  const validate = () => {
+    if (!formData.make.trim() || !formData.model.trim()) {
+        setError('Make and Model are required.');
+        return false;
+    }
+    if (formData.year && (formData.year < 1900 || formData.year > new Date().getFullYear() + 1)) {
+        setError('Please enter a valid 4-digit year.');
+        return false;
+    }
+    return true;
   };
 
   const handleForceCreate = async () => {
@@ -71,6 +83,8 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validate()) return;
+
     setIsSubmitting(true);
     setError('');
 
@@ -90,8 +104,12 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'An error occurred.';
       
+      // Handle Soft Duplicates (Similar bike exists)
       if (err.response?.status === 409 && err.response?.data?.isSoftDuplicate) {
-        const userConfirmed = await confirm(errorMsg); 
+        const userConfirmed = await confirm(
+            "Similar Vehicle Found",
+            `${errorMsg} Do you want to save it anyway?`
+        ); 
         if (userConfirmed) {
           handleForceCreate(); 
           return; 
@@ -106,31 +124,98 @@ const MotorcycleForm = ({ customer, motorcycleToEdit, onFormSubmit, onClose }) =
   };
 
   return (
-    <Box 
-      component="form" 
-      onSubmit={handleSubmit} 
-      sx={{ p: 3, pt: 1 }}
-    >
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      
-      {/* --- WRAP FORM FIELDS IN MOTION DIV --- */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-        <Stack spacing={2}>
-            <TextField label="Make (e.g., Honda)" name="make" value={formData.make} onChange={handleChange} required fullWidth />
-            <TextField label="Model (e.g., Click 125i)" name="model" value={formData.model} onChange={handleChange} required fullWidth />
-            <TextField label="Year" name="year" type="number" value={formData.year} onChange={handleChange} fullWidth />
-            <TextField label="Color" name="color" value={formData.color} onChange={handleChange} fullWidth />
-            <TextField label="Plate Number (Optional)" name="plateNumber" value={formData.plateNumber} onChange={handleChange} fullWidth />
-            <TextField label="VIN (Optional)" name="vin" value={formData.vin} onChange={handleChange} fullWidth />
-            <Stack direction="row" spacing={2} justifyContent="flex-end">
-            <Button onClick={onClose} disabled={isSubmitting}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={isSubmitting}>
-                {isSubmitting ? <LoadingSpinner text="" /> : (motorcycleToEdit ? 'Update' : 'Save')}
-            </Button>
+    <>
+      <DialogContent dividers>
+        <Box component="form" id="motorcycle-form" onSubmit={handleSubmit}>
+          {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+          
+          <Stack spacing={2.5}>
+            <Stack direction="row" spacing={2}>
+                <TextField 
+                    label="Make" 
+                    name="make" 
+                    value={formData.make} 
+                    onChange={handleChange} 
+                    required 
+                    fullWidth 
+                    variant="outlined"
+                    size="small"
+                    placeholder="e.g. Honda"
+                />
+                <TextField 
+                    label="Model" 
+                    name="model" 
+                    value={formData.model} 
+                    onChange={handleChange} 
+                    required 
+                    fullWidth 
+                    variant="outlined"
+                    size="small"
+                    placeholder="e.g. Click 125i"
+                />
             </Stack>
-        </Stack>
-      </motion.div>
-    </Box>
+
+            <Stack direction="row" spacing={2}>
+                <TextField 
+                    label="Year" 
+                    name="year" 
+                    type="number" 
+                    value={formData.year} 
+                    onChange={handleChange} 
+                    fullWidth 
+                    variant="outlined"
+                    size="small"
+                    placeholder="e.g. 2023"
+                />
+                <TextField 
+                    label="Color" 
+                    name="color" 
+                    value={formData.color} 
+                    onChange={handleChange} 
+                    fullWidth 
+                    variant="outlined"
+                    size="small"
+                    placeholder="e.g. Matte Black"
+                />
+            </Stack>
+
+            <TextField 
+                label="Plate Number (Optional)" 
+                name="plateNumber" 
+                value={formData.plateNumber} 
+                onChange={handleChange} 
+                fullWidth 
+                variant="outlined"
+                size="small"
+                placeholder="e.g. ABC 1234"
+            />
+            <TextField 
+                label="VIN / Chassis Number (Optional)" 
+                name="vin" 
+                value={formData.vin} 
+                onChange={handleChange} 
+                fullWidth 
+                variant="outlined"
+                size="small"
+                placeholder="Vehicle Identification Number"
+            />
+          </Stack>
+        </Box>
+      </DialogContent>
+      
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} disabled={isSubmitting} color="inherit">Cancel</Button>
+        <Button 
+            type="submit" 
+            form="motorcycle-form" 
+            variant="contained" 
+            disabled={isSubmitting}
+            startIcon={!isSubmitting && <SaveIcon />}
+        >
+            {isSubmitting ? (motorcycleToEdit ? 'Updating...' : 'Saving...') : (motorcycleToEdit ? 'Update Vehicle' : 'Save Vehicle')}
+        </Button>
+      </DialogActions>
+    </>
   );
 };
 

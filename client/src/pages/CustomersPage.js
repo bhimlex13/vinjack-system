@@ -5,7 +5,7 @@ import CustomerForm from '../components/CustomerForm';
 import CustomerMotorcyclesModal from '../components/CustomerMotorcyclesModal';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion';
 
 // MUI Imports
 import { 
@@ -22,7 +22,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { FaUserFriends, FaMotorcycle } from 'react-icons/fa';
 
-// --- NEW IMPORT ---
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const CustomersPage = () => {
@@ -44,7 +43,6 @@ const CustomersPage = () => {
       transition: { duration: 0.4, ease: "easeOut" }
     }
   };
-  // ------------------------------
 
   const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
@@ -115,9 +113,9 @@ const CustomersPage = () => {
   }, [fetchCustomers, confirm]);
 
   const columns = [
-    { field: 'name', headerName: 'Customer Name', flex: 1 },
-    { field: 'email', headerName: 'Email', flex: 1, renderCell: (params) => params.value || 'N/A' },
-    { field: 'phone', headerName: 'Phone Number', flex: 1, renderCell: (params) => params.value || 'N/A' },
+    { field: 'name', headerName: 'Customer Name', flex: 1, minWidth: 150 },
+    { field: 'email', headerName: 'Email', flex: 1, minWidth: 200, renderCell: (params) => params.value || 'N/A' },
+    { field: 'phone', headerName: 'Phone Number', flex: 1, minWidth: 150, renderCell: (params) => params.value || 'N/A' },
     {
       field: 'actions',
       headerName: 'Actions',
@@ -126,20 +124,20 @@ const CustomersPage = () => {
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => (
-        <Stack direction="row" spacing={0.5}>
+        <Stack direction="row" spacing={1} justifyContent="center" width="100%">
           <Tooltip title="View Vehicles">
-            <IconButton size="small" onClick={() => setManagingCustomer(params.row)}>
-              <FaMotorcycle />
+            <IconButton size="small" onClick={() => setManagingCustomer(params.row)} sx={{ color: 'primary.main', bgcolor: 'primary.50' }}>
+              <FaMotorcycle size={16} />
             </IconButton>
           </Tooltip>
           <Tooltip title="Edit Customer">
-            <IconButton size="small" onClick={() => openModalForEdit(params.row)}>
-              <EditIcon />
+            <IconButton size="small" onClick={() => openModalForEdit(params.row)} sx={{ color: 'info.main', bgcolor: 'info.50' }}>
+              <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title="Delete Customer">
-            <IconButton size="small" color="error" onClick={() => handleDelete(params.row._id)}>
-              <DeleteIcon />
+            <IconButton size="small" color="error" onClick={() => handleDelete(params.row._id)} sx={{ bgcolor: 'error.50' }}>
+              <DeleteIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </Stack>
@@ -147,37 +145,38 @@ const CustomersPage = () => {
     }
   ];
 
-  // --- RENDER LOADING SPINNER IF FETCHING ---
   if (isLoading && customers.length === 0) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <LoadingSpinner text="Loading Customers..." />
-      </Box>
-    );
+    return <LoadingSpinner text="Loading Customers..." />;
   }
 
   return (
-    <Container maxWidth="xl" sx={{ p: 3, mt: 2 }}>
-      
-      {/* --- ANIMATED HEADER SECTION --- */}
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Stack direction="row" alignItems="center" spacing={2}>
-              <FaUserFriends size={32} />
-              <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-                Customer Management
-              </Typography>
+        
+        {/* Header */}
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 3, gap: 2 }}>
+          <Stack direction="row" spacing={2} alignItems="center">
+             <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'primary.light', color: 'primary.dark', display: 'flex' }}>
+                <FaUserFriends size={24} />
+             </Box>
+             <Box>
+                <Typography variant="h5" fontWeight={700}>Customer Management</Typography>
+                <Typography variant="body2" color="text.secondary">Manage customer profiles and vehicle records</Typography>
+             </Box>
           </Stack>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openModalForAdd}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openModalForAdd} sx={{ fontWeight: 600, px: 3, py: 1 }}>
             Add Customer
           </Button>
         </Box>
         
-        <Paper sx={{ p: 2, mb: 3 }}>
+        {/* Filters */}
+        <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
           <Grid container spacing={2}>
+            {/* Using SIZE prop for V2/V6 Grid compatibility */}
             <Grid item size={{ xs: 12, md: 8 }}>
               <TextField
-                label="Search Customers (by Name, Email, or Phone)"
+                label="Search Customers"
+                placeholder="Search by Name, Email, or Phone..."
                 variant="outlined"
                 size="small"
                 fullWidth
@@ -186,15 +185,17 @@ const CustomersPage = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchIcon />
+                      <SearchIcon color="action" />
                     </InputAdornment>
                   ),
+                  sx: { borderRadius: 2 }
                 }}
               />
             </Grid>
             <Grid item size={{ xs: 12, md: 4 }}>
               <TextField
-                label="Filter by Motorcycle Make (e.g., Honda)"
+                label="Filter by Motorcycle"
+                placeholder="e.g. Honda, Yamaha..."
                 variant="outlined"
                 size="small"
                 fullWidth
@@ -203,16 +204,18 @@ const CustomersPage = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <FaMotorcycle />
+                      <FaMotorcycle color="gray" />
                     </InputAdornment>
                   ),
+                  sx: { borderRadius: 2 }
                 }}
               />
             </Grid>
           </Grid>
         </Paper>
 
-        <Paper sx={{ height: '70vh', width: '100%' }}>
+        {/* Data Grid */}
+        <Paper sx={{ height: 600, width: '100%', borderRadius: 3, boxShadow: 3, overflow: 'hidden' }}>
           <DataGrid
             rows={filteredCustomers} 
             columns={columns}
@@ -222,11 +225,23 @@ const CustomersPage = () => {
               pagination: { paginationModel: { pageSize: 10 } },
             }}
             pageSizeOptions={[10, 25, 50]}
+            disableRowSelectionOnClick
+            sx={{
+              border: 0,
+              '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: 'grey.50',
+                fontWeight: 700,
+                fontSize: '0.9rem'
+              },
+              '& .MuiDataGrid-row:hover': {
+                backgroundColor: 'action.hover'
+              }
+            }}
           />
         </Paper>
       </motion.div>
 
-      {/* --- ANIMATED DIALOGS --- */}
+      {/* Dialogs */}
       <AnimatePresence>
         {isModalOpen && (
           <Dialog 
@@ -234,9 +249,9 @@ const CustomersPage = () => {
             onClose={() => setIsModalOpen(false)} 
             fullWidth 
             maxWidth="sm"
-            // PaperProps={{ component: motion.div, initial: { y: 50, opacity: 0 }, animate: { y: 0, opacity: 1 } }} // Optional: Animate dialog entrance
+            PaperProps={{ sx: { borderRadius: 3 } }}
           >
-            <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
+            <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
             <CustomerForm
               onFormSubmit={handleFormSubmit}
               customerToEdit={editingCustomer}

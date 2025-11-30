@@ -2,15 +2,16 @@
 import React, { useContext } from 'react';
 import { NavLink } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion } from 'framer-motion';
 
 // MUI Imports
 import {
   Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Toolbar, Typography, Divider, Box, IconButton, ListSubheader
+  Toolbar, Typography, Divider, Box, IconButton, ListSubheader, useTheme, useMediaQuery
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import CloseIcon from '@mui/icons-material/Close';
 
 // React Icons
 import {
@@ -21,61 +22,112 @@ import {
   FaTruckMoving 
 } from 'react-icons/fa';
 
-const drawerWidth = 250;
+const drawerWidth = 260;
 
-const StyledDrawer = styled(Drawer, { shouldForwardProp: (prop) => prop !== 'open' })(
+// Mixin for opened drawer style
+const openedMixin = (theme) => ({
+  width: drawerWidth,
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.enteringScreen,
+  }),
+  overflowX: 'hidden',
+  // --- ADDED: Shadow and removed border for elevation effect ---
+  boxShadow: '4px 0 20px rgba(0,0,0,0.08)', 
+  borderRight: 'none',
+  // -----------------------------------------------------------
+});
+
+// Mixin for closed drawer style
+const closedMixin = (theme) => ({
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  overflowX: 'hidden',
+  width: `calc(${theme.spacing(7)} + 1px)`,
+  [theme.breakpoints.up('sm')]: {
+    width: `calc(${theme.spacing(8)} + 1px)`,
+  },
+  // --- ADDED: Shadow and removed border for elevation effect ---
+  boxShadow: '4px 0 20px rgba(0,0,0,0.08)',
+  borderRight: 'none',
+  // -----------------------------------------------------------
+});
+
+const DesktopDrawer = styled(Drawer, { shouldForwardProp: (prop) => prop !== 'open' })(
   ({ theme, open }) => ({
-    '& .MuiDrawer-paper': {
-      position: 'relative',
-      whiteSpace: 'nowrap',
-      width: drawerWidth,
-      transition: theme.transitions.create('width', {
-        easing: theme.transitions.easing.sharp,
-        duration: theme.transitions.duration.enteringScreen,
-      }),
-      boxSizing: 'border-box',
-      ...(!open && {
-        overflowX: 'hidden',
-        transition: theme.transitions.create('width', {
-          easing: theme.transitions.easing.sharp,
-          duration: theme.transitions.duration.leavingScreen,
-        }),
-        width: theme.spacing(7),
-        [theme.breakpoints.up('sm')]: {
-          width: theme.spacing(9),
-        },
-      }),
-    },
+    width: drawerWidth,
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
+    ...(open && {
+      ...openedMixin(theme),
+      '& .MuiDrawer-paper': openedMixin(theme),
+    }),
+    ...(!open && {
+      ...closedMixin(theme),
+      '& .MuiDrawer-paper': closedMixin(theme),
+    }),
   }),
 );
 
-// --- MODIFIED: Wrapped ListItem in motion.div ---
-const NavListItem = ({ to, icon, text, isCollapsed }) => (
-  <motion.div
-    layout
-    initial={{ opacity: 0, x: -20 }}
-    animate={{ opacity: 1, x: 0 }}
-    transition={{ duration: 0.3 }}
-  >
-    <ListItem disablePadding component={NavLink} to={to}
-      style={({ isActive }) => ({
-        textDecoration: 'none',
-        color: 'inherit',
-        backgroundColor: isActive ? 'rgba(0, 123, 255, 0.1)' : 'transparent',
-      })}
+// Animated List Item Component
+const NavListItem = ({ to, icon, text, isOpen, isMobile, toggleSidebar }) => (
+  <ListItem disablePadding sx={{ display: 'block', mb: 0.5 }}>
+    <ListItemButton
+      component={NavLink}
+      to={to}
+      onClick={isMobile ? toggleSidebar : undefined}
+      sx={{
+        minHeight: 48,
+        justifyContent: isOpen ? 'initial' : 'center',
+        px: 2.5,
+        mx: 1,
+        borderRadius: 2,
+        transition: 'all 0.3s ease',
+        '&.active': {
+          backgroundColor: 'primary.main',
+          color: 'primary.contrastText',
+          boxShadow: '0 4px 12px 0 rgba(0,0,0,0.2)', // Added shadow to active button too
+          '& .MuiListItemIcon-root': {
+            color: 'inherit',
+          },
+        },
+        '&:hover': {
+          backgroundColor: 'action.hover', 
+          transform: 'translateX(3px)',
+        },
+      }}
     >
-      <ListItemButton sx={{ pl: isCollapsed ? 2.5 : 3 }}>
-        <ListItemIcon sx={{ minWidth: 0, mr: isCollapsed ? 'auto' : 3, justifyContent: 'center' }}>
-          {icon}
-        </ListItemIcon>
-        <ListItemText primary={text} sx={{ opacity: isCollapsed ? 0 : 1 }} />
-      </ListItemButton>
-    </ListItem>
-  </motion.div>
+      <ListItemIcon
+        sx={{
+          minWidth: 0,
+          mr: isOpen ? 2 : 'auto',
+          justifyContent: 'center',
+          color: 'text.secondary',
+          fontSize: '1.3rem',
+        }}
+      >
+        {icon}
+      </ListItemIcon>
+      <ListItemText 
+        primary={text} 
+        primaryTypographyProps={{ 
+          fontSize: '0.95rem', 
+          fontWeight: 500,
+          letterSpacing: '0.3px'
+        }}
+        sx={{ opacity: isOpen ? 1 : 0 }} 
+      />
+    </ListItemButton>
+  </ListItem>
 );
 
-const Sidebar = ({ isCollapsed, toggleSidebar }) => {
+const Sidebar = ({ isOpen, toggleSidebar }) => {
   const { user, hasPermission } = useContext(AuthContext);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const mainNav = [
     { text: 'Dashboard', to: '/dashboard', icon: <FaTachometerAlt />, perm: hasPermission('canViewDashboard') },
@@ -107,78 +159,103 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
     { text: 'Data Management', to: '/data-management', icon: <FaDatabase />, perm: true },
   ];
 
-  const renderNav = (items) => {
-    return items
-      .filter(item => item.perm) 
-      .map(item => <NavListItem key={item.text} {...item} isCollapsed={isCollapsed} />);
+  const renderNavGroup = (items, title) => {
+    const filteredItems = items.filter(item => item.perm);
+    if (filteredItems.length === 0) return null;
+
+    return (
+      <Box sx={{ mb: 1 }}>
+        {isOpen && title && (
+          <ListSubheader 
+            component="div" 
+            sx={{ 
+              backgroundColor: 'transparent',
+              fontSize: '0.75rem',
+              textTransform: 'uppercase',
+              fontWeight: 'bold',
+              color: 'text.disabled',
+              mt: 2,
+              mb: 0.5,
+              lineHeight: '20px'
+            }}
+          >
+            {title}
+          </ListSubheader>
+        )}
+        {!isOpen && title && <Divider sx={{ my: 1, opacity: 0.5 }} />}
+        
+        {filteredItems.map(item => (
+          <NavListItem 
+            key={item.text} 
+            {...item} 
+            isOpen={isOpen} 
+            isMobile={isMobile}
+            toggleSidebar={toggleSidebar}
+          />
+        ))}
+      </Box>
+    );
   };
 
-  const renderedMainNav = renderNav(mainNav);
-  const renderedSalesNav = renderNav(salesNav);
-  const renderedManagementNav = renderNav(managementNav);
-  const renderedReportingNav = renderNav(reportingNav);
-  const renderedAdminNav = renderNav(adminNav);
-
-
-  return (
-    <StyledDrawer variant="permanent" open={!isCollapsed}>
-      <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: [1] }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mr: 'auto', pl: 1 }}>
-          {/* --- ANIMATED LOGO --- */}
+  const drawerContent = (
+    <>
+      <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: [2] }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <motion.img 
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
             src="/assets/vinjack_logo.png" 
             alt="VinJack Logo" 
-            style={{ width: 40, height: 40, marginRight: 12 }} 
+            style={{ width: 35, height: 35, marginRight: 12 }} 
           />
-          <Typography component="h1" variant="h6" noWrap>VinJack MS</Typography>
+          {isOpen && (
+            <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 700, letterSpacing: '-0.5px' }}>
+              VinJack MS
+            </Typography>
+          )}
         </Box>
-        <IconButton onClick={toggleSidebar}><ChevronLeftIcon /></IconButton>
+        <IconButton onClick={toggleSidebar}>
+          {isMobile ? <CloseIcon /> : <ChevronLeftIcon />}
+        </IconButton>
       </Toolbar>
       <Divider />
-      <List component="nav">
-
-        {renderedMainNav.length > 0 && (
-          <>
-            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Dashboard</ListSubheader>
-            {renderedMainNav}
-          </>
-        )}
-        
-        {renderedSalesNav.length > 0 && (
-          <>
-            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1, lineHeight: '30px', mt: 1 }}>Sales</ListSubheader>
-            {renderedSalesNav}
-          </>
-        )}
-        
-        {renderedManagementNav.length > 0 && (
-          <>
-            <Divider sx={{ my: 1 }} />
-            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Inventory & Suppliers</ListSubheader>
-            {renderedManagementNav}
-          </>
-        )}
-
-        {renderedReportingNav.length > 0 && (
-          <>
-            <Divider sx={{ my: 1 }} />
-            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Reports & Logs</ListSubheader>
-            {renderedReportingNav}
-          </>
-        )}
-
-        {user && user.role === 'Super Admin' && (
-          <>
-            <Divider sx={{ my: 1 }} />
-            <ListSubheader component="div" inset sx={{ opacity: isCollapsed ? 0 : 1 }}>Administration</ListSubheader>
-            {renderedAdminNav}
-          </>
-        )}
+      
+      <List component="nav" sx={{ px: 1, pb: 4 }}>
+        {renderNavGroup(mainNav, '')}
+        {renderNavGroup(salesNav, 'Sales')}
+        {renderNavGroup(managementNav, 'Inventory & Supply')}
+        {renderNavGroup(reportingNav, 'Reports')}
+        {renderNavGroup(adminNav, 'Admin')}
       </List>
-    </StyledDrawer>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer
+        variant="temporary"
+        open={isOpen}
+        onClose={toggleSidebar}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': { 
+            boxSizing: 'border-box', 
+            width: '100%', 
+            maxWidth: '100%' 
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+    );
+  }
+
+  return (
+    <DesktopDrawer variant="permanent" open={isOpen} sx={{ display: { xs: 'none', md: 'block' } }}>
+      {drawerContent}
+    </DesktopDrawer>
   );
 };
 

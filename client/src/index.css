@@ -24,3 +24,33 @@
 .spinner-gear {
   animation: run 0.8s ease-in-out infinite; /* Apply the running animation to the motorcycle icon */
 }
+
+/* --- Modern Scrollbar Design --- */
+
+/* For Webkit browsers (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 8px;               /* Width of vertical scrollbar */
+  height: 8px;              /* Height of horizontal scrollbar */
+}
+
+/* Track (the background of the scrollbar) */
+::-webkit-scrollbar-track {
+  background: transparent;  /* Keep it see-through so it blends in */
+}
+
+/* Handle (the moving part) */
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;      /* Subtle gray */
+  border-radius: 4px;       /* Rounded corners (pill shape) */
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;      /* Slightly darker when grabbed */
+}
+
+/* Firefox support (uses different syntax) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 transparent;
+}

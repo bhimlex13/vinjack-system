@@ -3,7 +3,10 @@ import React, { useEffect, useState, useContext } from 'react';
 import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
 import { Bar, Line } from 'react-chartjs-2';
-import { Chart, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
+import { 
+  Chart, CategoryScale, LinearScale, BarElement, LineElement, 
+  PointElement, Title, Tooltip as ChartTooltip, Legend, Filler 
+} from 'chart.js';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 
@@ -11,8 +14,10 @@ import { motion } from 'framer-motion';
 import {
   Box, Grid, Paper, Typography, ToggleButton, ToggleButtonGroup, Container,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
-  Stack, Tooltip
+  Stack, Tooltip, useTheme
 } from '@mui/material';
+
+// Icons
 import { FaMoneyBillWave, FaShoppingCart, FaWarehouse } from 'react-icons/fa';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
@@ -29,29 +34,26 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 // Loading Spinner
 import LoadingSpinner from '../components/LoadingSpinner';
 
-Chart.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, ChartTooltip, Legend);
+// Register ChartJS components
+Chart.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, ChartTooltip, Legend, Filler);
 
-// --- HELPER FUNCTION for number shortening ---
+// --- HELPER: Number Shortening ---
 const formatStatValue = (value) => {
   let prefix = '';
   let numberStr = String(value);
 
-  // Check for currency symbol
   if (numberStr.startsWith('₱')) {
     prefix = '₱';
     numberStr = numberStr.substring(1);
   }
 
-  // Remove commas for parsing
   numberStr = numberStr.replace(/,/g, '');
   const number = parseFloat(numberStr);
 
-  // If not a number, return original value
   if (isNaN(number)) {
     return { display: value, tooltip: value };
   }
 
-  // Create a full-precision tooltip
   const isCurrency = prefix === '₱';
   const tooltip = `${prefix}${number.toLocaleString(undefined, {
     maximumFractionDigits: isCurrency ? 2 : 0,
@@ -59,53 +61,90 @@ const formatStatValue = (value) => {
   })}`;
 
   let display;
-
   if (number >= 1_000_000_000) {
     display = `${prefix}${(number / 1_000_000_000).toFixed(1)}B+`;
   } else if (number >= 1_000_000) {
     display = `${prefix}${(number / 1_000_000).toFixed(1)}M+`;
-  } else if (number >= 10_000) { // Shorten numbers 10,000 and up
+  } else if (number >= 10_000) {
     display = `${prefix}${Math.floor(number / 1000)}K+`;
   } else {
-    display = `${prefix}${number.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    display = `${prefix}${number.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
   }
 
   return { display, tooltip };
 };
 
-// --- StatCard component ---
+// --- COMPONENT: StatCard ---
 const StatCard = ({ title, value, icon, color }) => {
   const { display, tooltip } = formatStatValue(value);
+  const theme = useTheme();
 
   return (
-    <Paper
-      elevation={3}
-      sx={{ p: 2.5, display: 'flex', alignItems: 'center', borderLeft: 5, borderColor: `${color}.main`, height: '100%' }}
-    >
-      <Box sx={{ color: `${color}.main`, fontSize: '2.5rem', mr: 2, flexShrink: 0 }}>{icon}</Box>
-      
-      {/* Wrap text content in Tooltip */}
-      <Tooltip title={<Typography variant="body1">{tooltip}</Typography>} placement="top">
+    <Tooltip title={<Typography variant="body2">{tooltip}</Typography>} placement="top" arrow>
+      <Paper
+        component={motion.div}
+        whileHover={{ y: -5, boxShadow: theme.shadows[10] }}
+        elevation={2}
+        sx={{
+          p: 3,
+          display: 'flex',
+          alignItems: 'center',
+          height: '100%',
+          width: '100%',
+          borderRadius: 3,
+          position: 'relative',
+          overflow: 'hidden',
+          '&:before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '6px',
+            height: '100%',
+            backgroundColor: `${color}.main`,
+          }
+        }}
+      >
+        <Box 
+          sx={{ 
+            color: `${color}.main`, 
+            fontSize: '2.2rem', 
+            mr: 2.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: 1.5,
+            borderRadius: '50%',
+            backgroundColor: (theme) => theme.palette.mode === 'light' ? `${color}.50` : 'rgba(255,255,255,0.05)'
+          }}
+        >
+          {icon}
+        </Box>
+        
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography color="textSecondary" variant="subtitle1" gutterBottom>{title}</Typography>
+          <Typography color="textSecondary" variant="body2" fontWeight={600} textTransform="uppercase" letterSpacing={0.5} gutterBottom>
+            {title}
+          </Typography>
           <Typography
             variant="h5"
             component="p"
             sx={{
-              fontWeight: 'bold',
+              fontWeight: 800,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
-              textOverflow: 'ellipsis'
+              textOverflow: 'ellipsis',
+              color: 'text.primary'
             }}
           >
             {display}
           </Typography>
         </Box>
-      </Tooltip>
-    </Paper>
+      </Paper>
+    </Tooltip>
   );
-}
+};
 
+// --- MAIN COMPONENT: DashboardPage ---
 const DashboardPage = () => {
   const { user } = useContext(AuthContext);
   const [summary, setSummary] = useState(null);
@@ -114,18 +153,14 @@ const DashboardPage = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [pendingPOs, setPendingPOs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // --- MODIFIED: Default set to 'today' ---
   const [timeRange, setTimeRange] = useState('today');
 
-  // --- FRAMER MOTION VARIANTS ---
+  // Framer Motion Variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: {
-        staggerChildren: 0.1 // Stagger effect for cards
-      }
+      transition: { staggerChildren: 0.05 }
     }
   };
 
@@ -134,28 +169,21 @@ const DashboardPage = () => {
     visible: {
       y: 0,
       opacity: 1,
-      transition: {
-        type: 'spring',
-        stiffness: 100,
-        damping: 12
-      }
+      transition: { type: 'spring', stiffness: 100, damping: 15 }
     }
   };
-  // ------------------------------
 
-  // Load user preferences on mount (only timeRange now)
+  // Load Preferences
   useEffect(() => {
     if (user?.role === 'Super Admin' || user?.role === 'Admin') {
       const loadPreferences = async () => {
         try {
-          if (user.dashboardPreferences) {
-             const prefs = user.dashboardPreferences;
-             if (prefs.timeRange) setTimeRange(prefs.timeRange);
+          if (user.dashboardPreferences?.timeRange) {
+             setTimeRange(user.dashboardPreferences.timeRange);
           } else {
              const { data } = await api.get('/users/me');
-             if (data.dashboardPreferences) {
-                const prefs = data.dashboardPreferences;
-                if (prefs.timeRange) setTimeRange(prefs.timeRange);
+             if (data.dashboardPreferences?.timeRange) {
+                setTimeRange(data.dashboardPreferences.timeRange);
              }
           }
         } catch (error) {
@@ -166,17 +194,16 @@ const DashboardPage = () => {
     }
   }, [user]);
 
-  // Main data fetching effect
+  // Fetch Data
   useEffect(() => {
     if (!user) return;
 
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Only timeRange is sent now
         const summaryParams = new URLSearchParams({ range: timeRange });
 
-        const [summaryResponse, lowStockResponse, salesTrendResponse, recentActivitiesResponse, pendingPOsResponse] = await Promise.all([
+        const [summaryRes, lowStockRes, salesTrendRes, recentActRes, pendingPOsRes] = await Promise.all([
           api.get(`/reports/summary?${summaryParams.toString()}`),
           api.get('/reports/low-stock'),
           api.get(`/reports/sales-trend?range=${timeRange}`),
@@ -184,11 +211,11 @@ const DashboardPage = () => {
           api.get('/reports/pending-pos')
         ]);
 
-        setSummary(summaryResponse.data);
-        setLowStockItems(lowStockResponse.data);
-        setSalesTrend(salesTrendResponse.data);
-        setRecentActivities(recentActivitiesResponse.data);
-        setPendingPOs(pendingPOsResponse.data);
+        setSummary(summaryRes.data);
+        setLowStockItems(lowStockRes.data);
+        setSalesTrend(salesTrendRes.data);
+        setRecentActivities(recentActRes.data);
+        setPendingPOs(pendingPOsRes.data);
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
         toast.error("Failed to load dashboard data.");
@@ -205,7 +232,7 @@ const DashboardPage = () => {
     }
   };
 
-  // Chart functions
+  // --- CHART CONFIGURATION ---
   const getTrendChartTitle = () => {
     switch (timeRange) {
       case 'today': return 'Revenue Trend (Today)';
@@ -218,25 +245,27 @@ const DashboardPage = () => {
   const formatTrendChartLabels = (data) => {
     if (!data || data.length === 0) return [];
     const firstLabel = data[0]._id;
-     if (firstLabel && (firstLabel.includes(':') || /\d{2}:00$/.test(firstLabel))) { // Hourly format check
+    
+    if (firstLabel && (firstLabel.includes(':') || /\d{2}:00$/.test(firstLabel))) { 
+        // Hourly
         return data.map(d => {
-             const hourPart = d._id.slice(-5); // Get "HH:00" or similar
-             const hour = parseInt(hourPart.split(':')[0], 10);
-             const dateObj = new Date(); // Use current date as base
-             dateObj.setHours(hour, 0, 0, 0); // Set the hour
+             const hour = parseInt(d._id.split(':')[0], 10);
+             const dateObj = new Date();
+             dateObj.setHours(hour, 0, 0, 0);
              return dateObj.toLocaleTimeString([], { hour: 'numeric', hour12: true });
         });
-    } else if (firstLabel && firstLabel.length === 7) { // Monthly: YYYY-MM
+    } else if (firstLabel && firstLabel.length === 7) { 
+        // Monthly
         return data.map(d => {
             const [year, month] = d._id.split('-');
-            const dateObj = new Date(year, month - 1, 2); // Use day 2
-            return dateObj.toLocaleDateString("en-US", { month: 'long', year: 'numeric' });
+            const dateObj = new Date(year, month - 1, 2);
+            return dateObj.toLocaleDateString("en-US", { month: 'short', year: 'numeric' });
         });
-    } else if (firstLabel && firstLabel.length === 10) { // Daily: YYYY-MM-DD
+    } else if (firstLabel && firstLabel.length === 10) { 
+        // Daily
         return data.map(d => new Date(d._id + 'T12:00:00Z').toLocaleDateString("en-US", { month: 'short', day: 'numeric' }));
     }
-    console.warn("Unrecognized label format in sales trend:", firstLabel);
-    return []; // Fallback for unrecognized format
+    return []; 
   };
 
   const barChartData = {
@@ -244,13 +273,17 @@ const DashboardPage = () => {
     datasets: [{
       label: 'Qty Sold',
       data: summary?.topSellingProducts?.map(p => p.totalQuantitySold) || [],
-      backgroundColor: 'rgba(0, 123, 255, 0.6)',
+      backgroundColor: 'rgba(54, 162, 235, 0.7)',
+      borderRadius: 4,
     }],
   };
+  
   const barChartOptions = {
-     responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+    responsive: true, 
+    maintainAspectRatio: false, 
+    indexAxis: 'y',
     plugins: { legend: { display: false } },
-    scales: { x: { beginAtZero: true }, y: { ticks: { autoSkip: false } } }
+    scales: { x: { beginAtZero: true, grid: { display: false } }, y: { grid: { display: false } } }
   };
 
   const lineChartData = {
@@ -258,59 +291,87 @@ const DashboardPage = () => {
     datasets: [{
       label: 'Revenue',
       data: salesTrend?.map(d => d.totalSales) || [],
-      borderColor: 'rgb(75, 192, 192)',
-      backgroundColor: 'rgba(75, 192, 192, 0.2)',
-      fill: true, tension: 0.4, pointBackgroundColor: 'rgb(75, 192, 192)'
+      borderColor: '#2e7d32', // Success Greenish
+      backgroundColor: (context) => {
+        const ctx = context.chart.ctx;
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(46, 125, 50, 0.4)');
+        gradient.addColorStop(1, 'rgba(46, 125, 50, 0.0)');
+        return gradient;
+      },
+      fill: true, 
+      tension: 0.4, 
+      pointRadius: 4,
+      pointBackgroundColor: '#2e7d32',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2
     }]
   };
+  
   const lineChartOptions = {
-     responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, title: { display: false } },
-    scales: { y: { beginAtZero: true } }
+    responsive: true, 
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+    scales: { 
+        y: { beginAtZero: true, grid: { borderDash: [2, 4] } },
+        x: { grid: { display: false } }
+    },
+    interaction: { mode: 'nearest', axis: 'x', intersect: false }
   };
 
-
+  // --- RENDER ---
   if (isLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <LoadingSpinner text="Fetching dashboard data..." />
-      </Box>
-    );
-  }
-
-  if (!user) {
-    return (
-       <Container maxWidth="lx" sx={{ mt: 4, mb: 4 }}>
-         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 3 }}>
-            Dashboard
-         </Typography>
-         <Paper sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="h6">Please log in to view the dashboard.</Typography>
-         </Paper>
-       </Container>
-    );
+    return <LoadingSpinner text="Loading Dashboard..." />;
   }
 
   return (
-    <Container maxWidth="lx" sx={{ mt: 4, mb: 4 }}>
-      {/* Header & Time Range Toggle */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mr: 2 }}>
-          Dashboard
-        </Typography>
+    <Container maxWidth="xl" sx={{ pb: 4 }}>
+      {/* Header Section */}
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 4, gap: 2 }}>
+        <Box>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.5px' }}>
+            Dashboard
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+                Overview of your business performance
+            </Typography>
+        </Box>
 
         <Stack direction="row" spacing={1.5} alignItems="center">
-            {/* Time Range Filter */}
-            <ToggleButtonGroup color="primary" value={timeRange} exclusive onChange={handleTimeRangeChange} size="small">
-              <ToggleButton value="all">All Time</ToggleButton>
-              <ToggleButton value="month">Month</ToggleButton>
-              <ToggleButton value="week">Week</ToggleButton>
+            <ToggleButtonGroup 
+                color="primary" 
+                value={timeRange} 
+                exclusive 
+                onChange={handleTimeRangeChange} 
+                size="small"
+                sx={{ 
+                    backgroundColor: 'background.paper',
+                    boxShadow: 1,
+                    '& .MuiToggleButton-root': {
+                        border: 'none',
+                        borderRadius: '8px !important',
+                        px: 2,
+                        py: 0.75,
+                        margin: '4px',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        '&.Mui-selected': {
+                            backgroundColor: 'primary.main',
+                            color: 'white',
+                            boxShadow: 2
+                        }
+                    }
+                }}
+            >
               <ToggleButton value="today">Today</ToggleButton>
+              <ToggleButton value="week">Week</ToggleButton>
+              <ToggleButton value="month">Month</ToggleButton>
+              <ToggleButton value="all">All Time</ToggleButton>
             </ToggleButtonGroup>
         </Stack>
       </Box>
 
-      {/* Dashboard Grid with Animations */}
+      {/* Main Grid - Using 'size' prop for alignment stability */}
       <Grid 
         container 
         spacing={3}
@@ -319,7 +380,8 @@ const DashboardPage = () => {
         initial="hidden"
         animate="visible"
       >
-        {/* Stat Cards */}
+        {/* --- STAT CARDS --- */}
+        {/* Force xs: 12 for full width on mobile */}
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Total Revenue" value={`₱${(summary?.totalRevenue)?.toFixed(2) || '0.00'}`} icon={<FaMoneyBillWave />} color="primary" />
         </Grid>
@@ -330,81 +392,88 @@ const DashboardPage = () => {
           <StatCard title="Total Sales" value={summary?.totalSales || 0} icon={<FaShoppingCart />} color="success" />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
-          <StatCard title="Total Items Sold" value={summary?.totalQuantitySold || 0} icon={<ShoppingCartCheckoutIcon />} color="success" />
+          <StatCard title="Items Sold" value={summary?.totalQuantitySold || 0} icon={<ShoppingCartCheckoutIcon />} color="warning" />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
-          <StatCard title="Total Units in Stock" value={summary?.totalStockQuantity || 0} icon={<FaWarehouse />} color="error" />
+          <StatCard title="Stock Units" value={summary?.totalStockQuantity || 0} icon={<FaWarehouse />} color="error" />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
-          <StatCard title="Product Types (SKUs)" value={summary?.totalSKUs || 0} icon={<InventoryIcon />} color="secondary" />
+          <StatCard title="Products (SKUs)" value={summary?.totalSKUs || 0} icon={<InventoryIcon />} color="secondary" />
         </Grid>
 
-        {/* Main Trend Chart */}
+        {/* --- REVENUE TREND CHART --- */}
         <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
-          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: 350 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <ShowChartIcon color="action" sx={{ mr: 1 }}/>
-                <Typography variant="h6" component="h3">{getTrendChartTitle()}</Typography>
+          <Paper elevation={2} sx={{ p: 3, display: 'flex', flexDirection: 'column', height: 400, borderRadius: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'success.light', color: 'success.dark', mr: 1.5, display: 'flex' }}>
+                    <ShowChartIcon fontSize="small" />
+                </Box>
+                <Typography variant="h6" fontWeight={700}>{getTrendChartTitle()}</Typography>
             </Box>
             <Box sx={{ flexGrow: 1, position: 'relative' }}>
               {salesTrend && salesTrend.length > 0 ? (
                 <Line options={lineChartOptions} data={lineChartData} />
               ) : (
-                <Box sx={{display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center'}}>
-                  <Typography>No sales data to display trend for this period.</Typography>
+                <Box sx={{display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', opacity: 0.6 }}>
+                  <ShowChartIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 1 }} />
+                  <Typography variant="body1" color="textSecondary">No sales trend data available.</Typography>
                 </Box>
               )}
             </Box>
           </Paper>
         </Grid>
 
-        {/* Top 5 Selling Products */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
-          <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
-                <BarChartIcon color="action" sx={{ mr: 1 }}/>
-                <Typography variant="h6" component="h3">Top 5 Selling Products</Typography>
+        {/* --- TOP 5 SELLING PRODUCTS --- */}
+        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+          <Paper elevation={2} sx={{ p: 3, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3 }}>
+             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'primary.light', color: 'primary.dark', mr: 1.5, display: 'flex' }}>
+                    <BarChartIcon fontSize="small" />
+                </Box>
+                <Typography variant="h6" fontWeight={700}>Top 5 Selling Products</Typography>
             </Box>
-            <Box sx={{ flexGrow: 1, position: 'relative', overflowY: 'auto' }}>
+            <Box sx={{ flexGrow: 1, position: 'relative' }}>
                 {summary?.topSellingProducts && summary.topSellingProducts.length > 0 ? (
                     <Bar options={barChartOptions} data={barChartData} />
                 ) : (
-                    <Box sx={{display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center'}}>
-                      <Typography>No product sales data for this period.</Typography>
+                    <Box sx={{display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
+                      <Typography variant="body2">No product sales data.</Typography>
                     </Box>
                 )}
             </Box>
           </Paper>
         </Grid>
 
-        {/* Top 5 Selling Services */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
-           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
-                <BuildIcon color="info" sx={{ mr: 1 }} />
-                <Typography variant="h6" component="h3">Top 5 Selling Services</Typography>
+        {/* --- TOP 5 SELLING SERVICES --- */}
+        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+           <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+              <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'info.light', color: 'info.dark', mr: 1.5, display: 'flex' }}>
+                    <BuildIcon fontSize="small" />
+                </Box>
+                <Typography variant="h6" fontWeight={700}>Top 5 Selling Services</Typography>
               </Box>
-            <TableContainer sx={{ flexGrow: 1 }}>
-                 <Table stickyHeader size="small">
+            <TableContainer sx={{ flexGrow: 1, px: 1 }}>
+                 <Table stickyHeader size="medium">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Service Name</TableCell>
-                      <TableCell align="right">Count</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Service Name</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Count</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {summary?.topSellingServices && summary.topSellingServices.length > 0 ? (
                       summary.topSellingServices.map((service) => (
                         <TableRow key={service._id} hover>
-                          <TableCell>{service.serviceInfo?.name || 'N/A'}</TableCell>
+                          <TableCell sx={{ fontWeight: 500 }}>{service.serviceInfo?.name || 'N/A'}</TableCell>
                           <TableCell align="right">
-                            <Chip label={service.count} color="info" variant="outlined" size="small" />
+                            <Chip label={service.count} color="info" size="small" sx={{ fontWeight: 600, borderRadius: 1 }} />
                           </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={2} align="center">No service sales data for this period.</TableCell>
+                        <TableCell colSpan={2} align="center" sx={{ color: 'text.disabled', py: 4 }}>No data available.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -413,34 +482,36 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* Slow Moving Products */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
-          <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
-                <TrendingDownIcon color="error" sx={{ mr: 1 }} />
-                <Typography variant="h6" component="h3">Slow Moving Products</Typography>
+        {/* --- SLOW MOVING PRODUCTS --- */}
+        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+          <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+             <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'warning.light', color: 'warning.dark', mr: 1.5, display: 'flex' }}>
+                    <TrendingDownIcon fontSize="small" />
+                </Box>
+                <Typography variant="h6" fontWeight={700}>Slow Moving Products</Typography>
               </Box>
-            <TableContainer sx={{ flexGrow: 1 }}>
-                 <Table stickyHeader size="small">
+            <TableContainer sx={{ flexGrow: 1, px: 1 }}>
+                 <Table stickyHeader size="medium">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Product Name</TableCell>
-                      <TableCell align="right">Qty Sold</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Product Name</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Qty Sold</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {summary?.slowMovingProducts && summary.slowMovingProducts.length > 0 ? (
                       summary.slowMovingProducts.map((prod) => (
                         <TableRow key={prod._id} hover>
-                          <TableCell>{prod.productInfo?.name || 'N/A'}</TableCell>
+                          <TableCell sx={{ fontWeight: 500 }}>{prod.productInfo?.name || 'N/A'}</TableCell>
                           <TableCell align="right">
-                             <Chip label={prod.totalQuantitySold} color="warning" variant="outlined" size="small" />
+                             <Chip label={prod.totalQuantitySold} color="warning" variant="outlined" size="small" sx={{ fontWeight: 600 }} />
                           </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={2} align="center">No slow-moving product data for this period.</TableCell>
+                        <TableCell colSpan={2} align="center" sx={{ color: 'text.disabled', py: 4 }}>No slow-moving items.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -449,30 +520,30 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* Inventory by Category Summary */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
-          <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
-                <CategoryIcon color="secondary" sx={{ mr: 1 }} />
-                <Typography variant="h6" component="h3">Inventory by Category</Typography>
+        {/* --- INVENTORY BY CATEGORY --- */}
+        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+          <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+             <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'secondary.light', color: 'secondary.dark', mr: 1.5, display: 'flex' }}>
+                    <CategoryIcon fontSize="small" />
+                </Box>
+                <Typography variant="h6" fontWeight={700}>Inventory by Category</Typography>
               </Box>
-            <TableContainer sx={{ flexGrow: 1 }}>
-                 <Table stickyHeader size="small">
+            <TableContainer sx={{ flexGrow: 1, px: 1 }}>
+                 <Table stickyHeader size="medium">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Category Name</TableCell>
-                      <TableCell align="right">SKUs</TableCell>
-                      <TableCell align="right">Total Qty</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Category</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>SKUs</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Total Qty</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {summary?.categorySummary && summary.categorySummary.length > 0 ? (
                       summary.categorySummary.map((cat) => (
                         <TableRow key={cat.categoryName} hover>
-                          <TableCell sx={{ fontWeight: 'medium' }}>{cat.categoryName}</TableCell>
-                          <TableCell align="right">
-                             {cat.skuCount}
-                          </TableCell>
+                          <TableCell sx={{ fontWeight: 500 }}>{cat.categoryName}</TableCell>
+                          <TableCell align="right">{cat.skuCount}</TableCell>
                           <TableCell align="right">
                              <Chip label={cat.totalStock} variant="outlined" size="small" />
                           </TableCell>
@@ -480,7 +551,7 @@ const DashboardPage = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={3} align="center">No category data available.</TableCell>
+                        <TableCell colSpan={3} align="center" sx={{ color: 'text.disabled', py: 4 }}>No category data.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -489,75 +560,97 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* Low Stock Items */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
-          <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
-                  <WarningAmberIcon color="warning" sx={{ mr: 1 }}/>
-                  <Typography variant="h6" component="h3">Low Stock Items</Typography>
+        {/* --- LOW STOCK ITEMS --- */}
+        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+          <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+              <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'error.light', color: 'error.dark', mr: 1.5, display: 'flex' }}>
+                    <WarningAmberIcon fontSize="small" />
+                  </Box>
+                  <Typography variant="h6" fontWeight={700}>Low Stock Items</Typography>
               </Box>
-            <TableContainer sx={{ flexGrow: 1 }}>
-                <Table stickyHeader size="small">
+            <TableContainer sx={{ flexGrow: 1, px: 1 }}>
+                <Table stickyHeader size="medium">
                   <TableHead>
-                    <TableRow><TableCell>Product</TableCell><TableCell align="right">Qty Left</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Product</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary' }}>Qty Left</TableCell>
+                    </TableRow>
                   </TableHead>
                   <TableBody>
                     {lowStockItems && lowStockItems.length > 0 ? (lowStockItems.map((item) => (
                       <TableRow key={item._id} hover>
-                        <TableCell>{item.name}</TableCell>
-                        <TableCell align="right"><Chip label={item.quantity} color={item.quantity === 0 ? "error" : "warning"} size="small"/></TableCell>
+                        <TableCell sx={{ fontWeight: 500 }}>{item.name}</TableCell>
+                        <TableCell align="right">
+                          <Chip 
+                            label={item.quantity} 
+                            color={item.quantity === 0 ? "error" : "warning"} 
+                            size="small" 
+                            variant="filled"
+                            sx={{ fontWeight: 700, minWidth: 40 }}
+                          />
+                        </TableCell>
                       </TableRow>
-                    ))) : (<TableRow><TableCell colSpan={2} align="center">All items are sufficiently stocked.</TableCell></TableRow>)}
+                    ))) : (
+                      <TableRow>
+                        <TableCell colSpan={2} align="center" sx={{ color: 'text.disabled', py: 4 }}>All items are sufficiently stocked.</TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
             </TableContainer>
           </Paper>
         </Grid>
 
-        {/* Recent Activities */}
-        <Grid item size={{ xs: 12, md: 6 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
-           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
-                <ReceiptLongIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6" component="h3">Recent Activity</Typography>
+        {/* --- RECENT ACTIVITY --- */}
+        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+           <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+             <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'secondary.light', color: 'secondary.dark', mr: 1.5, display: 'flex' }}>
+                    <ReceiptLongIcon fontSize="small" />
+                </Box>
+                <Typography variant="h6" fontWeight={700}>Recent Activity</Typography>
               </Box>
-            <TableContainer sx={{ flexGrow: 1 }}>
-                 <Table size="small">
+            <TableContainer sx={{ flexGrow: 1, px: 1 }}>
+                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Time</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Details</TableCell>
-                      <TableCell>User</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Type</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Details</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>User</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {recentActivities && recentActivities.length > 0 ? (
                       recentActivities.map((activity) => (
-                        <TableRow key={activity.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                          <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                            {new Date(activity.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </TableCell>
-                          <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                            {new Date(activity.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+                        <TableRow key={activity.id} hover>
+                          <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap', color: 'text.secondary' }}>
+                            <Box fontWeight="600">{new Date(activity.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Box>
+                            <Box fontSize="0.75rem">{new Date(activity.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}</Box>
                           </TableCell>
                           <TableCell>
-                            <Chip label={activity.type} size="small" variant="outlined" color={
+                            <Chip 
+                              label={activity.type} 
+                              size="small" 
+                              variant="outlined" 
+                              color={
                                 activity.type === 'Sale' ? 'success' :
                                 activity.type === 'Delivery' ? 'info' :
                                 activity.type === 'Adjustment' ? 'warning' :
                                 activity.type === 'Return' ? 'error' : 'default'
-                            } />
+                              }
+                              sx={{ fontWeight: 600, fontSize: '0.7rem', height: 24 }}
+                            />
                           </TableCell>
-                          <TableCell sx={{ fontSize: '0.8rem', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={activity.description}>
+                          <TableCell sx={{ fontSize: '0.85rem', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={activity.description}>
                             {activity.description}
                           </TableCell>
                           <TableCell sx={{ fontSize: '0.8rem' }}>{activity.user}</TableCell>
                         </TableRow>
                       ))
                     ) : (
-                      <TableRow><TableCell colSpan={5} align="center">No recent activity.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} align="center" sx={{ color: 'text.disabled', py: 4 }}>No recent activity.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -565,25 +658,42 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* Pending Purchase Orders */}
-        <Grid item size={{  md: 12 }} sx={{ height: '420px' }} component={motion.div} variants={itemVariants}>
-          <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
-                <AssignmentIcon color="secondary" sx={{ mr: 1 }} />
-                <Typography variant="h6" component="h3">Pending Purchase Orders</Typography>
+        {/* --- PENDING PURCHASE ORDERS --- */}
+        <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
+          <Paper elevation={2} sx={{ p: 0, height: 350, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+             <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'text.disabled', color: 'white', mr: 1.5, display: 'flex' }}>
+                    <AssignmentIcon fontSize="small" />
+                </Box>
+                <Typography variant="h6" fontWeight={700}>Pending Purchase Orders</Typography>
               </Box>
-            <TableContainer sx={{ flexGrow: 1 }}>
-                <Table size="small">
+            <TableContainer sx={{ flexGrow: 1, px: 2 }}>
+                <Table size="medium">
                   <TableHead>
-                    <TableRow><TableCell>PO Number</TableCell><TableCell>Status</TableCell></TableRow>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>PO Number</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.secondary' }}>Status</TableCell>
+                    </TableRow>
                   </TableHead>
                   <TableBody>
                     {pendingPOs && pendingPOs.length > 0 ? (pendingPOs.map((po) => (
                       <TableRow key={po._id} hover>
-                        <TableCell>{po.poNumber}</TableCell>
-                        <TableCell><Chip label={po.status} size="small" color={po.status === 'Pending' ? 'warning' : 'info'} /></TableCell>
+                        <TableCell sx={{ fontWeight: 500, fontFamily: 'monospace' }}>{po.poNumber}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={po.status} 
+                            size="small" 
+                            color={po.status === 'Pending' ? 'warning' : 'info'} 
+                            variant="filled"
+                            sx={{ fontWeight: 700, borderRadius: 1 }}
+                          />
+                        </TableCell>
                       </TableRow>
-                    ))) : (<TableRow><TableCell colSpan={2} align="center">No pending orders.</TableCell></TableRow>)}
+                    ))) : (
+                      <TableRow>
+                        <TableCell colSpan={2} align="center" sx={{ color: 'text.disabled', py: 4 }}>No pending orders.</TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
             </TableContainer>

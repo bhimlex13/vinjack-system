@@ -1,19 +1,14 @@
 // client/src/components/StockGauge.js
 import React from 'react';
 import { Box, Typography, LinearProgress, Tooltip } from '@mui/material';
-import { motion } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion } from 'framer-motion'; 
 
 const getStatusDetails = (status) => {
   switch (status) {
-    case 'Out of Stock':
-      return { text: 'Out of Stock', color: 'inherit' }; // Grey
-    case 'Critical':
-      return { text: 'Critical', color: 'error' };   // Red
-    case 'Low':
-      return { text: 'Low', color: 'warning' }; // Orange
-    case 'Healthy': 
-    default:
-      return { text: 'In Stock', color: 'success' }; // Green
+    case 'Out of Stock': return { text: 'Out of Stock', color: 'error' }; 
+    case 'Critical': return { text: 'Critical', color: 'error' };   
+    case 'Low': return { text: 'Low', color: 'warning' }; 
+    case 'Healthy': default: return { text: 'In Stock', color: 'success' }; 
   }
 };
 
@@ -36,17 +31,12 @@ const StockGauge = ({ quantity, maxStock, stockStatus }) => {
       <Box sx={{ width: '100%', pt: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
           <Typography
-            variant="body2"
-            component="span"
-            sx={{
-              fontWeight: 'bold',
-              color: statusColor === 'inherit' ? 'text.secondary' : `${statusColor}.main`,
-              whiteSpace: 'nowrap'
-            }}
+            variant="caption"
+            sx={{ fontWeight: 'bold', color: 'text.primary', whiteSpace: 'nowrap' }}
           >
             {quantityDisplay} 
           </Typography>
-          <Typography variant="body2" component="span" sx={{ color: 'text.secondary' }}>
+          <Typography variant="caption" color="text.secondary">
             {progressBarValue}% 
           </Typography>
         </Box>
@@ -57,19 +47,18 @@ const StockGauge = ({ quantity, maxStock, stockStatus }) => {
                 initial={{ width: 0 }}
                 animate={{ width: `${progressBarValue}%` }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
-                style={{ 
-                    height: '100%', 
-                    // Need to map MUI colors to actual CSS colors for motion style if not using classes
-                    // Simple workaround: Use MUI LinearProgress inside motion div or just stick to simple LinearProgress if animation is overkill
-                    // Actually, standard MUI LinearProgress animates on value change by default. 
-                    // Let's enhance it by animating from 0 on mount.
-                }}
+                style={{ height: '100%' }}
             >
                  <LinearProgress
                     variant="determinate"
                     value={progressBarValue} 
                     color={statusColor} 
-                    sx={{ height: 6, borderRadius: 5 }}
+                    sx={{ 
+                        height: 6, 
+                        borderRadius: 5,
+                        backgroundColor: 'transparent', // Let parent bg show
+                        '& .MuiLinearProgress-bar': { borderRadius: 5 }
+                    }}
                 />
             </motion.div>
         </Box>
