@@ -380,9 +380,9 @@ const SupplierPOReviewPage = () => {
           </Box>
           
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item size={{ xs: 6 }}><Typography><strong>PO Number:</strong> {po.poNumber}</Typography></Grid>
-            <Grid item size={{ xs: 6 }}><Typography><strong>From:</strong> {po.supplier.name}</Typography></Grid>
-            <Grid item size={{ xs: 12 }}><Typography><strong>Type:</strong> {po.poType}</Typography></Grid>
+            <Grid size={{ xs: 6 }}><Typography><strong>PO Number:</strong> {po.poNumber}</Typography></Grid>
+            <Grid size={{ xs: 6 }}><Typography><strong>From:</strong> {po.supplier.name}</Typography></Grid>
+            <Grid size={{ xs: 12 }}><Typography><strong>Type:</strong> {po.poType}</Typography></Grid>
           </Grid>
 
           <TableContainer component={Paper} variant="outlined">

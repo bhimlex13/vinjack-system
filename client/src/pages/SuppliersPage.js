@@ -201,7 +201,7 @@ const SuppliersPage = () => {
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
         
         {/* Header Section */}
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
           <Stack direction="row" alignItems="center" spacing={2}>
               <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'secondary.light', color: 'secondary.dark', display: 'flex' }}>
                 <LocalShippingIcon fontSize="medium" />
@@ -216,7 +216,7 @@ const SuppliersPage = () => {
             variant="contained" 
             startIcon={<AddIcon />} 
             onClick={openSupplierModalForAdd}
-            sx={{ fontWeight: 600, px: 3, borderRadius: 2 }}
+            sx={{ fontWeight: 600, px: 3, borderRadius: 2, width: { xs: '100%', sm: 'auto' } }}
           >
             Add Supplier
           </Button>
@@ -225,7 +225,8 @@ const SuppliersPage = () => {
         {/* Filters Section */}
         <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item size={{ xs: 12, md: 8 }}>
+            {/* Standard V2 Grid Syntax */}
+            <Grid size={{ xs: 12, md: 8 }}>
               <TextField
                 fullWidth
                 placeholder="Search Name, Contact Person, or Email..."
@@ -243,7 +244,7 @@ const SuppliersPage = () => {
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
               />
             </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Filter by Status</InputLabel>
                 <Select

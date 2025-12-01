@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { createDelivery } from '../api/deliveryApi';
 import api from '../api/axios';
-import AuthContext from '../context/AuthContext';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -28,7 +27,6 @@ const formatDateForInput = (date) => {
 };
 
 const RecordDeliveryForm = ({ onClose }) => {
-  const { user } = useContext(AuthContext);
   const { confirm } = useContext(ConfirmationContext);
 
   const [suppliers, setSuppliers] = useState([]);
@@ -231,7 +229,6 @@ const RecordDeliveryForm = ({ onClose }) => {
       );
   }
 
-  // --- MODIFIED: Added bgcolor: 'background.paper' to fix transparency issue ---
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, bgcolor: 'background.paper' }}>
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
@@ -429,20 +426,33 @@ const RecordDeliveryForm = ({ onClose }) => {
         </Table>
       </TableContainer>
 
-      {/* Action Buttons */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Button onClick={onClose} color="inherit" disabled={isLoading} variant="outlined">Cancel</Button>
-          <Button
-            type="submit"
-            variant="contained"
-            color="success"
-            startIcon={isLoading ? null : <SaveIcon />}
-            disabled={productsReceived.length === 0 || !selectedSupplier || !deliveryDate || isLoading}
-            sx={{ px: 3, fontWeight: 700 }}
-          >
-            {isLoading ? <LoadingSpinner text="" /> : 'Save Delivery'}
-          </Button>
-      </Box>
+      {/* Action Buttons - Stacked on Mobile, Right-Aligned on Desktop */}
+      <Grid container spacing={2} sx={{ pt: 2, mt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Grid size={{ xs: 12, sm: 'auto' }} sx={{ ml: { sm: 'auto' }, order: { xs: 2, sm: 1 } }}>
+              <Button 
+                onClick={onClose} 
+                color="inherit" 
+                disabled={isLoading} 
+                variant="outlined" 
+                fullWidth
+              >
+                Cancel
+              </Button>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 'auto' }} sx={{ order: { xs: 1, sm: 2 } }}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="success"
+                startIcon={isLoading ? null : <SaveIcon />}
+                disabled={productsReceived.length === 0 || !selectedSupplier || !deliveryDate || isLoading}
+                fullWidth
+                sx={{ px: 3, fontWeight: 700 }}
+              >
+                {isLoading ? <LoadingSpinner text="" /> : 'Save Delivery'}
+              </Button>
+          </Grid>
+      </Grid>
     </Box>
   );
 };

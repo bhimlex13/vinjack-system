@@ -10,7 +10,7 @@ import {
   Box, Typography, Tabs, Tab, Button, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, TextField, IconButton, Switch, FormControlLabel,
-  Tooltip, Grid, Chip, Container, TablePagination, InputAdornment
+  Tooltip, Chip, Container, TablePagination, InputAdornment
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -18,7 +18,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download'; 
 import StorageIcon from '@mui/icons-material/Storage';
 import BackupIcon from '@mui/icons-material/Backup';
-import SearchIcon from '@mui/icons-material/Search'; // Added SearchIcon
+import SearchIcon from '@mui/icons-material/Search';
 
 // Initial state for the form
 const emptyFormState = { name: '', description: '', charge: '', status: 'active' };
@@ -318,6 +318,8 @@ const DataManagementPage = () => {
                 onChange={handleTabChange} 
                 indicatorColor="primary"
                 textColor="primary"
+                variant="scrollable"
+                scrollButtons="auto"
                 sx={{ '& .MuiTab-root': { fontWeight: 600, minHeight: 60 } }}
             >
               <Tab label="Categories" value="categories" />
@@ -328,7 +330,7 @@ const DataManagementPage = () => {
 
           <Box sx={{ p: 3 }}>
             {/* Toolbar: Search and Add Button */}
-            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2 }}>
               <TextField
                 placeholder="Search..."
                 size="small"
@@ -344,7 +346,12 @@ const DataManagementPage = () => {
                 }}
                 sx={{ width: { xs: '100%', sm: 300 } }}
               />
-              <Button variant="contained" startIcon={<AddIcon />} onClick={() => openModal()}>
+              <Button 
+                variant="contained" 
+                startIcon={<AddIcon />} 
+                onClick={() => openModal()}
+                sx={{ width: { xs: '100%', sm: 'auto' } }}
+              >
                 Add New {{ categories: 'Category', brands: 'Brand', services: 'Service' }[activeTab]}
               </Button>
             </Box>
@@ -356,7 +363,7 @@ const DataManagementPage = () => {
         </Paper>
 
         {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
-          <Paper sx={{ p: 3, mt: 4, borderRadius: 3, borderLeft: '6px solid', borderLeftColor: 'secondary.main', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <Paper sx={{ p: 3, mt: 4, borderRadius: 3, borderLeft: '6px solid', borderLeftColor: 'secondary.main', display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Box sx={{ p: 1.5, borderRadius: '50%', bgcolor: 'secondary.50', color: 'secondary.main', mr: 2 }}>
                     <BackupIcon fontSize="medium" />
@@ -375,7 +382,7 @@ const DataManagementPage = () => {
               startIcon={isDownloading ? <CircularProgress size={20} color="inherit" /> : <DownloadIcon />}
               onClick={handleDownloadBackup}
               disabled={isDownloading}
-              sx={{ fontWeight: 700 }}
+              sx={{ fontWeight: 700, width: { xs: '100%', sm: 'auto' } }}
             >
               {isDownloading ? 'Generating...' : 'Download Backup'}
             </Button>

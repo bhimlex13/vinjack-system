@@ -164,7 +164,12 @@ const CustomersPage = () => {
                 <Typography variant="body2" color="text.secondary">Manage customer profiles and vehicle records</Typography>
              </Box>
           </Stack>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openModalForAdd} sx={{ fontWeight: 600, px: 3, py: 1 }}>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            onClick={openModalForAdd} 
+            sx={{ fontWeight: 600, px: 3, py: 1, width: { xs: '100%', sm: 'auto' } }}
+          >
             Add Customer
           </Button>
         </Box>
@@ -172,8 +177,8 @@ const CustomersPage = () => {
         {/* Filters */}
         <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
           <Grid container spacing={2}>
-            {/* Using SIZE prop for V2/V6 Grid compatibility */}
-            <Grid item size={{ xs: 12, md: 8 }}>
+            {/* Standard V2 Grid Syntax */}
+            <Grid size={{ xs: 12, md: 8 }}>
               <TextField
                 label="Search Customers"
                 placeholder="Search by Name, Email, or Phone..."
@@ -192,7 +197,7 @@ const CustomersPage = () => {
                 }}
               />
             </Grid>
-            <Grid item size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <TextField
                 label="Filter by Motorcycle"
                 placeholder="e.g. Honda, Yamaha..."

@@ -209,8 +209,8 @@ const DeliveriesPage = () => {
       
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
         
-        {/* Header */}
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Header - Stacked on Mobile, Row on Desktop */}
+        <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
           <Stack direction="row" alignItems="center" spacing={2}>
               <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'primary.light', color: 'primary.dark', display: 'flex' }}>
                 <LocalShippingIcon fontSize="medium" />
@@ -221,13 +221,13 @@ const DeliveriesPage = () => {
               </Box>
           </Stack>
           
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: { xs: '100%', sm: 'auto' } }}>
             <Button 
                 variant="contained" 
                 color="success"
                 startIcon={<LocalShippingIcon />}
                 onClick={() => setIsDeliveryModalOpen(true)}
-                sx={{ fontWeight: 600, px: 3 }}
+                sx={{ fontWeight: 600, px: 3, width: { xs: '100%', sm: 'auto' } }}
             >
                 Record Delivery
             </Button>
@@ -235,7 +235,7 @@ const DeliveriesPage = () => {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => navigate('/purchase-orders/new')}
-                sx={{ fontWeight: 600, px: 3 }}
+                sx={{ fontWeight: 600, px: 3, width: { xs: '100%', sm: 'auto' } }}
             >
                 Create PO
             </Button>
@@ -246,23 +246,25 @@ const DeliveriesPage = () => {
         <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
           <Grid container spacing={2} alignItems="center">
             
-            {/* Date Presets - Grid V2 Syntax */}
+            {/* Date Presets - Full Width, Scrollable on Mobile */}
             <Grid size={{ xs: 12 }}>
-                <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
-                    {['today', 'week', 'month', 'year', 'all'].map((preset) => (
-                        <Button 
-                            key={preset}
-                            variant={datePreset === preset ? 'contained' : 'outlined'} 
-                            onClick={() => handleDatePreset(preset)}
-                            sx={{ textTransform: 'capitalize' }}
-                        >
-                            {preset === 'all' ? 'All Time' : preset}
-                        </Button>
-                    ))}
-                </ButtonGroup>
+                <Box sx={{ overflowX: 'auto', pb: 0.5, whiteSpace: 'nowrap' }}>
+                    <ButtonGroup variant="outlined" aria-label="date range presets" size="small">
+                        {['today', 'week', 'month', 'year', 'all'].map((preset) => (
+                            <Button 
+                                key={preset}
+                                variant={datePreset === preset ? 'contained' : 'outlined'} 
+                                onClick={() => handleDatePreset(preset)}
+                                sx={{ textTransform: 'capitalize' }}
+                            >
+                                {preset === 'all' ? 'All Time' : preset}
+                            </Button>
+                        ))}
+                    </ButtonGroup>
+                </Box>
             </Grid>
 
-            {/* Date Inputs */}
+            {/* Date Inputs - Full width on mobile, 4 cols on desktop */}
             <Grid size={{ xs: 12, md: 4 }}>
               <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
             </Grid>
@@ -272,7 +274,7 @@ const DeliveriesPage = () => {
 
             <Grid size={{ xs: 12 }} sx={{ my: 0.5 }}><Divider /></Grid>
 
-            {/* Search and Supplier Filter */}
+            {/* Search - Full width on mobile, 8 cols on desktop */}
             <Grid size={{ xs: 12, md: 8 }}>
                 <TextField
                     fullWidth
@@ -291,6 +293,8 @@ const DeliveriesPage = () => {
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 />
             </Grid>
+            
+            {/* Supplier Filter - Full width on mobile, 4 cols on desktop */}
             <Grid size={{ xs: 12, md: 4 }}>
                 <FormControl fullWidth size="small">
                     <InputLabel>Filter by Supplier</InputLabel>
@@ -365,8 +369,8 @@ const DeliveriesPage = () => {
               sx: { 
                 borderRadius: 3, 
                 overflow: 'hidden',
-                bgcolor: 'background.paper', // Added: Fixes transparency
-                boxShadow: 24 // Added: Restores shadow depth
+                bgcolor: 'background.paper', 
+                boxShadow: 24 
               }
             }}
           >
@@ -452,8 +456,8 @@ const DeliveriesPage = () => {
               sx: { 
                 borderRadius: 3, 
                 overflow: 'hidden',
-                bgcolor: 'background.paper', // Added: Fixes transparency
-                boxShadow: 24 // Added: Restores shadow depth
+                bgcolor: 'background.paper',
+                boxShadow: 24 
               }
             }}
           >

@@ -8,7 +8,7 @@ import { toast } from 'react-toastify';
 // MUI Imports
 import {
   Box, Button, TextField, FormControl, InputLabel, Select, MenuItem,
-  Grid, ToggleButtonGroup, ToggleButton, Alert, Stack, InputAdornment, IconButton,
+  Grid, ToggleButtonGroup, ToggleButton, Alert, InputAdornment, IconButton,
   Typography, Tooltip, FormHelperText,
   Autocomplete, Dialog, DialogTitle, DialogContent, DialogActions,
   Paper, List, ListItem, Divider, FormControlLabel, Checkbox 
@@ -207,9 +207,6 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
     const invalidCostEntry = formData.supplierCosts.find(sc => sc.cost === '' || isNaN(sc.cost) || Number(sc.cost) < 0);
     if (invalidCostEntry) { setError(`Please enter a valid, non-negative cost for all assigned suppliers.`); return; }
     
-    // Allow creating product without supplier initially if needed, but warn
-    // if (!productToEdit && (!formData.supplierCosts || formData.supplierCosts.length === 0)) { setError('Please assign at least one supplier and set their cost.'); return; }
-    
     const dataToSend = { ...formData }; 
     if (productToEdit) { delete dataToSend.quantity; }
     
@@ -250,7 +247,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
   }
 
   return (
-    <Box sx={{ minWidth: 600, p: 3, pt: 1 }}>
+    <Box sx={{ width: '100%', p: 3, pt: 1, pb: 2 }}>
         <AddSupplierDialog
             open={isAddSupplierDialogOpen}
             onClose={() => setIsAddSupplierDialogOpen(false)}
@@ -260,19 +257,19 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
         />
 
         <Box component="form" onSubmit={handleSubmit}>
-          {/* Using Grid V2 Standard */}
+          {/* Using Grid V2 Standard - REMOVED item prop */}
           <Grid container spacing={2}>
              {/* Item Code */}
-             <Grid item size={{ xs: 12 }}> 
+             <Grid size={{ xs: 12 }}> 
                 <TextField fullWidth required name="itemCode" label="Item Code" value={formData.itemCode} onChange={handleChange} disabled={!!productToEdit} InputProps={{ endAdornment: ( <InputAdornment position="end"> <Tooltip title="Generate Unique Item Code"><IconButton onClick={handleGenerateItemCode} edge="end" disabled={!!productToEdit}> <AutoFixHighIcon /> </IconButton></Tooltip> </InputAdornment> ) }} /> 
                 {!!productToEdit && <FormHelperText>Item Code cannot be changed after creation.</FormHelperText>} 
              </Grid>
              
              {/* Product Name */}
-             <Grid item size={{ xs: 12 }}><TextField fullWidth required name="name" label="Product Name" value={formData.name} onChange={handleChange} /></Grid>
+             <Grid size={{ xs: 12 }}><TextField fullWidth required name="name" label="Product Name" value={formData.name} onChange={handleChange} /></Grid>
 
-             {/* Category & Brand */}
-            <Grid item size={{ xs: 6 }}>
+             {/* Category & Brand - Stack on mobile, side-by-side on tablet+ */}
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth required>
                 <InputLabel>Category</InputLabel>
                 <Select name="category" label="Category" value={dropdownsLoaded && categories.some(c => c._id === formData.category) ? formData.category : ''} onChange={handleChange}>
@@ -280,7 +277,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item size={{ xs: 6 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth required>
                 <InputLabel>Brand</InputLabel>
                 <Select name="brand" label="Brand" value={dropdownsLoaded && brands.some(b => b._id === formData.brand) ? formData.brand : ''} onChange={handleChange}>
@@ -290,19 +287,19 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
             </Grid>
             
              {/* Serialized Checkbox */}
-             <Grid item size={{ xs: 12 }}>
+             <Grid size={{ xs: 12 }}>
                 <FormControlLabel
                     control={ <Checkbox checked={formData.isSerialized} onChange={handleCheckboxChange} name="isSerialized" disabled={!!productToEdit && productToEdit.quantity > 0} /> }
                     label={ <Box sx={{ display: 'flex', alignItems: 'center' }}> Track Specific Serial Numbers/Tags <Tooltip title="Enabling serialization means each unit must have a unique ID upon receipt and sale."><InfoOutlinedIcon sx={{ ml: 0.5 }} fontSize="small" color="action" /></Tooltip> </Box> }
                 />
             </Grid>
 
-            {/* Suppliers Section */}
-            <Grid item size={{ xs: 12 }}>
+            {/* Suppliers Section - Added MaxHeight to prevent overlap */}
+            <Grid size={{ xs: 12 }}>
                 <Typography variant="subtitle2" gutterBottom fontWeight="bold">Assigned Suppliers & Costs</Typography>
                 
-                {/* Supplier List */}
-                <Paper variant="outlined" sx={{ p: 1.5, mb: 1, backgroundColor: 'background.paper' }}> 
+                {/* Supplier List - SCROLLABLE CONTAINER FIX */}
+                <Paper variant="outlined" sx={{ p: 1.5, mb: 1, backgroundColor: 'background.paper', maxHeight: '250px', overflowY: 'auto' }}> 
                     <List dense disablePadding>
                         {getAssignedSupplierDetailsWithCost.length > 0 ? (
                             getAssignedSupplierDetailsWithCost.map((supplier, index) => {
@@ -332,20 +329,18 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
                 {/* Add Supplier Button */}
                  <Button size="small" startIcon={<AddCircleOutlineIcon />} onClick={() => setIsAddSupplierDialogOpen(true)} disabled={supplierLoading}>Add Supplier</Button>
                  
-                 {/* --- HELPER TEXT PRESERVED HERE --- */}
                  <FormHelperText sx={{ mt: 1 }}>
                     Click the star ☆ icon to set a supplier's cost as the default for profit calculations.
                  </FormHelperText>
-                 {/* -------------------------------- */}
             </Grid>
 
-             {/* Pricing & Stock */}
-             <Grid item size={{ xs: 6 }}><TextField fullWidth required type="number" name="price" label="Selling Price" value={formData.price} onChange={handleChange} inputProps={{ step: "0.01", min: 0 }} /></Grid>
-             <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="quantity" label="Current Qty" value={formData.quantity} onChange={handleChange} inputProps={{ min: 0 }} disabled={!!productToEdit} InputProps={productToEdit ? { endAdornment: ( <InputAdornment position="end"> <Tooltip title="Use 'Adjust Stock' button in inventory list."> <InfoOutlinedIcon color="action" /> </Tooltip> </InputAdornment> ) }: {}} /> </Grid>
-             <Grid item size={{ xs: 6 }}> <TextField fullWidth required type="number" name="maxStock" label="Max Stock" value={formData.maxStock} onChange={handleChange} inputProps={{ min: 1 }} /> </Grid>
+             {/* Pricing & Stock - Responsive: Stack on mobile, Row on larger screens */}
+             <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth required type="number" name="price" label="Selling Price" value={formData.price} onChange={handleChange} inputProps={{ step: "0.01", min: 0 }} /></Grid>
+             <Grid size={{ xs: 12, sm: 4 }}> <TextField fullWidth required type="number" name="quantity" label="Current Qty" value={formData.quantity} onChange={handleChange} inputProps={{ min: 0 }} disabled={!!productToEdit} InputProps={productToEdit ? { endAdornment: ( <InputAdornment position="end"> <Tooltip title="Use 'Adjust Stock' button in inventory list."> <InfoOutlinedIcon color="action" /> </Tooltip> </InputAdornment> ) }: {}} /> </Grid>
+             <Grid size={{ xs: 12, sm: 4 }}> <TextField fullWidth required type="number" name="maxStock" label="Max Stock" value={formData.maxStock} onChange={handleChange} inputProps={{ min: 1 }} /> </Grid>
              
              {productToEdit && (user?.role === 'Super Admin' || user?.role === 'Admin') && (
-                <Grid item size={{ xs: 6 }}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                     <FormControl fullWidth required>
                         <InputLabel>Status</InputLabel>
                         <Select name="status" label="Status" value={formData.status} onChange={handleChange}>
@@ -357,7 +352,7 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
              )}
 
             {/* Image Upload */}
-            <Grid item size={{ xs: 12 }}>
+            <Grid size={{ xs: 12 }}>
               <FormControl fullWidth>
                 <ToggleButtonGroup value={imageSource} exclusive onChange={(e, val) => val && setImageSource(val)} size="small">
                   <ToggleButton value="url">URL</ToggleButton>
@@ -372,16 +367,49 @@ const ProductForm = ({ onFormSubmit, productToEdit, onClose, onProductArchive })
           
           {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
-          {/* Action Buttons */}
-          <Stack direction="row" justifyContent={productToEdit && (user.role === 'Super Admin' || user.role === 'Admin') ? "space-between" : "flex-end"} alignItems="center" sx={{ mt: 3 }}>
+          {/* Action Buttons - Stacked on Mobile, Row on Desktop */}
+          <Grid container spacing={2} sx={{ mt: 3 }}>
+            
+            {/* Archive Button (Bottom on mobile, Left on desktop) */}
             {productToEdit && (user.role === 'Super Admin' || user.role === 'Admin') && formData.status === 'active' && (
-              <Button color="warning" onClick={handleArchive} startIcon={<ArchiveIcon />}>Archive Product</Button>
+              <Grid size={{ xs: 12, sm: 'auto' }} sx={{ order: { xs: 3, sm: 1 }, mr: { sm: 'auto' } }}>
+                <Button 
+                    fullWidth 
+                    color="warning" 
+                    onClick={handleArchive} 
+                    startIcon={<ArchiveIcon />}
+                    variant="outlined" 
+                >
+                    Archive Product
+                </Button>
+              </Grid>
             )}
-            <Stack direction="row" spacing={2}> 
-              <Button onClick={onClose}>Cancel</Button> 
-              <Button type="submit" variant="contained">{productToEdit ? 'Save Changes' : 'Add Product'}</Button> 
-            </Stack>
-          </Stack>
+
+            {/* Cancel Button (Middle on mobile, Right on desktop) */}
+            <Grid size={{ xs: 12, sm: 'auto' }} sx={{ order: { xs: 2, sm: 2 }, ml: { sm: 'auto' } }}>
+              <Button 
+                fullWidth 
+                onClick={onClose} 
+                variant="outlined" 
+                color="inherit"
+              >
+                Cancel
+              </Button>
+            </Grid>
+
+            {/* Save Button (Top on mobile, Right on desktop) */}
+            <Grid size={{ xs: 12, sm: 'auto' }} sx={{ order: { xs: 1, sm: 3 } }}>
+              <Button 
+                fullWidth 
+                type="submit" 
+                variant="contained" 
+                size="large"
+              >
+                {productToEdit ? 'Save Changes' : 'Add Product'}
+              </Button>
+            </Grid>
+
+          </Grid>
         </Box>
     </Box>
   );

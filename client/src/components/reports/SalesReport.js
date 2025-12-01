@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 import {
   Typography, Paper, TextField, Button, Grid, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Alert, Box, Autocomplete, FormControl, 
-  InputLabel, Select, MenuItem, ButtonGroup, Stack, useTheme, Chip
+  InputLabel, Select, MenuItem, ButtonGroup, Stack, Chip
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
@@ -23,7 +23,6 @@ import { FaMoneyBillWave, FaCoins, FaChartLine } from 'react-icons/fa';
 import LoadingSpinner from '../LoadingSpinner';
 
 const SalesReport = () => {
-  const theme = useTheme();
   const [reportData, setReportData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -226,7 +225,7 @@ const SalesReport = () => {
     doc.output('dataurlnewwindow');
   };
 
-  // --- FIXED: SummaryCard with explicit animation ---
+  // --- Summary Card ---
   const SummaryCard = ({ title, value, color, icon }) => (
     <Grid size={{ xs: 12, sm: 4 }}>
       <Paper 
@@ -278,23 +277,25 @@ const SalesReport = () => {
           </Box>
         ) : (
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 7 }}>
-              <ButtonGroup fullWidth variant="outlined" size="medium">
-                {['today', 'week', 'month', 'year', 'all'].map((p) => (
-                  <Button 
-                    key={p} 
-                    variant={datePreset === p ? 'contained' : 'outlined'} 
-                    onClick={() => handleDatePreset(p)}
-                    sx={{ textTransform: 'capitalize' }}
-                  >
-                    {p === 'all' ? 'All Time' : p}
-                  </Button>
-                ))}
-              </ButtonGroup>
+            <Grid size={{ xs: 12, lg: 7 }}>
+              <Box sx={{ overflowX: 'auto', pb: 0.5, whiteSpace: 'nowrap' }}>
+                <ButtonGroup fullWidth variant="outlined" size="medium">
+                    {['today', 'week', 'month', 'year', 'all'].map((p) => (
+                    <Button 
+                        key={p} 
+                        variant={datePreset === p ? 'contained' : 'outlined'} 
+                        onClick={() => handleDatePreset(p)}
+                        sx={{ textTransform: 'capitalize' }}
+                    >
+                        {p === 'all' ? 'All Time' : p}
+                    </Button>
+                    ))}
+                </ButtonGroup>
+              </Box>
             </Grid>
             
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Stack direction="row" spacing={1}>
+            <Grid size={{ xs: 12, lg: 5 }}>
+              <Stack direction="row" spacing={1} justifyContent={{ xs: 'flex-start', lg: 'flex-end' }}>
                 <Button 
                   variant="outlined" color="primary" fullWidth startIcon={<DownloadIcon />} 
                   onClick={handleDownloadCSV} disabled={isLoading || reportData.length === 0}
@@ -378,12 +379,12 @@ const SalesReport = () => {
               <Table stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Date</TableCell>
-                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Customer</TableCell>
-                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Items / Services</TableCell>
-                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Recorded By</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Revenue</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Profit</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100', verticalAlign: 'middle' }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100', verticalAlign: 'middle' }}>Customer</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100', verticalAlign: 'middle' }}>Items / Services</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100', verticalAlign: 'middle' }}>Recorded By</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, bgcolor: 'grey.100', verticalAlign: 'middle' }}>Revenue</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, bgcolor: 'grey.100', verticalAlign: 'middle' }}>Profit</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -393,12 +394,12 @@ const SalesReport = () => {
                     
                     return (
                       <TableRow key={sale._id} hover>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        <TableCell sx={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                           <Typography variant="body2" fontWeight={600}>{new Date(sale.createdAt).toLocaleDateString()}</Typography>
                           <Typography variant="caption" color="textSecondary">{new Date(sale.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
                         </TableCell>
-                        <TableCell>{sale.customer?.name || 'Walk-in'}</TableCell>
-                        <TableCell>
+                        <TableCell sx={{ verticalAlign: 'middle' }}>{sale.customer?.name || 'Walk-in'}</TableCell>
+                        <TableCell sx={{ verticalAlign: 'middle' }}>
                            <Box sx={{ maxHeight: 80, overflowY: 'auto', pr: 1 }}>
                             {sale.items.map((item, idx) => (
                                 <Box key={`i-${idx}`} sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', mb: 0.5 }}>
@@ -412,9 +413,9 @@ const SalesReport = () => {
                             ))}
                            </Box>
                         </TableCell>
-                        <TableCell>{sale.recordedBy?.fullName || 'N/A'}</TableCell>
-                        <TableCell align="right">{`₱${sale.totalAmount.toFixed(2)}`}</TableCell>
-                        <TableCell align="right">
+                        <TableCell sx={{ verticalAlign: 'middle' }}>{sale.recordedBy?.fullName || 'N/A'}</TableCell>
+                        <TableCell align="right" sx={{ verticalAlign: 'middle' }}>{`₱${sale.totalAmount.toFixed(2)}`}</TableCell>
+                        <TableCell align="right" sx={{ verticalAlign: 'middle' }}>
                           <Chip 
                             label={`₱${saleProfit.toFixed(2)}`} 
                             size="small" 
@@ -427,7 +428,7 @@ const SalesReport = () => {
                     );
                   }) : (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6, verticalAlign: 'middle' }}>
                         <Typography color="textSecondary">No sales records found for this period.</Typography>
                       </TableCell>
                     </TableRow>

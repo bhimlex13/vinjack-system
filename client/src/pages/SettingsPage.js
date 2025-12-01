@@ -308,7 +308,7 @@ const SettingsPage = () => {
       <Grid container spacing={3}>
 
         {/* --- Profile Section (READ ONLY) --- */}
-        <Grid item size={{ xs: 12 }} >
+        <Grid size={{ xs: 12 }}>
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                     <AccountCircleIcon color="action" sx={{ mr: 1 }} />
@@ -320,7 +320,6 @@ const SettingsPage = () => {
                   <ListItem><ListItemIcon><EmailIcon /></ListItemIcon><ListItemText primary="Email" secondary={profile.email} /></ListItem>
                   <ListItem><ListItemIcon><VpnKeyIcon /></ListItemIcon><ListItemText primary="Password" secondary="********" /></ListItem>
                 </List>
-                {/* REMOVED: Edit Button */}
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
                     Note: To update profile details or change password, please contact the Administrator or the Owner.
                 </Typography>
@@ -328,7 +327,7 @@ const SettingsPage = () => {
         </Grid>
 
         {/* --- Notifications Section --- */}
-        <Grid item size={{ xs: 12 }}>
+        <Grid size={{ xs: 12 }}>
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                     <NotificationsIcon color="action" sx={{ mr: 1 }} />
@@ -336,7 +335,7 @@ const SettingsPage = () => {
                 </Box>
                 <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
                     {/* Low Stock Alert */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2, mb: 2 }}>
                         <FormControlLabel
                           control={
                             <Switch
@@ -353,7 +352,7 @@ const SettingsPage = () => {
                               {isNotificationSaving && personalSettings.notificationsEnabled !== originalPersonalSettings.notificationsEnabled && <CircularProgress size={16} sx={{ ml: 1 }} />}
                             </Box>
                           }
-                          sx={{ mr: 'auto' }}
+                          sx={{ mr: 'auto', width: '100%' }}
                         />
                         <TextField
                             label="Low Stock Alert Time"
@@ -365,7 +364,7 @@ const SettingsPage = () => {
                             InputLabelProps={{ shrink: true }}
                             inputProps={{ step: 300 }}
                             helperText="Saves on blur."
-                            sx={{ mt: { xs: 1, sm: 0 }, width: '100%', maxWidth: { xs: '100%', sm: '200px' } }}
+                            sx={{ width: { xs: '100%', sm: '200px' } }}
                             size="small"
                         />
                     </Box>
@@ -373,7 +372,7 @@ const SettingsPage = () => {
                     <Divider sx={{ my: 2 }} />
 
                     {/* Daily Sales Report */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
                         <FormControlLabel
                           control={
                             <Switch
@@ -390,7 +389,7 @@ const SettingsPage = () => {
                               {isNotificationSaving && personalSettings.dailySalesReportEnabled !== originalPersonalSettings.dailySalesReportEnabled && <CircularProgress size={16} sx={{ ml: 1 }} />}
                             </Box>
                           }
-                          sx={{ mr: 'auto' }}
+                          sx={{ mr: 'auto', width: '100%' }}
                         />
                         <TextField
                             label="Daily Report Time"
@@ -402,7 +401,7 @@ const SettingsPage = () => {
                             InputLabelProps={{ shrink: true }}
                             inputProps={{ step: 300 }} 
                             helperText="Saves on blur."
-                            sx={{ mt: { xs: 1, sm: 0 }, width: '100%', maxWidth: { xs: '100%', sm: '200px' } }}
+                            sx={{ width: { xs: '100%', sm: '200px' } }}
                             size="small"
                         />
                     </Box>
@@ -414,7 +413,7 @@ const SettingsPage = () => {
         
         {/* --- Backup Settings (Super Admin Only) --- */}
         {user?.role === 'Super Admin' && (
-          <Grid item size={{ xs: 12 }}>
+          <Grid size={{ xs: 12 }}>
             <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                  <SettingsBackupRestoreIcon color="action" sx={{ mr: 1 }} />
@@ -424,7 +423,7 @@ const SettingsPage = () => {
                   {isBackupLoading ? (
                      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress size={24} /></Box>
                   ) : (
-                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
                       <FormControlLabel
                         control={
                           <Switch
@@ -436,29 +435,24 @@ const SettingsPage = () => {
                         }
                         label={
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                Enable Daily Automated Backups to Google Cloud Storage
+                                Enable Daily Automated Backups to GCS
                                 {isBackupSaving && <CircularProgress size={16} sx={{ ml: 1 }} />}
                             </Box>
                         }
-                        sx={{ mr: 2, mb: { xs: 2, sm: 0 }, width: '100%' }}
+                        sx={{ mr: 2, width: '100%' }}
                       />
                       <TextField
-                        label="Scheduled Backup Time (Manila Time)"
+                        label="Scheduled Backup Time"
                         type="time"
-                        fullWidth
                         value={backupSettings.time}
                         onChange={handleBackupTimeChange}
                         onBlur={handleBackupTimeBlur}
                         name="timeInput"
                         disabled={!backupSettings.enabled || isBackupLoading || isBackupSaving}
-                        helperText="Saves automatically when you click away."
+                        helperText="Saves automatically."
                         InputLabelProps={{ shrink: true }}
                         inputProps={{ step: 300 }}
-                        sx={{ 
-                          mt: { xs: 2, sm: 2 }, 
-                          width: '100%' , 
-                          minWidth: '220px'
-                        }} 
+                        sx={{ width: { xs: '100%', sm: '220px' } }} 
                       />
                     </Box>
                   )}
@@ -471,7 +465,7 @@ const SettingsPage = () => {
 
         {/* --- Manual Backup & Restore (Super Admin Only) --- */}
         {user?.role === 'Super Admin' && (
-          <Grid item size={{ xs: 12 }}>
+          <Grid size={{ xs: 12 }}>
              <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexShrink: 0 }}>
                  <SecurityIcon color="action" sx={{ mr: 1 }} />
@@ -480,14 +474,14 @@ const SettingsPage = () => {
               <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <Box>
                     <Typography variant="body2" gutterBottom>
-                      Manually trigger a database backup to Google Cloud Storage. The backup file (.gz) can be used for restoring later.
+                      Manually trigger a database backup to Google Cloud Storage.
                     </Typography>
                     <Button
                       variant="contained" color="info"
                       startIcon={isBackingUpToGCS ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
                       onClick={handleTriggerBackupToGCS}
                       disabled={isBackingUpToGCS || isRestoring}
-                      sx={{mb: 2}}
+                      sx={{mb: 2, width: { xs: '100%', sm: 'auto' }}}
                     >
                       {isBackingUpToGCS ? 'Backing Up...' : 'Backup Now to GCS'}
                     </Button>
@@ -496,7 +490,7 @@ const SettingsPage = () => {
                   <Box>
                     <Typography variant="body2" color="error" gutterBottom sx={{ fontWeight: 'bold' }}>
                       <WarningAmberIcon sx={{ fontSize: '1rem', verticalAlign: 'middle', mr: 0.5 }} />
-                      WARNING: Restoring will overwrite ALL current data. Choose a backup file from Google Cloud Storage.
+                      WARNING: Restoring will overwrite ALL current data.
                     </Typography>
                     <FormControl fullWidth margin="normal" disabled={isLoadingBackups || isRestoring || isBackingUpToGCS}>
                         <InputLabel id="gcs-backup-select-label">Select Backup to Restore from GCS</InputLabel>
@@ -521,12 +515,13 @@ const SettingsPage = () => {
                         </Select>
                         {!isLoadingBackups && gcsBackups.length > 0 && <FormHelperText>Backups are listed newest first.</FormHelperText>}
                     </FormControl>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' }, mt: 2 }}>
                       <Button
                         variant="contained" color="error"
                         startIcon={isRestoring ? <CircularProgress size={20} color="inherit" /> : <RestoreIcon />}
                         onClick={handleRestoreSubmit}
                         disabled={!selectedRestoreFile || isRestoring || isLoadingBackups || isBackingUpToGCS}
+                        sx={{ width: { xs: '100%', sm: 'auto' } }}
                       >
                         {isRestoring ? 'Restoring...' : 'Restore Selected Backup'}
                       </Button>

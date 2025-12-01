@@ -12,7 +12,6 @@ import {
   Tabs,
   Tab,
   Paper,
-  useTheme
 } from '@mui/material';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
@@ -50,7 +49,6 @@ function TabPanel(props) {
 
 const ReportsPage = () => {
   const [currentTab, setCurrentTab] = useState(0);
-  const theme = useTheme();
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);

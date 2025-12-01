@@ -12,7 +12,7 @@ import {
   Typography, Paper, TextField, Button, Grid, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Alert, List, ListItem, ListItemText,
   Box, Autocomplete, FormControl, InputLabel, Select, MenuItem, ButtonGroup,
-  Chip, Stack, useTheme
+  Chip
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
@@ -249,7 +249,6 @@ const ReturnsReport = () => {
     doc.output('dataurlnewwindow');
   };
 
-  // --- FIXED: SummaryCard with explicit animation ---
   const SummaryCard = ({ title, value, icon, color }) => (
     <Grid size={{ xs: 12, sm: 4 }}>
       <Paper 
@@ -309,11 +308,11 @@ const ReturnsReport = () => {
               </ButtonGroup>
             </Grid>
             <Grid size={{ xs: 12, md: 5 }}>
-              <Stack direction="row" spacing={1} fullWidth>
-                <Button variant="outlined" onClick={handleDownloadCustomerCSV} disabled={isLoading || customerReturns.length === 0} startIcon={<DownloadIcon />} fullWidth>Cust CSV</Button>
-                <Button variant="outlined" onClick={handleDownloadSupplierCSV} disabled={isLoading || supplierReturns.length === 0} startIcon={<DownloadIcon />} fullWidth>Supp CSV</Button>
-                <Button variant="contained" color="secondary" onClick={handleDownloadPDF} disabled={isLoading || (customerReturns.length === 0 && supplierReturns.length === 0)} startIcon={<PictureAsPdfIcon />} fullWidth>PDF</Button>
-              </Stack>
+              <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5, '::-webkit-scrollbar': { height: 4 } }}>
+                <Button variant="outlined" onClick={handleDownloadCustomerCSV} disabled={isLoading || customerReturns.length === 0} startIcon={<DownloadIcon />} sx={{ whiteSpace: 'nowrap' }}>Cust CSV</Button>
+                <Button variant="outlined" onClick={handleDownloadSupplierCSV} disabled={isLoading || supplierReturns.length === 0} startIcon={<DownloadIcon />} sx={{ whiteSpace: 'nowrap' }}>Supp CSV</Button>
+                <Button variant="contained" color="secondary" onClick={handleDownloadPDF} disabled={isLoading || (customerReturns.length === 0 && supplierReturns.length === 0)} startIcon={<PictureAsPdfIcon />} sx={{ whiteSpace: 'nowrap' }}>PDF</Button>
+              </Box>
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
