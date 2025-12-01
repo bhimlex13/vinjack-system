@@ -4,7 +4,7 @@ import React from 'react';
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, Box, Typography, IconButton, Alert, AlertTitle, Tooltip
+  Button, Box, Typography, IconButton, Alert, AlertTitle, Tooltip, Paper
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
@@ -12,51 +12,50 @@ const CredentialsDisplayModal = ({ credentials, onClose }) => {
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
-    // In a real app, you might want to use a Snackbar for feedback instead of an alert.
-    alert('Copied to clipboard!');
   };
 
   return (
-    <Dialog open={true} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Employee Credentials</DialogTitle>
+    <Dialog open={true} onClose={onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ fontWeight: 700 }}>Employee Credentials</DialogTitle>
       <DialogContent>
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          <AlertTitle>Important</AlertTitle>
-          Please copy these credentials and send them to the new employee.
-          <strong> This is the only time they will be shown.</strong>
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <AlertTitle>Action Required</AlertTitle>
+          Please copy these credentials immediately. 
+          <strong> They will not be shown again.</strong>
         </Alert>
-        <Box sx={{ my: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography>Username:</Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography component="strong" sx={{ fontWeight: 'bold' }}>
-                {credentials.username}
-              </Typography>
-              <Tooltip title="Copy Username">
-                <IconButton onClick={() => handleCopy(credentials.username)} size="small">
-                  <ContentCopyIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+        
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="body2" color="text.secondary">Username</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography component="strong" sx={{ fontWeight: 'bold', fontFamily: 'monospace', fontSize: '1.1rem' }}>
+                    {credentials.username}
+                </Typography>
+                <Tooltip title="Copy Username">
+                    <IconButton onClick={() => handleCopy(credentials.username)} size="small">
+                    <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+                </Box>
             </Box>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography>Temporary Password:</Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography component="strong" sx={{ fontWeight: 'bold' }}>
-                {credentials.password}
-              </Typography>
-              <Tooltip title="Copy Password">
-                <IconButton onClick={() => handleCopy(credentials.password)} size="small">
-                  <ContentCopyIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary">Password</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography component="strong" sx={{ fontWeight: 'bold', fontFamily: 'monospace', fontSize: '1.1rem', color: 'primary.main' }}>
+                    {credentials.password}
+                </Typography>
+                <Tooltip title="Copy Password">
+                    <IconButton onClick={() => handleCopy(credentials.password)} size="small">
+                    <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+                </Box>
             </Box>
-          </Box>
-        </Box>
+        </Paper>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} variant="contained">
-          Close
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} variant="contained" fullWidth>
+          Done
         </Button>
       </DialogActions>
     </Dialog>
