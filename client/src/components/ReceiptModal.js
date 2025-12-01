@@ -74,18 +74,16 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
         
         yPos += (nameLines.length * 4);
 
-        // --- NEW: Print Serials on Receipt ---
         if (item.serialNumbers && item.serialNumbers.length > 0) {
             doc.setFontSize(7);
             const serials = `SN: ${item.serialNumbers.join(', ')}`;
             const serialLines = doc.splitTextToSize(serials, 40);
             doc.text(serialLines, 5, yPos);
-            yPos += (serialLines.length * 3) + 2; // Add spacing
+            yPos += (serialLines.length * 3) + 2; 
             doc.setFontSize(8);
         } else {
             yPos += 2;
         }
-        // --- END NEW ---
       });
     }
 
@@ -162,13 +160,11 @@ const ReceiptModal = ({ open, saleData, onClose, onViewImage }) => {
                   <TableRow key={`prod-${item.product?._id || item._id}`}>
                     <TableCell sx={{ p: '4px 0', border: 'none' }}>
                       {item.product?.name || 'N/A'}
-                      {/* --- NEW: Show Serial Numbers on Screen --- */}
                       {item.serialNumbers && item.serialNumbers.length > 0 && (
                         <Typography variant="caption" display="block" color="text.secondary">
                             SN: {item.serialNumbers.join(', ')}
                         </Typography>
                       )}
-                      {/* --- END NEW --- */}
                     </TableCell>
                     <TableCell align="center" sx={{ p: '4px 0', border: 'none' }}>{item.quantity || 0}</TableCell>
                     <TableCell align="right" sx={{ p: '4px 0', border: 'none' }}>

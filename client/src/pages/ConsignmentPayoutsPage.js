@@ -5,14 +5,12 @@ import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
 import PayoutHistory from '../components/reports/PayoutHistory';
 import { motion, AnimatePresence } from 'framer-motion'; 
-// --- MODIFIED: Date Imports ---
 import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
-// --- END MODIFICATION ---
 
 import {
   Container, Typography, Paper, Box, Alert, Tooltip, IconButton,
   TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem,
-  Tabs, Tab, Grid, Button, ButtonGroup // --- MODIFIED: Added Grid, Button, ButtonGroup ---
+  Tabs, Tab, Grid, Button, ButtonGroup
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
@@ -52,7 +50,7 @@ function TabPanel(props) {
 }
 
 const OwedPayouts = () => {
-  const today = new Date().toISOString().split('T')[0]; // --- NEW ---
+  const today = new Date().toISOString().split('T')[0];
 
   const [payables, setPayables] = useState([]);
   const [allSuppliers, setAllSuppliers] = useState([]);
@@ -61,11 +59,11 @@ const OwedPayouts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   
-  // --- MODIFIED: Date Filter State ---
+  // --- Date Filter State (Matched with ReturnsPage) ---
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [datePreset, setDatePreset] = useState('today');
-  // --- END MODIFICATION ---
+  // ----------------------------------------------------
 
   const { confirm } = useContext(ConfirmationContext);
 
@@ -106,7 +104,7 @@ const OwedPayouts = () => {
     fetchPayables();
   }, []);
 
-  // --- MODIFIED: Date Preset Handler ---
+  // --- Date Preset Handler (Matched with ReturnsPage) ---
   const handleDatePreset = (preset) => {
     const now = new Date();
     let start = now;
@@ -126,14 +124,14 @@ const OwedPayouts = () => {
       start = startOfYear(now);
       end = endOfDay(now);
     } else if (preset === 'all') {
-      start = new Date(0); // Epoch start
+      start = new Date(0); 
       end = endOfDay(now);
     }
 
     setStartDate(format(start, 'yyyy-MM-dd'));
     setEndDate(format(end, 'yyyy-MM-dd'));
   };
-  // --- END MODIFICATION ---
+  // -----------------------------------------------------
 
   const handleMarkAsPaid = async (payable) => {
     const isConfirmed = await confirm(
@@ -155,17 +153,15 @@ const OwedPayouts = () => {
 
   const filteredPayables = useMemo(() => {
     return payables.filter(p => {
-      // --- MODIFIED: Add Date Logic ---
+      // --- Filter Logic (Matched with ReturnsPage) ---
       const saleDate = new Date(p.sale?.createdAt || p.createdAt);
-      // Create comparison dates from state (which are YYYY-MM-DD strings)
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
-      
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
 
       const dateMatch = saleDate >= start && saleDate <= end;
-      // --- END MODIFICATION ---
+      // -----------------------------------------------
 
       const supplierMatch = filterSupplier ? p.supplier?._id === filterSupplier : true;
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -237,27 +233,36 @@ const OwedPayouts = () => {
   return (
     <Box component={motion.div} variants={containerVariants} initial="hidden" animate="visible"> 
       
-      {/* --- MODIFIED: Date Filter Paper --- */}
-      <Paper sx={{ p: 2, mb: 2 }}>
+      {/* --- Date Filter Paper (Matched Layout) --- */}
+      <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item size={{ xs: 12 }}>
-            <ButtonGroup fullWidth variant="outlined" aria-label="date range presets">
-              <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
-              <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
-              <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
-              <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
-              <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
-            </ButtonGroup>
+          
+          {/* Standardized Date Preset Buttons */}
+          <Grid size={{ xs: 12 }}>
+              <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
+                  {['today', 'week', 'month', 'year', 'all'].map((preset) => (
+                      <Button 
+                          key={preset}
+                          variant={datePreset === preset ? 'contained' : 'outlined'} 
+                          onClick={() => handleDatePreset(preset)}
+                          sx={{ textTransform: 'capitalize', borderRadius: 2 }}
+                      >
+                          {preset === 'all' ? 'All Time' : preset}
+                      </Button>
+                  ))}
+              </ButtonGroup>
           </Grid>
-          <Grid item size={{ xs: 12, md: 6 }}>
+
+          {/* Date Inputs */}
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
           </Grid>
-          <Grid item size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
           </Grid>
         </Grid>
       </Paper>
-      {/* --- END MODIFICATION --- */}
+      {/* ------------------------------------------- */}
 
       {/* Filter and Search Bar */}
       <Paper sx={{ p: 2, my: 3, display: 'flex', gap: 2, alignItems: 'center' }}>

@@ -7,12 +7,9 @@ import {
   uploadCountersignedAgreement 
 } from '../api/purchaseOrderApi';
 import ConfirmationContext from '../context/ConfirmationContext';
-import AuthContext from '../context/AuthContext'; // --- NEW: Import AuthContext ---
+import AuthContext from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import jsPDF from 'jspdf'; 
-import autoTable from 'jspdf-autotable'; 
 import { motion, AnimatePresence } from 'framer-motion';
-// REMOVED: import socket from '../api/socket'; 
 
 import PurchaseOrderPrintout from '../components/PurchaseOrderPrintout';
 import ReceiveStockModal from '../components/ReceiveStockModal';
@@ -24,7 +21,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
   Dialog, DialogContent, DialogActions, Chip, Link as MuiLink, IconButton,
   Tooltip, Card, CardContent, CardActions, Collapse,
-  Stepper, Step, StepLabel
+  Stepper, Step, StepLabel, Stack
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
@@ -39,6 +36,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import GavelIcon from '@mui/icons-material/Gavel'; 
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -57,6 +55,7 @@ const Row = ({ item, poStatus, formatCurrency }) => {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
         sx={{ '& > *': { borderBottom: 'unset' }, ...(isUnavailable ? { textDecoration: 'line-through', color: 'text.disabled' } : {}) }}
+        hover
       >
         <TableCell>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -65,9 +64,9 @@ const Row = ({ item, poStatus, formatCurrency }) => {
                 {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
               </IconButton>
             )}
-            <Box sx={{ ml: hasSerials ? 1 : 5 }}>
-                {item.product?.name || 'Product not found'}
-                {hasSerials && <Chip label="Serialized" size="small" color="info" sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} />}
+            <Box sx={{ ml: hasSerials ? 1 : 0 }}>
+                <Typography variant="body2" fontWeight={600}>{item.product?.name || 'Product not found'}</Typography>
+                {hasSerials && <Chip label="Serialized" size="small" color="info" sx={{ mt: 0.5, height: 20, fontSize: '0.65rem' }} />}
             </Box>
           </Box>
         </TableCell>
@@ -76,7 +75,7 @@ const Row = ({ item, poStatus, formatCurrency }) => {
         <TableCell align="right">
           {isChanged ? (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-              <Typography variant="body2" sx={{ textDecoration: 'line-through' }}>
+              <Typography variant="body2" sx={{ textDecoration: 'line-through', color: 'text.secondary' }}>
                 {formatCurrency(item.cost)}
               </Typography>
               <ArrowForwardIcon fontSize="small" color="action" />
@@ -88,13 +87,13 @@ const Row = ({ item, poStatus, formatCurrency }) => {
             formatCurrency(item.cost)
           )}
         </TableCell>
-        <TableCell align="right">{formatCurrency(item.total)}</TableCell>
+        <TableCell align="right" sx={{ fontWeight: 700 }}>{formatCurrency(item.total)}</TableCell>
       </TableRow>
       
       <TableRow>
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
           <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box sx={{ margin: 1, p: 2, bgcolor: '#f9f9f9', borderRadius: 1 }}>
+            <Box sx={{ margin: 1, p: 2, bgcolor: 'grey.50', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
               <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
                  <QrCodeScannerIcon fontSize="small" />
                  Recorded Serial Numbers / IDs
@@ -102,7 +101,7 @@ const Row = ({ item, poStatus, formatCurrency }) => {
               <Grid container spacing={1}>
                  {item.serialNumbers && item.serialNumbers.map((sn, index) => (
                      <Grid item key={index}>
-                         <Chip label={sn} size="small" variant="outlined" />
+                         <Chip label={sn} size="small" variant="outlined" sx={{ bgcolor: 'white' }} />
                      </Grid>
                  ))}
               </Grid>
@@ -118,7 +117,6 @@ const PurchaseOrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { confirm } = useContext(ConfirmationContext);
-  // --- NEW: Get socket from AuthContext ---
   const { socket } = useContext(AuthContext);
   
   const [po, setPo] = useState(null);
@@ -157,7 +155,6 @@ const PurchaseOrderDetailPage = () => {
 
   const fetchPo = useCallback(async () => {
     try {
-      // Only trigger full loading if data isn't there yet
       if (!po) setLoading(true);
       const data = await getPurchaseOrderById(id);
       setPo(data);
@@ -172,26 +169,20 @@ const PurchaseOrderDetailPage = () => {
 
   useEffect(() => {
     fetchPo();
-
-    // --- NEW: Real-Time Listener with AuthContext Socket ---
     if (!socket) return;
-
     const handleRealTimeUpdate = (data) => {
-        // Only refresh if the updated PO matches the one we are viewing
         if (data.poId === id) {
             console.log('Current PO Updated by Supplier. Refreshing...');
             toast.info('This PO has just been updated by the supplier.');
             fetchPo();
         }
     };
-
     socket.on('po_supplier_update', handleRealTimeUpdate);
-
     return () => {
         socket.off('po_supplier_update', handleRealTimeUpdate);
     };
     // eslint-disable-next-line
-  }, [fetchPo, id, socket]); // Add socket
+  }, [fetchPo, id, socket]); 
 
   const handleApprove = async () => {
     const isConfirmed = await confirm('Approve Changes?', 'This will finalize costs and quantities.');
@@ -274,12 +265,10 @@ const PurchaseOrderDetailPage = () => {
         toast.error("Please upload the countersigned file first.");
         return;
     }
-
     const isConfirmed = await confirm(
         "Confirm Approval?", 
         "This will approve the PO, finalize the agreement, and notify the supplier to deliver stock."
     );
-    
     if (!isConfirmed) return;
 
     setIsCountersigning(true);
@@ -299,9 +288,9 @@ const PurchaseOrderDetailPage = () => {
   const getActiveStep = () => {
     if (!po) return 0;
     if (po.status === 'Pending') return 0;
-    if (po.status === 'Awaiting Approval' && po.signedAgreementUrl && !po.countersignedAgreementUrl) return 1; // Waiting for countersign
-    if (po.status === 'Approved' || po.status === 'Agreement Uploaded - Awaiting Delivery') return 2; // Countersigned, waiting delivery
-    if (po.status === 'Partially Received' || po.status === 'Completed') return 3; // Done
+    if (po.status === 'Awaiting Approval' && po.signedAgreementUrl && !po.countersignedAgreementUrl) return 1; 
+    if (po.status === 'Approved' || po.status === 'Agreement Uploaded - Awaiting Delivery') return 2; 
+    if (po.status === 'Partially Received' || po.status === 'Completed') return 3; 
     return 0;
   };
   
@@ -338,7 +327,6 @@ const PurchaseOrderDetailPage = () => {
   const supplierLink = po?.supplierResponseToken ? `${window.location.origin}/supplier/po/${po.supplierResponseToken}` : null;
   const signedAgreementUrl = po?.signedAgreementUrl;
   const countersignedUrl = po?.countersignedAgreementUrl; 
-  
   const isReceivingAllowed = ['Approved', 'Partially Received', 'Agreement Uploaded - Awaiting Delivery'].includes(po.status);
 
   return (
@@ -375,91 +363,119 @@ const PurchaseOrderDetailPage = () => {
         )}
       </AnimatePresence>
 
-      <Paper sx={{ p: 3 }} component={motion.div} variants={containerVariants} initial="hidden" animate="visible">
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+      <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 3 }} component={motion.div} variants={containerVariants} initial="hidden" animate="visible">
+        {/* Top Header */}
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, mb: 3 }}>
           <motion.div variants={itemVariants}>
-            <Typography variant="h4" gutterBottom>{po.poNumber}</Typography>
-            <Typography variant="subtitle1" color="textSecondary">Order Date: {new Date(po.orderDate).toLocaleDateString()}</Typography>
-            <Chip 
-              label={po.poType === 'Consignment' ? 'Consignment Order' : 'Standard Purchase Order'}
-              color={po.poType === 'Consignment' ? 'info' : 'default'}
-              sx={{ mt: 1, fontWeight: 'bold' }}
-            />
+            <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="h4" fontWeight={800}>{po.poNumber}</Typography>
+                <Chip 
+                label={po.poType === 'Consignment' ? 'Consignment' : 'Standard PO'}
+                color={po.poType === 'Consignment' ? 'info' : 'default'}
+                variant="outlined"
+                size="small"
+                sx={{ fontWeight: 'bold', border: 'none', bgcolor: 'action.hover' }}
+                />
+            </Stack>
+            <Typography variant="subtitle2" color="textSecondary" fontWeight={600} sx={{ mt: 0.5 }}>
+                Ordered: {new Date(po.orderDate).toLocaleDateString()}
+            </Typography>
           </motion.div>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button variant="outlined" onClick={() => navigate('/purchase-orders')}>Back to List</Button>
-            <Button variant="contained" startIcon={<PrintIcon />} onClick={() => setIsPrintModalOpen(true)}>Print / Download PO</Button>
-          </Box>
+          <Stack direction="row" spacing={2} flexWrap="wrap">
+            <Button variant="outlined" startIcon={<ArrowBackIcon />} onClick={() => navigate('/purchase-orders')}>Back</Button>
+            <Button variant="contained" startIcon={<PrintIcon />} onClick={() => setIsPrintModalOpen(true)}>Print PO</Button>
+          </Stack>
         </Box>
-        <Divider sx={{ my: 2 }} />
+        <Divider sx={{ mb: 3 }} />
         
         <Grid container spacing={3}>
-          <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
-            <Typography variant="h6">Supplier Details</Typography>
-            <Typography><strong>Name:</strong> {po.supplier.name}</Typography>
-            <Typography><strong>Contact:</strong> {po.supplier.contactPerson || 'N/A'}</Typography>
-             <Typography><strong>Email:</strong> {po.supplier.email || 'N/A'}</Typography>
+          {/* Supplier Info */}
+          <Grid size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+            <Card variant="outlined" sx={{ height: '100%', borderRadius: 2 }}>
+                <CardContent>
+                    <Typography variant="h6" fontWeight={700} gutterBottom>Supplier Details</Typography>
+                    <Box sx={{ display: 'grid', gap: 0.5 }}>
+                        <Typography variant="body2"><strong>Name:</strong> {po.supplier.name}</Typography>
+                        <Typography variant="body2"><strong>Contact:</strong> {po.supplier.contactPerson || 'N/A'}</Typography>
+                        <Typography variant="body2"><strong>Email:</strong> {po.supplier.email || 'N/A'}</Typography>
+                    </Box>
+                </CardContent>
+            </Card>
           </Grid>
-          <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
-            <Typography variant="h6">Order Summary</Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography><strong>Status:</strong></Typography> <StatusChip status={po.status} />
-            </Box>
-            <Typography><strong>Total Amount:</strong> {formatCurrency(po.totalAmount)}</Typography>
+
+          {/* Order Summary */}
+          <Grid size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+             <Card variant="outlined" sx={{ height: '100%', borderRadius: 2 }}>
+                <CardContent>
+                    <Typography variant="h6" fontWeight={700} gutterBottom>Order Summary</Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                             <Typography variant="body2" fontWeight={600}>Current Status:</Typography> 
+                             <StatusChip status={po.status} />
+                        </Box>
+                        <Divider />
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" fontWeight={600}>Total Amount:</Typography>
+                            <Typography variant="h6" color="primary.main" fontWeight={800}>{formatCurrency(po.totalAmount)}</Typography>
+                        </Box>
+                    </Box>
+                </CardContent>
+            </Card>
           </Grid>
 
           {supplierLink && ['Pending', 'Awaiting Approval'].includes(po.status) && (
-            <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
-              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LinkIcon /> Supplier Review Link
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                <MuiLink href={supplierLink} target="_blank" rel="noopener noreferrer" sx={{ wordBreak: 'break-all' }}>{supplierLink}</MuiLink>
-                <Tooltip title="Copy Link"><IconButton size="small" onClick={handleCopyLink}><ContentCopyIcon fontSize="small" /></IconButton></Tooltip>
-              </Box>
+            <Grid size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
+               <Alert severity="info" icon={<LinkIcon fontSize="inherit" />} sx={{ borderRadius: 2 }}>
+                  <Typography variant="subtitle2" fontWeight={700}>Supplier Review Link:</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                    <MuiLink href={supplierLink} target="_blank" rel="noopener noreferrer" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{supplierLink}</MuiLink>
+                    <Tooltip title="Copy Link"><IconButton size="small" onClick={handleCopyLink}><ContentCopyIcon fontSize="small" /></IconButton></Tooltip>
+                  </Box>
+               </Alert>
             </Grid>
           )}
 
           {/* --- DISPLAY AGREEMENTS AND STATUS --- */}
           {po.poType === 'Consignment' && (
-            <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
-              <Card variant="outlined" sx={{ borderColor: 'info.main' }}>
+            <Grid size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
+              <Card variant="outlined" sx={{ borderColor: 'info.main', borderRadius: 2 }}>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
                     <DescriptionIcon color="info" /> Consignment Agreements
                   </Typography>
                   
-                  {/* --- NEW: PROGRESS STEPPER --- */}
+                  {/* Progress Stepper with scroll wrapper for mobile */}
                   {po.consignmentMethod === 'System' && (
-                      <Box sx={{ width: '100%', mb: 4, mt: 2 }}>
-                        <Stepper activeStep={getActiveStep()} alternativeLabel>
-                            {consignmentSteps.map((label) => (
-                            <Step key={label}>
-                                <StepLabel>{label}</StepLabel>
-                            </Step>
-                            ))}
-                        </Stepper>
+                      <Box sx={{ width: '100%', mb: 4, mt: 2, overflowX: 'auto' }}>
+                        <Box sx={{ minWidth: '600px', p: 1 }}> 
+                            <Stepper activeStep={getActiveStep()} alternativeLabel>
+                                {consignmentSteps.map((label) => (
+                                <Step key={label}>
+                                    <StepLabel>{label}</StepLabel>
+                                </Step>
+                                ))}
+                            </Stepper>
+                        </Box>
                       </Box>
                   )}
-                  {/* ----------------------------- */}
 
                   {/* 1. Supplier Signed Version */}
                   {signedAgreementUrl ? (
                     <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2">1. Supplier Signed Version:</Typography>
-                        <MuiLink component="button" variant="body1" onClick={() => handleOpenImageView(signedAgreementUrl)} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+                        <Typography variant="subtitle2" fontWeight={600} color="text.secondary">1. Supplier Signed Version:</Typography>
+                        <MuiLink component="button" variant="body1" onClick={() => handleOpenImageView(signedAgreementUrl)} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold', mt: 0.5 }}>
                             <PictureAsPdfIcon color="error" /> View Supplier PDF
                         </MuiLink>
                     </Box>
                   ) : (
-                    <Typography color="text.secondary" sx={{mb: 2}}>Waiting for supplier to upload signed agreement...</Typography>
+                    <Typography color="text.secondary" variant="body2" sx={{ mb: 2, fontStyle: 'italic' }}>Waiting for supplier to upload signed agreement...</Typography>
                   )}
 
                   {/* 2. Countersigned Version (Final) */}
                   {countersignedUrl && (
                     <Box>
-                        <Typography variant="subtitle2">2. Countersigned (Final) Version:</Typography>
-                        <MuiLink component="button" variant="body1" onClick={() => handleOpenImageView(countersignedUrl)} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold', color: 'success.main' }}>
+                        <Typography variant="subtitle2" fontWeight={600} color="text.secondary">2. Countersigned (Final) Version:</Typography>
+                        <MuiLink component="button" variant="body1" onClick={() => handleOpenImageView(countersignedUrl)} sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold', color: 'success.main', mt: 0.5 }}>
                             <GavelIcon /> View Final Countersigned PDF
                         </MuiLink>
                     </Box>
@@ -476,18 +492,19 @@ const PurchaseOrderDetailPage = () => {
           )}
         </Grid>
 
-        <Divider sx={{ my: 3 }} />
+        <Divider sx={{ my: 4 }} />
+        
         <motion.div variants={itemVariants}>
-            <Typography variant="h6" gutterBottom>Items</Typography>
-            <TableContainer component={Paper} variant="outlined">
+            <Typography variant="h6" fontWeight={700} gutterBottom>Order Items</Typography>
+            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
             <Table>
                 <TableHead>
-                <TableRow>
-                    <TableCell>Product Name</TableCell>
-                    <TableCell align="right">Ordered</TableCell>
-                    <TableCell align="right">Received</TableCell>
-                    <TableCell align="right">Unit Cost</TableCell>
-                    <TableCell align="right">Subtotal</TableCell>
+                <TableRow sx={{ bgcolor: 'grey.50' }}>
+                    <TableCell sx={{ fontWeight: 700 }}>Product Name</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Ordered</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Received</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Unit Cost</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Subtotal</TableCell>
                 </TableRow>
                 </TableHead>
                 <TableBody>
@@ -500,39 +517,38 @@ const PurchaseOrderDetailPage = () => {
         </motion.div>
 
         {/* --- ACTION BUTTONS AREA --- */}
-        <Box sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'grey.300', borderRadius: 1 }} component={motion.div} variants={itemVariants}>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, alignItems: 'center' }}>
+        <Box sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'grey.50' }} component={motion.div} variants={itemVariants}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'flex-end', gap: 2, alignItems: 'center' }}>
                 
                 {/* --- SYSTEM CONSIGNMENT APPROVAL FLOW --- */}
                 {po.status === 'Awaiting Approval' && po.poType === 'Consignment' && po.consignmentMethod === 'System' && (
-                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%', justifyContent: 'flex-end' }}>
-                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                            <Button
-                                component="label"
-                                variant="outlined"
-                                color="secondary"
-                                startIcon={<FileUploadIcon />}
-                            >
-                                {countersignFile ? countersignFile.name : "Select Countersigned PDF"}
-                                <input type="file" hidden accept="application/pdf,image/*" onChange={handleCountersignFileSelect} />
-                            </Button>
-                            <Button 
-                                variant="contained" 
-                                color="primary" 
-                                startIcon={<GavelIcon />} 
-                                onClick={handleCountersignSubmit}
-                                disabled={!countersignFile || isCountersigning}
-                            >
-                                {isCountersigning ? <LoadingSpinner text=""/> : "Countersign & Approve"}
-                            </Button>
-                        </Box>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, alignItems: 'center', width: '100%', justifyContent: 'flex-end' }}>
+                        <Button
+                            component="label"
+                            variant="outlined"
+                            color="secondary"
+                            startIcon={<FileUploadIcon />}
+                            fullWidth={false}
+                        >
+                            {countersignFile ? countersignFile.name : "Select Countersigned PDF"}
+                            <input type="file" hidden accept="application/pdf,image/*" onChange={handleCountersignFileSelect} />
+                        </Button>
+                        <Button 
+                            variant="contained" 
+                            color="primary" 
+                            startIcon={<GavelIcon />} 
+                            onClick={handleCountersignSubmit}
+                            disabled={!countersignFile || isCountersigning}
+                        >
+                            {isCountersigning ? <LoadingSpinner text=""/> : "Countersign & Approve"}
+                        </Button>
                     </Box>
                 )}
 
                 {/* --- STANDARD APPROVAL (Non-System Consignment) --- */}
                 {po.status === 'Awaiting Approval' && (po.poType !== 'Consignment' || po.consignmentMethod !== 'System') && (
                     <>
-                        <Typography>This PO is awaiting your approval.</Typography>
+                        <Typography variant="body2" color="text.secondary">This PO is awaiting your approval.</Typography>
                         <Button variant="contained" color="primary" startIcon={<ThumbUpIcon />} onClick={handleApprove}>
                             Approve Supplier Changes
                         </Button>

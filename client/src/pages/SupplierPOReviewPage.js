@@ -31,8 +31,6 @@ const SupplierPOReviewPage = () => {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   
-  // 'submitted' tracks purely the local action of clicking submit.
-  // We also use po.status to determine if it was ALREADY submitted previously.
   const [submittedLocal, setSubmittedLocal] = useState(false);
 
   const [items, setItems] = useState([]);
@@ -40,21 +38,11 @@ const SupplierPOReviewPage = () => {
   
   const [signedAgreementFile, setSignedAgreementFile] = useState(null);
 
-  // Default Guide to FALSE, only open if pending
   const [isGuideOpen, setIsGuideOpen] = useState(false); 
   const [detailsConfirmed, setDetailsConfirmed] = useState(false); 
   const [pdfDownloaded, setPdfDownloaded] = useState(false); 
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-
-  const containerVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { duration: 0.5, ease: "easeOut" }
-    }
-  };
 
   useEffect(() => {
     const fetchPO = async () => {
@@ -63,7 +51,6 @@ const SupplierPOReviewPage = () => {
         const poData = await getPurchaseOrderByToken(token);
         setPo(poData);
         
-        // Initialize items
         const initialItems = poData.items.map(item => ({
           ...item,
           supplierUpdatedCost: item.cost,
@@ -71,15 +58,12 @@ const SupplierPOReviewPage = () => {
         }));
         setItems(initialItems);
 
-        // Open guide ONLY if status is Pending
         if (poData.status === 'Pending') {
             setIsGuideOpen(true);
         }
 
         setError(null);
       } catch (err) {
-        // Even if backend throws 409, we can handle it, but our backend now returns data.
-        // If generic error:
         setError(err.response?.data?.message || 'Failed to load the Purchase Order.');
         console.error(err);
       } finally {
@@ -212,7 +196,6 @@ const SupplierPOReviewPage = () => {
       await updateBySupplier(token, submissionData);
       setSubmittedLocal(true);
       
-      // Reload to fetch updated status and show status tracker
       setTimeout(() => window.location.reload(), 1000);
 
     } catch (err) {
@@ -228,7 +211,6 @@ const SupplierPOReviewPage = () => {
     return { priceChanges, unavailableItems };
   }, [items]);
 
-  // --- HELPER: Determine Status Step ---
   const getActiveStep = () => {
     if (!po) return 0;
     if (po.status === 'Pending') return 1;
@@ -251,13 +233,10 @@ const SupplierPOReviewPage = () => {
   const isSubmitDisabled = submitting || (isSystemConsignment && !signedAgreementFile);
   const submitTooltip = isSystemConsignment && !signedAgreementFile ? "You must upload the signed agreement before submitting." : "";
 
-  // --- RENDER LOADING ---
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><LoadingSpinner text="Loading Order..." /></Box>;
   if (error) return <Container sx={{mt: 5}}><Alert severity="error">{error}</Alert></Container>;
   if (!po) return null;
 
-  // --- DETERMINE VIEW MODE ---
-  // If status is NOT Pending, OR we just submitted locally -> Show Status View
   const isReadOnlyMode = po.status !== 'Pending' || submittedLocal;
 
   if (isReadOnlyMode) {
@@ -297,11 +276,7 @@ const SupplierPOReviewPage = () => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {/* For read-only view, use the data from the PO directly if available, or fallback to items state */}
                         {po.items.map((item) => {
-                            // If PO is already updated (Awaiting Approval+), item.cost IS the agreed cost.
-                            // If we just submitted, items state has the new values.
-                            // We prefer 'items' state if we just submitted local, otherwise PO data.
                             const displayCost = submittedLocal 
                                 ? items.find(i => i.product._id === item.product._id)?.supplierUpdatedCost 
                                 : item.cost;
@@ -340,7 +315,6 @@ const SupplierPOReviewPage = () => {
     );
   }
 
-  // --- EDITABLE FORM VIEW (Only if Status is Pending) ---
   return (
     <>
       <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
@@ -406,9 +380,9 @@ const SupplierPOReviewPage = () => {
           </Box>
           
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={6}><Typography><strong>PO Number:</strong> {po.poNumber}</Typography></Grid>
-            <Grid item xs={6}><Typography><strong>From:</strong> {po.supplier.name}</Typography></Grid>
-            <Grid item xs={12}><Typography><strong>Type:</strong> {po.poType}</Typography></Grid>
+            <Grid item size={{ xs: 6 }}><Typography><strong>PO Number:</strong> {po.poNumber}</Typography></Grid>
+            <Grid item size={{ xs: 6 }}><Typography><strong>From:</strong> {po.supplier.name}</Typography></Grid>
+            <Grid item size={{ xs: 12 }}><Typography><strong>Type:</strong> {po.poType}</Typography></Grid>
           </Grid>
 
           <TableContainer component={Paper} variant="outlined">

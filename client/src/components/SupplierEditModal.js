@@ -1,14 +1,13 @@
 // client/src/components/SupplierEditModal.js
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import api from '../api/axios'; // Use base api for product search
+import api from '../api/axios'; 
 import { 
   updateSupplier, 
-  // --- NEW IMPORTS ---
   getSupplierOrderHistory,
   updateSupplierProductCatalog 
-  // --- END NEW IMPORTS ---
 } from '../api/supplierApi'; 
 import { toast } from 'react-toastify';
+import { motion } from 'framer-motion'; // Added for dialog transition
 
 // MUI Imports
 import {
@@ -17,20 +16,19 @@ import {
   Typography, InputAdornment, List, ListItem, ListItemText, IconButton,
   CircularProgress, Card, CardContent, CardMedia, Avatar,
   CardActionArea, Chip, Stack, Tooltip,
-  // --- NEW IMPORTS ---
   TableContainer, Table, TableHead, TableRow, TableCell, TableBody,
-  Link as MuiLink // Renamed to avoid conflict with React Router
-  // --- END NEW IMPORTS ---
+  Link as MuiLink 
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import NoPhotographyIcon from '@mui/icons-material/NoPhotography';
+import SaveIcon from '@mui/icons-material/Save'; // Added Save Icon
 import { grey } from '@mui/material/colors';
-// --- NEW IMPORT ---
-import { Link } from 'react-router-dom'; // For linking to POs
+import { Link } from 'react-router-dom';
 
-// --- TabPanel Component (No changes) ---
+import LoadingSpinner from './LoadingSpinner'; // If you want consistent spinners
+
+// --- TabPanel Component ---
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
   return (
@@ -40,9 +38,10 @@ function TabPanel(props) {
       id={`supplier-tabpanel-${index}`}
       aria-labelledby={`supplier-tab-${index}`}
       {...other}
+      style={{ height: '100%' }} // Ensure height fill
     >
       {value === index && (
-        <Box sx={{ pt: 3, pb: 3, height: '60vh' }}>
+        <Box sx={{ pt: 3, pb: 3, height: '100%', overflowY: 'auto' }}>
           {children}
         </Box>
       )}
@@ -68,9 +67,7 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
         api.get('/suppliers') 
       ]);
       setAllProducts(productsRes.data);
-      // --- MODIFIED: Ensure 'note' is initialized ---
       setCatalog(catalogRes.data.map(item => ({...item, note: item.note || ''})));
-      // --- END MODIFICATION ---
       setAllSuppliers(suppliersRes.data);
     } catch (err) {
       toast.error('Failed to load product data.');
@@ -101,9 +98,7 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
     
     setCatalog(prev => [
       ...prev,
-      // --- MODIFIED: Add 'note' field ---
       { product: product, cost: suggestedCost, note: '', _id: product._id } 
-      // --- END MODIFICATION ---
     ]);
 
     if (suggestedCost > 0) {
@@ -115,7 +110,6 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
     setCatalog(prev => prev.filter(item => item.product._id !== productId));
   };
 
-  // --- MODIFIED: Generic update handler for cost and note ---
   const handleItemChange = (productId, field, value) => {
     setCatalog(prev => 
       prev.map(item => {
@@ -124,13 +118,12 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
             const newCost = parseFloat(value);
             return { ...item, cost: isNaN(newCost) ? '' : newCost };
           }
-          return { ...item, [field]: value }; // For 'note'
+          return { ...item, [field]: value }; 
         }
         return item;
       })
     );
   };
-  // --- END MODIFICATION ---
   
   const handleCostFocus = (e) => {
     if (Number(e.target.value) === 0) {
@@ -147,15 +140,12 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
 
     setIsSaving(true);
     try {
-      // --- MODIFIED: Send 'product', 'cost', and 'note' ---
       const payload = catalog.map(item => ({
         product: item.product._id,
         cost: Number(item.cost),
-        note: item.note // <-- ADDED
+        note: item.note 
       }));
-      // --- Use new API function ---
       await updateSupplierProductCatalog(supplier._id, payload);
-      // --- END USE ---
       toast.success("Supplier's product catalog updated!");
       onClose();
     } catch (err) {
@@ -171,25 +161,29 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
   };
 
   if (isLoading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><CircularProgress /></Box>;
+    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><LoadingSpinner text="Loading Catalog..." /></Box>;
   }
 
   return (
     <Grid container spacing={2} sx={{ height: '100%' }}>
-      {/* Left Side: Product Selection (POS style) */}
+      {/* Left Side: Product Selection */}
       <Grid item size={{ xs: 12, md: 7 }} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <TextField
           fullWidth
-          label="Search All Products"
+          placeholder="Search All Products..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
+          size="small"
+          InputProps={{ 
+              startAdornment: <InputAdornment position="start"><SearchIcon color="action" /></InputAdornment>,
+              sx: { borderRadius: 2 }
+          }}
         />
-        <Paper variant="outlined" sx={{ mt: 2, flex: 1, overflowY: 'auto', p: 1 }}>
+        <Paper variant="outlined" sx={{ mt: 2, flex: 1, overflowY: 'auto', p: 1, bgcolor: 'grey.50', borderRadius: 2 }}>
           <Grid container spacing={1}>
             {availableProducts.length > 0 ? availableProducts.map(product => (
               <Grid item size={{ xs: 12, sm: 6, md: 4 }} key={product._id}>
-                <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                   <CardActionArea 
                     onClick={() => handleAddProduct(product)}
                     sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1}} 
@@ -203,37 +197,50 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
                           alt={product.name}
                         />
                       ) : (
-                        <Avatar variant="rounded" sx={{ width: 80, height: 80, bgcolor: grey[200] }}>
+                        <Avatar variant="rounded" sx={{ width: 70, height: 70, bgcolor: grey[100] }}>
                           <NoPhotographyIcon color="action" />
                         </Avatar>
                       )}
                     </Box>
                     <CardContent sx={{ flexGrow: 1, p: 1.5, pt: 0.5, width: '100%' }}>
-                      <Typography variant="body2" fontWeight="bold" gutterBottom noWrap title={product.name}>
+                      <Typography variant="body2" fontWeight="bold" gutterBottom noWrap title={product.name} sx={{ fontSize: '0.85rem' }}>
                         {product.name}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        In Stock: {product.quantity}
+                        Stock: {product.quantity}
                       </Typography>
                     </CardContent>
                   </CardActionArea>
                 </Card>
               </Grid>
             )) : (
-              <Box sx={{ p: 3, textAlign: 'center', width: '100%' }}>
-                <Typography color="text.secondary">No products found, or all products are already in the supplier's catalog.</Typography>
+              <Box sx={{ p: 3, textAlign: 'center', width: '100%', opacity: 0.7 }}>
+                <Typography variant="body2">No products found or all items added.</Typography>
               </Box>
             )}
           </Grid>
         </Paper>
       </Grid>
 
-      {/* Right Side: Supplier's Catalog (The "Cart") */}
+      {/* Right Side: Catalog List */}
       <Grid item size={{ xs: 12, md: 5 }} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="h6" gutterBottom>
-          {supplier.name}'s Catalog
-        </Typography>
-        <Paper variant="outlined" sx={{ flex: 1, overflowY: 'auto' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight={700} color="text.secondary">
+            Current Catalog ({catalog.length})
+            </Typography>
+            <Button 
+                variant="contained" 
+                size="small"
+                startIcon={<SaveIcon />}
+                onClick={handleSaveChanges} 
+                disabled={isSaving} 
+                sx={{ borderRadius: 2 }}
+            >
+                Save
+            </Button>
+        </Box>
+        
+        <Paper variant="outlined" sx={{ flex: 1, overflowY: 'auto', borderRadius: 2 }}>
           <List dense>
             {catalog.length > 0 ? catalog.map(item => {
               const otherSupplierCosts = item.product.supplierCosts
@@ -244,62 +251,53 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
                 <ListItem
                   key={item.product._id}
                   divider
-                  // --- MODIFIED: Use spacing, add image ---
                   sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'flex-start' }}
                 >
                   <Avatar 
                     variant="rounded" 
                     src={item.product.image} 
-                    sx={{ width: 56, height: 56, bgcolor: grey[200] }}
+                    sx={{ width: 50, height: 50, bgcolor: grey[100] }}
                   >
                     <NoPhotographyIcon color="action" />
                   </Avatar>
 
                   <Box sx={{ flexGrow: 1 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                      <Typography fontWeight="bold">{item.product.name}</Typography>
+                      <Typography fontWeight="bold" variant="body2">{item.product.name}</Typography>
                       <IconButton 
                         edge="end" 
                         size="small" 
-                        aria-label="delete" 
                         onClick={() => handleRemoveProduct(item.product._id)}
-                        sx={{ ml: 1 }}
+                        sx={{ ml: 1, color: 'error.main' }}
                       >
-                        <DeleteIcon color="error" />
+                        <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Box>
 
                     <TextField
-                      label="Supplier Cost"
+                      label="Cost (₱)"
                       size="small"
                       type="number"
                       value={item.cost}
                       onFocus={handleCostFocus}
                       onChange={(e) => handleItemChange(item.product._id, 'cost', e.target.value)}
                       variant="outlined"
-                      sx={{ mt: 1, width: '160px' }}
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">₱</InputAdornment>
-                      }}
+                      sx={{ mt: 1, width: '100%' }}
                     />
 
-                    {/* --- NEW: Comment/Note Field --- */}
                     <TextField
-                      label="Note (e.g., quality, variant)"
+                      placeholder="Note (e.g. quality, variant)"
                       size="small"
                       value={item.note}
                       onChange={(e) => handleItemChange(item.product._id, 'note', e.target.value)}
                       variant="standard"
                       fullWidth
-                      sx={{ mt: 1.5 }}
+                      sx={{ mt: 1 }}
                     />
-                    {/* --- END NEW --- */}
 
                     {otherSupplierCosts.length > 0 && (
-                      <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
-                          Others:
-                        </Typography>
+                      <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">Others:</Typography>
                         {otherSupplierCosts.map(sc => (
                           <Tooltip key={sc.supplier} title={`From: ${getSupplierName(sc.supplier)}`}>
                             <Chip
@@ -309,6 +307,7 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
                               variant="outlined"
                               color="primary"
                               clickable
+                              sx={{ height: 20, fontSize: '0.7rem' }}
                             />
                           </Tooltip>
                         ))}
@@ -316,30 +315,22 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
                     )}
                   </Box>
                 </ListItem>
-                // --- END MODIFICATION ---
               );
             }) : (
-              <ListItem>
-                <ListItemText primary="No products added yet." secondary="Click on a product from the left to add it." />
-              </ListItem>
+              <Box sx={{ p: 4, textAlign: 'center', opacity: 0.6 }}>
+                <Typography variant="body2">Catalog is empty.</Typography>
+                <Typography variant="caption">Select products from the left to add.</Typography>
+              </Box>
             )}
           </List>
         </Paper>
-        <Button 
-          variant="contained" 
-          onClick={handleSaveChanges} 
-          disabled={isSaving} 
-          sx={{ mt: 2 }}
-        >
-          {isSaving ? <CircularProgress size={24} /> : 'Save Catalog Changes'}
-        </Button>
       </Grid>
     </Grid>
   );
 };
 
 
-// --- NEW: Order History Tab Component ---
+// --- Order History Tab ---
 const OrderHistory = ({ supplier }) => {
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -371,23 +362,23 @@ const OrderHistory = ({ supplier }) => {
       'Completed': 'success',
       'Cancelled': 'error',
     };
-    return <Chip label={status} color={colorMap[status] || 'default'} size="small" />;
+    return <Chip label={status} color={colorMap[status] || 'default'} size="small" variant="filled" sx={{ height: 24, fontSize: '0.75rem', fontWeight: 600 }} />;
   };
 
   if (isLoading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><CircularProgress /></Box>;
+    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><LoadingSpinner text="Loading History..." /></Box>;
   }
 
   return (
-    <TableContainer component={Paper} variant="outlined" sx={{ height: '100%', overflowY: 'auto' }}>
+    <TableContainer component={Paper} variant="outlined" sx={{ height: '100%', overflowY: 'auto', borderRadius: 2 }}>
       <Table stickyHeader size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Date</TableCell>
-            <TableCell>Type</TableCell>
-            <TableCell>Reference</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell align="right">Amount</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Reference</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+            <TableCell align="right" sx={{ fontWeight: 700 }}>Amount</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -397,7 +388,7 @@ const OrderHistory = ({ supplier }) => {
               <TableCell>{item.type}</TableCell>
               <TableCell>
                 {item.type.startsWith('PO') ? (
-                  <MuiLink component={Link} to={`/purchase-orders/${item._id}`} underline="hover">
+                  <MuiLink component={Link} to={`/purchase-orders/${item._id}`} underline="hover" fontWeight={500}>
                     {item.reference}
                   </MuiLink>
                 ) : (
@@ -405,12 +396,12 @@ const OrderHistory = ({ supplier }) => {
                 )}
               </TableCell>
               <TableCell>{getStatusChip(item.status)}</TableCell>
-              <TableCell align="right">{formatCurrency(item.amount)}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>{formatCurrency(item.amount)}</TableCell>
             </TableRow>
           )) : (
             <TableRow>
-              <TableCell colSpan={5} align="center">
-                No order history found for this supplier.
+              <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                No order history found.
               </TableCell>
             </TableRow>
           )}
@@ -419,7 +410,6 @@ const OrderHistory = ({ supplier }) => {
     </TableContainer>
   );
 };
-// --- END NEW COMPONENT ---
 
 
 // --- Main Modal Component ---
@@ -495,26 +485,37 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
-      <DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      fullWidth 
+      maxWidth="lg"
+      PaperProps={{
+        component: motion.div,
+        initial: { opacity: 0, y: 50 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: 50 },
+        transition: { duration: 0.3 },
+        sx: { height: '85vh', borderRadius: 3 }
+      }}
+    >
+      <DialogTitle sx={{ fontWeight: 700 }}>
         {currentSupplier ? `Edit Supplier: ${currentSupplier.name}` : 'Add New Supplier'}
       </DialogTitle>
       
-      <DialogContent sx={{ display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          {/* --- MODIFIED: Added 3rd tab --- */}
+      <DialogContent sx={{ display: 'flex', flexDirection: 'column', p: 0 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3 }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="supplier edit tabs">
-            <Tab label="Supplier Info" id="supplier-tab-0" />
-            <Tab label="Product Catalog" id="supplier-tab-1" disabled={!currentSupplier} />
-            <Tab label="Order History" id="supplier-tab-2" disabled={!currentSupplier} />
+            <Tab label="Supplier Info" id="supplier-tab-0" sx={{ fontWeight: 600 }} />
+            <Tab label="Product Catalog" id="supplier-tab-1" disabled={!currentSupplier} sx={{ fontWeight: 600 }} />
+            <Tab label="Order History" id="supplier-tab-2" disabled={!currentSupplier} sx={{ fontWeight: 600 }} />
           </Tabs>
-          {/* --- END MODIFICATION --- */}
         </Box>
 
-        {/* --- Tab 1: Supplier Info Form (No changes) --- */}
+        {/* --- Tab 1: Supplier Info Form --- */}
         <TabPanel value={tabValue} index={0}>
-          <Box component="form" onSubmit={handleInfoSubmit} sx={{ p: 2, height: '100%', overflowY: 'auto' }}>
-            <Grid container spacing={2}>
+          <Box component="form" onSubmit={handleInfoSubmit} sx={{ p: 3, height: '100%', overflowY: 'auto' }}>
+            <Grid container spacing={3}>
               {error && (
                 <Grid item size={{ xs: 12 }}>
                   <Alert severity="error">{error}</Alert>
@@ -601,33 +602,36 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
                 </FormControl>
               </Grid>
             </Grid>
-            <DialogActions sx={{ pt: 3, pr: 0 }}>
-              <Button onClick={onClose}>Cancel</Button>
-              <Button type="submit" variant="contained" disabled={isSavingInfo}>
+            <DialogActions sx={{ pt: 4, pr: 0 }}>
+              <Button onClick={onClose} variant="outlined" color="inherit">Cancel</Button>
+              <Button type="submit" variant="contained" disabled={isSavingInfo} sx={{ fontWeight: 600 }}>
                 {isSavingInfo ? <CircularProgress size={24} /> : (currentSupplier ? 'Update Details' : 'Create & Continue')}
               </Button>
             </DialogActions>
           </Box>
         </TabPanel>
 
-        {/* --- Tab 2: Product Catalog Editor (Now points to the component) --- */}
+        {/* --- Tab 2: Product Catalog Editor --- */}
         <TabPanel value={tabValue} index={1}>
           {currentSupplier ? (
-            <ProductCatalogEditor supplier={currentSupplier} onClose={onClose} />
+            <Box sx={{ p: 3, height: '100%' }}>
+                <ProductCatalogEditor supplier={currentSupplier} onClose={onClose} />
+            </Box>
           ) : (
             <Typography>Please save supplier details first.</Typography>
           )}
         </TabPanel>
 
-        {/* --- NEW: Tab 3: Order History --- */}
+        {/* --- Tab 3: Order History --- */}
         <TabPanel value={tabValue} index={2}>
           {currentSupplier ? (
-            <OrderHistory supplier={currentSupplier} />
+            <Box sx={{ p: 3, height: '100%' }}>
+                <OrderHistory supplier={currentSupplier} />
+            </Box>
           ) : (
             <Typography>Please save supplier details first.</Typography>
           )}
         </TabPanel>
-        {/* --- END NEW TAB --- */}
 
       </DialogContent>
     </Dialog>

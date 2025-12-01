@@ -11,17 +11,87 @@ import {
   Container, Typography, Box, Paper, Grid, TextField, Button, Autocomplete,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton,
   Alert, FormControl, InputLabel, Select, MenuItem, 
-  RadioGroup, FormControlLabel, Radio, FormLabel
+  RadioGroup, FormControlLabel, Radio, FormLabel,
+  Dialog, DialogTitle, DialogContent, DialogActions, Divider, List, ListItem, ListItemIcon, ListItemText
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import InfoIcon from '@mui/icons-material/Info';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 
 import LoadingSpinner from '../components/LoadingSpinner';
+
+const InstructionModal = ({ open, onClose }) => (
+  <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'primary.main', color: 'white' }}>
+      <InfoIcon /> Create Order Guide
+    </DialogTitle>
+    <DialogContent dividers>
+      <Typography variant="h6" gutterBottom color="primary">Order Types</Typography>
+      <List dense>
+        <ListItem>
+          <ListItemIcon><CheckCircleOutlineIcon color="success" /></ListItemIcon>
+          <ListItemText 
+            primary="Standard Purchase" 
+            secondary="Use this for regular stock replenishment where you pay the supplier immediately or on terms." 
+          />
+        </ListItem>
+        <ListItem>
+          <ListItemIcon><CheckCircleOutlineIcon color="info" /></ListItemIcon>
+          <ListItemText 
+            primary="Consignment" 
+            secondary="Use this when the supplier provides goods but retains ownership until they are sold. You pay only for what you sell." 
+          />
+        </ListItem>
+      </List>
+
+      <Divider sx={{ my: 2 }} />
+
+      <Typography variant="h6" gutterBottom color="primary">Consignment Methods</Typography>
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={6}>
+          <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+            <Typography variant="subtitle1" fontWeight="bold">1. System Generated</Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Best for a fully digital workflow.
+            </Typography>
+            <ul style={{ paddingLeft: 20, margin: 0, fontSize: '0.875rem' }}>
+                <li>You define the <strong>Terms & Conditions</strong> here.</li>
+                <li>The system generates a PDF Agreement.</li>
+                <li>A link is sent to the Supplier to <strong>digitally sign</strong>.</li>
+                <li>Once signed, you countersign to approve the PO.</li>
+            </ul>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+            <Typography variant="subtitle1" fontWeight="bold">2. Upload Signed PDF</Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Best if you already have a contract.
+            </Typography>
+            <ul style={{ paddingLeft: 20, margin: 0, fontSize: '0.875rem' }}>
+                <li>You have already discussed and signed a contract offline.</li>
+                <li>You simply <strong>upload the scanned PDF/Image</strong> here.</li>
+                <li>The PO is created immediately with the file attached.</li>
+            </ul>
+          </Paper>
+        </Grid>
+      </Grid>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose} variant="contained">Got it</Button>
+    </DialogActions>
+  </Dialog>
+);
 
 const CreatePurchaseOrderPage = () => {
   const navigate = useNavigate();
   const { confirm } = useContext(ConfirmationContext);
+
+  // --- UPDATED: Default state is TRUE so it pops up on visit ---
+  const [openHelp, setOpenHelp] = useState(true);
 
   // Form State
   const [supplier, setSupplier] = useState(null);
@@ -275,36 +345,40 @@ const CreatePurchaseOrderPage = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <InstructionModal open={openHelp} onClose={() => setOpenHelp(false)} />
+      
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
-        <Typography variant="h4" component="h1" gutterBottom>
-            Create New Purchase Order
-        </Typography>
-        <Paper sx={{ p: 3 }}>
-            <Grid container spacing={3}>
-            {/* UPDATED: Step 1 changes width dynamically. 
-                If supplier is selected, it takes 6 columns (half).
-                If not, it takes 12 columns (full).
-            */}
-            <Grid item size={{ xs: 12, md: supplier ? 6 : 12 }}>
-                <Typography variant="h6" gutterBottom>Step 1: Select Supplier</Typography>
-                <Autocomplete
-                options={suppliersList}
-                getOptionLabel={(option) => option.name || ''}
-                isOptionEqualToValue={(option, value) => option._id === value._id}
-                value={supplier}
-                onChange={handleSupplierChange}
-                renderInput={(params) => <TextField {...params} label="Select Supplier" variant="outlined" />}
-                />
-            </Grid>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h4" component="h1" fontWeight={700}>
+                Create New Purchase Order
+            </Typography>
+            <Button startIcon={<HelpOutlineIcon />} onClick={() => setOpenHelp(true)} variant="text">
+                Guide & Instructions
+            </Button>
+        </Box>
 
-            {/* UPDATED: Step 2 only renders if supplier is selected */}
-            <AnimatePresence>
-                {supplier && (
-                    <Grid item size={{ xs: 12, md: 6 }} component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
-                        <Typography variant="h6" gutterBottom>Step 2: Order Type</Typography>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} md={poType === 'Consignment' ? 6 : 12}>
-                                <FormControl fullWidth>
+        <Paper sx={{ p: 3, borderRadius: 2 }}>
+            <Grid container spacing={3}>
+                
+                {/* Step 1: Supplier Selection */}
+                <Grid item size={{ xs: 12, md: supplier ? 6 : 12 }}>
+                    <Typography variant="h6" gutterBottom fontWeight={600}>Step 1: Select Supplier</Typography>
+                    <Autocomplete
+                        options={suppliersList}
+                        getOptionLabel={(option) => option.name || ''}
+                        isOptionEqualToValue={(option, value) => option._id === value._id}
+                        value={supplier}
+                        onChange={handleSupplierChange}
+                        renderInput={(params) => <TextField {...params} label="Select Supplier" variant="outlined" />}
+                    />
+                </Grid>
+
+                {/* Step 2: Order Type */}
+                <AnimatePresence>
+                    {supplier && (
+                        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
+                            <Typography variant="h6" gutterBottom fontWeight={600}>Step 2: Order Type</Typography>
+                            <FormControl fullWidth>
                                 <InputLabel>Order Type</InputLabel>
                                 <Select
                                     value={poType}
@@ -312,107 +386,85 @@ const CreatePurchaseOrderPage = () => {
                                     onChange={(e) => setPoType(e.target.value)}
                                     disabled={!supplier}
                                 >
-                                    <MenuItem value="Purchase">Purchase</MenuItem>
+                                    <MenuItem value="Purchase">Standard Purchase</MenuItem>
                                     <MenuItem value="Consignment">Consignment</MenuItem>
                                 </Select>
+                            </FormControl>
+                        </Grid>
+                    )}
+                </AnimatePresence>
+
+                {/* Step 3: Consignment Method (Only for Consignment) */}
+                <AnimatePresence>
+                    {supplier && poType === 'Consignment' && (
+                        <Grid item size={{ xs: 12 }} component={motion.div} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'primary.50', borderColor: 'primary.main' }}>
+                                <Typography variant="h6" gutterBottom fontWeight={600}>Step 3: Select Consignment Method</Typography>
+                                <FormControl component="fieldset">
+                                    <RadioGroup
+                                        row
+                                        value={consignmentMethod}
+                                        onChange={(e) => setConsignmentMethod(e.target.value)}
+                                    >
+                                        <FormControlLabel value="System" control={<Radio />} label="System Generated (Recommended)" />
+                                        <FormControlLabel value="Manual" control={<Radio />} label="Upload Signed PDF" />
+                                    </RadioGroup>
                                 </FormControl>
-                            </Grid>
-                            
-                            {poType === 'Consignment' && (
-                                <Grid item xs={12} md={6}>
-                                    <FormControl component="fieldset">
-                                        <FormLabel component="legend">Method</FormLabel>
-                                        <RadioGroup
-                                            row
-                                            value={consignmentMethod}
-                                            onChange={(e) => setConsignmentMethod(e.target.value)}
-                                        >
-                                            <FormControlLabel value="System" control={<Radio />} label="System Generated" />
-                                            <FormControlLabel value="Manual" control={<Radio />} label="Upload Signed PDF" />
-                                        </RadioGroup>
-                                    </FormControl>
-                                </Grid>
-                            )}
+                            </Paper>
                         </Grid>
-                    </Grid>
-                )}
-            </AnimatePresence>
+                    )}
+                </AnimatePresence>
 
-            {/* Dynamic Inputs for Consignment (Terms or Upload) */}
-            {supplier && poType === 'Consignment' && (
-                <Grid item size={{ xs: 12 }}>
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                    >
-                        <Paper variant="outlined" sx={{ p: 2, mb: 2, backgroundColor: '#fcfcfc' }}>
-                            {consignmentMethod === 'System' ? (
-                                <>
-                                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                        Terms and Conditions (For System PDF)
-                                    </Typography>
-                                    <TextField
-                                        fullWidth
-                                        multiline
-                                        rows={4}
-                                        variant="outlined"
-                                        value={termsAndConditions}
-                                        onChange={(e) => setTermsAndConditions(e.target.value)}
-                                        placeholder="Enter terms..."
-                                        // --- UPDATED: Enable Resizing ---
-                                        sx={{
-                                            '& .MuiInputBase-root': {
-                                                padding: 1.5
-                                            },
-                                            '& textarea': {
-                                                resize: 'vertical', // Allows user to resize vertically
-                                                minHeight: '100px'
-                                            }
-                                        }}
-                                        // -------------------------------
-                                    />
-                                </>
-                            ) : (
-                                <>
-                                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                        Upload Signed Consignment Agreement
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                        <Button
-                                            component="label"
+                {/* Step 4: Method Details (Terms OR Upload) */}
+                <AnimatePresence>
+                    {supplier && poType === 'Consignment' && (
+                        <Grid item size={{ xs: 12 }} component={motion.div} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                            <Paper variant="outlined" sx={{ p: 2, backgroundColor: '#fcfcfc' }}>
+                                {consignmentMethod === 'System' ? (
+                                    <>
+                                        <Typography variant="h6" gutterBottom fontWeight={600}>Step 4: Assign Terms and Conditions</Typography>
+                                        <TextField
+                                            fullWidth
+                                            multiline
+                                            rows={5}
                                             variant="outlined"
-                                            startIcon={<UploadFileIcon />}
-                                        >
-                                            Select File
-                                            <input type="file" hidden accept="application/pdf,image/*" onChange={handleFileUpload} />
-                                        </Button>
-                                        <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                                            {signedAgreementFile ? signedAgreementFile.name : 'No file chosen'}
-                                        </Typography>
-                                    </Box>
-                                </>
-                            )}
-                        </Paper>
-                    </motion.div>
-                </Grid>
-            )}
-
-            {/* Step 3: Items (Shows only after Step 1 is done) */}
-            {supplier && (
-                <motion.div 
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }} 
-                    transition={{ duration: 0.5 }}
-                    style={{ width: '100%' }}
-                >
-                    <Grid container spacing={3} sx={{ width: '100%', ml: 0 }}>
-                        <Grid item size={{ xs: 12 }}>
-                            <Typography variant="h6">Step 3: Add Items</Typography>
+                                            value={termsAndConditions}
+                                            onChange={(e) => setTermsAndConditions(e.target.value)}
+                                            placeholder="Enter terms..."
+                                            sx={{ '& textarea': { resize: 'vertical' } }}
+                                        />
+                                    </>
+                                ) : (
+                                    <>
+                                        <Typography variant="h6" gutterBottom fontWeight={600}>Step 4: Upload Signed Agreement</Typography>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Button
+                                                component="label"
+                                                variant="outlined"
+                                                startIcon={<UploadFileIcon />}
+                                            >
+                                                Select File
+                                                <input type="file" hidden accept="application/pdf,image/*" onChange={handleFileUpload} />
+                                            </Button>
+                                            <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                                                {signedAgreementFile ? signedAgreementFile.name : 'No file chosen'}
+                                            </Typography>
+                                        </Box>
+                                    </>
+                                )}
+                            </Paper>
                         </Grid>
+                    )}
+                </AnimatePresence>
 
-                        <Grid item size={{ xs: 12 }}>
-                            <Grid container spacing={2} alignItems="center">
+                {/* Step 5 (or 3): Add Items */}
+                {supplier && (
+                    <Grid item size={{ xs: 12 }} component={motion.div} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <Typography variant="h6" gutterBottom fontWeight={600}>
+                            {poType === 'Consignment' ? 'Step 5: Add Items' : 'Step 3: Add Items'}
+                        </Typography>
+                        
+                        <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
                             <Grid item size={{ xs: 12, sm: 6, md: 5 }}>
                                 <Autocomplete
                                 options={supplierProducts.filter(p => !items.some(item => item.product._id === p._id))}
@@ -422,9 +474,9 @@ const CreatePurchaseOrderPage = () => {
                                 onChange={(event, newValue) => {
                                     setSelectedProduct(newValue);
                                     if (newValue) {
-                                    setCost(newValue.cost !== undefined ? newValue.cost : 0);
+                                        setCost(newValue.cost !== undefined ? newValue.cost : 0);
                                     } else {
-                                    setCost(0);
+                                        setCost(0);
                                     }
                                     setQuantity(1);
                                 }}
@@ -483,19 +535,17 @@ const CreatePurchaseOrderPage = () => {
                                 Add
                                 </Button>
                             </Grid>
-                            </Grid>
                         </Grid>
 
-                        <Grid item size={{ xs: 12 }}>
-                            <TableContainer component={Paper} variant="outlined">
+                        <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
                             <Table>
                                 <TableHead>
-                                <TableRow>
-                                    <TableCell>Product</TableCell>
-                                    <TableCell align="right">Quantity</TableCell>
-                                    <TableCell align="right">Unit Cost</TableCell>
-                                    <TableCell align="right">Subtotal</TableCell>
-                                    <TableCell align="center">Actions</TableCell>
+                                <TableRow sx={{ bgcolor: 'grey.50' }}>
+                                    <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
+                                    <TableCell align="right" sx={{ fontWeight: 700 }}>Quantity</TableCell>
+                                    <TableCell align="right" sx={{ fontWeight: 700 }}>Unit Cost</TableCell>
+                                    <TableCell align="right" sx={{ fontWeight: 700 }}>Subtotal</TableCell>
+                                    <TableCell align="center" sx={{ fontWeight: 700 }}>Actions</TableCell>
                                 </TableRow>
                                 </TableHead>
                                 <TableBody component={AnimatePresence}>
@@ -521,32 +571,38 @@ const CreatePurchaseOrderPage = () => {
                                     </TableRow>
                                 ))}
                                 {items.length === 0 ? (
-                                    <TableRow><TableCell colSpan={5} align="center">No items added yet.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>No items added yet.</TableCell></TableRow>
                                 ) : (
-                                    <TableRow sx={{ '& td': { border: 0 } }}>
+                                    <TableRow sx={{ '& td': { border: 0, fontWeight: 700 } }}>
                                     <TableCell colSpan={3} align="right"><Typography variant="h6">Grand Total:</Typography></TableCell>
-                                    <TableCell align="right"><Typography variant="h6">₱{grandTotal.toFixed(2)}</Typography></TableCell>
+                                    <TableCell align="right"><Typography variant="h6" color="primary.main">₱{grandTotal.toFixed(2)}</Typography></TableCell>
                                     <TableCell />
                                     </TableRow>
                                 )}
                                 </TableBody>
                             </Table>
-                            </TableContainer>
-                        </Grid>
+                        </TableContainer>
 
                         <Grid item size={{ xs: 12 }}>
-                            <TextField label="Notes (Optional)" multiline rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} fullWidth />
+                            <TextField 
+                                label="Notes (Optional)" 
+                                multiline 
+                                rows={3} 
+                                value={notes} 
+                                onChange={(e) => setNotes(e.target.value)} 
+                                fullWidth 
+                                sx={{ '& textarea': { resize: 'vertical' } }}
+                            />
                         </Grid>
 
-                        <Grid item size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                            <Button variant="outlined" color="secondary" onClick={() => navigate('/purchase-orders')}>Cancel</Button>
+                        <Grid item size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
+                            <Button variant="outlined" color="inherit" onClick={() => navigate('/purchase-orders')}>Cancel</Button>
                             <Button variant="contained" onClick={handleSubmit} disabled={loading || items.length === 0 || !supplier}>
                             {loading ? <LoadingSpinner text="" /> : `Create ${poType} Order`}
                             </Button>
                         </Grid>
                     </Grid>
-                </motion.div>
-            )}
+                )}
             </Grid>
         </Paper>
       </motion.div>

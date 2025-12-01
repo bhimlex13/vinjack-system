@@ -1,12 +1,11 @@
 // client/src/pages/PurchaseOrdersPage.js
-import React, { useState, useEffect, useMemo, useContext } from 'react'; // --- ADDED: useContext ---
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPurchaseOrders, getSuppliers } from '../api/purchaseOrderApi';
-import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
 import { toast } from 'react-toastify'; 
 import { motion } from 'framer-motion'; 
-import AuthContext from '../context/AuthContext'; // --- NEW: Import AuthContext ---
-// REMOVED: import socket from '../api/socket'; 
+import AuthContext from '../context/AuthContext';
 
 // MUI Imports
 import {
@@ -15,11 +14,15 @@ import {
   Chip, Tooltip, IconButton, Grid, TextField, InputAdornment, FormControl,
   InputLabel, Select, MenuItem, TablePagination,
   Autocomplete,
-  ButtonGroup
+  ButtonGroup,
+  Divider,
+  Stack
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SearchIcon from '@mui/icons-material/Search';
+import DescriptionIcon from '@mui/icons-material/Description';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -34,17 +37,17 @@ const StatusChip = ({ status }) => {
     'Partially Received': { label: 'Partially Received', color: 'secondary' }
   };
   const style = statusStyles[status] || { label: status, color: 'default' };
-  return <Chip label={style.label} color={style.color} size="small" sx={{ fontWeight: 'bold' }} />;
+  return <Chip label={style.label} color={style.color} size="small" variant="filled" sx={{ fontWeight: 700, borderRadius: 1 }} />;
 };
 
-
 const PurchaseOrdersPage = () => {
+  const today = new Date().toISOString().split('T')[0];
+
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
   
-  // --- NEW: Get socket from AuthContext ---
   const { socket } = useContext(AuthContext); 
   
   // Filter States
@@ -52,9 +55,12 @@ const PurchaseOrdersPage = () => {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPoType, setFilterPoType] = useState('');
   const [filterSupplier, setFilterSupplier] = useState(null); 
-  const [datePreset, setDatePreset] = useState('all'); 
-  const [startDate, setStartDate] = useState(new Date(0));
-  const [endDate, setEndDate] = useState(endOfDay(new Date())); 
+  
+  // --- UPDATED: Date Filter State (Matching ReturnsPage) ---
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  const [datePreset, setDatePreset] = useState('today');
+  // --------------------------------------------------------
   
   const [suppliersList, setSuppliersList] = useState([]); 
   const [isFilterLoading, setIsFilterLoading] = useState(true); 
@@ -62,7 +68,6 @@ const PurchaseOrdersPage = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // --- FRAMER MOTION VARIANTS ---
   const pageVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -71,11 +76,9 @@ const PurchaseOrdersPage = () => {
       transition: { duration: 0.4, ease: "easeOut" }
     }
   };
-  // ------------------------------
 
   const fetchData = async () => {
     try {
-      // Only show full loading spinner on initial load, not on silent refreshes
       if (purchaseOrders.length === 0) setLoading(true);
       
       const [poData, suppliersData] = await Promise.all([
@@ -84,7 +87,6 @@ const PurchaseOrdersPage = () => {
       ]);
       
       setPurchaseOrders(poData);
-      // Only update supplier list if it's empty (optimization)
       if (suppliersList.length === 0) {
           setSuppliersList(suppliersData.filter(s => s.status === 'Approved'));
       }
@@ -93,7 +95,6 @@ const PurchaseOrdersPage = () => {
     } catch (err) {
       const errorMsg = 'Failed to fetch page data. Please try again later.';
       setError(errorMsg);
-      // Only toast if it's a user-initiated action, otherwise it might spam on socket errors
       if(loading) toast.error(errorMsg);
       console.error(err);
     } finally {
@@ -104,48 +105,60 @@ const PurchaseOrdersPage = () => {
 
   useEffect(() => {
     fetchData();
-
-    // --- NEW: Real-time Listener using Context Socket ---
     if (!socket) return;
-
     const handleRealTimeUpdate = (data) => {
       console.log('Real-time Update: Refreshing List...', data);
-      // Re-fetch data to ensure list shows new status (e.g., "Awaiting Approval")
       fetchData();
     };
-
     socket.on('po_supplier_update', handleRealTimeUpdate);
-
-    // Cleanup
     return () => {
       socket.off('po_supplier_update', handleRealTimeUpdate);
     };
     // eslint-disable-next-line
-  }, [socket]); // Add socket dependency
+  }, [socket]);
   
+  // --- UPDATED: Date Preset Handler (Matching ReturnsPage) ---
   const handleDatePreset = (preset) => {
     const now = new Date();
-    let start = startOfDay(now);
-    let end = endOfDay(now);
+    let start = now;
+    let end = now;
     setDatePreset(preset); 
 
-    if (preset === 'week') { start = startOfWeek(now); }
-    else if (preset === 'month') { start = startOfMonth(now); }
-    else if (preset === 'year') { start = startOfYear(now); }
-    else if (preset === 'all') { start = new Date(0); } 
-    
-    setStartDate(start);
-    setEndDate(end);
-    setPage(0); 
+    if (preset === 'today') {
+      start = startOfDay(now);
+      end = endOfDay(now);
+    } else if (preset === 'week') {
+      start = startOfWeek(now);
+      end = endOfDay(now);
+    } else if (preset === 'month') {
+      start = startOfMonth(now);
+      end = endOfDay(now);
+    } else if (preset === 'year') {
+      start = startOfYear(now);
+      end = endOfDay(now);
+    } else if (preset === 'all') {
+      start = new Date(0); 
+      end = endOfDay(now);
+    }
+
+    setStartDate(format(start, 'yyyy-MM-dd'));
+    setEndDate(format(end, 'yyyy-MM-dd'));
+    setPage(0);
   };
+  // -----------------------------------------------------------
 
   const filteredPurchaseOrders = useMemo(() => {
-    const start = startOfDay(startDate);
-    const end = endOfDay(endDate);
-
     return purchaseOrders.filter(po => {
+      // --- UPDATED: Date Logic (Matching ReturnsPage) ---
       const poDate = new Date(po.orderDate);
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      
       const dateMatch = poDate >= start && poDate <= end;
+      // --------------------------------------------------
+
       const statusMatch = filterStatus ? po.status === filterStatus : true;
       const typeMatch = filterPoType ? po.poType === filterPoType : true;
       const supplierMatch = filterSupplier ? po.supplier?._id === filterSupplier._id : true;
@@ -177,7 +190,6 @@ const PurchaseOrdersPage = () => {
     setPage(0); 
   };
 
-  // --- RENDER LOADING SPINNER ---
   if (loading && purchaseOrders.length === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
@@ -189,38 +201,60 @@ const PurchaseOrdersPage = () => {
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       
-      {/* --- ANIMATED CONTENT --- */}
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h4" component="h1">
-                Purchase Orders
-            </Typography>
+        
+        {/* Header */}
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 4, gap: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'primary.light', color: 'primary.dark', display: 'flex' }}>
+                <DescriptionIcon fontSize="medium" />
+              </Box>
+              <Box>
+                <Typography variant="h5" fontWeight={700}>Purchase Orders</Typography>
+                <Typography variant="body2" color="text.secondary">Manage supplier orders and consignments</Typography>
+              </Box>
+            </Stack>
             <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/purchase-orders/new')}
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/purchase-orders/new')}
+              sx={{ fontWeight: 600, px: 3, borderRadius: 2 }}
             >
-            Create Purchase Order
+              Create Purchase Order
             </Button>
         </Box>
 
-        <Paper sx={{ p: 2, mb: 3 }}>
-            <Grid container spacing={2}>
-            {/* Row 1: Date Presets */}
-            <Grid item size={{ xs: 12 }}>
-                <ButtonGroup fullWidth>
-                <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
-                <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
-                <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
-                <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
-                <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
+        {/* Filters */}
+        <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
+            <Grid container spacing={2} alignItems="center">
+            
+            {/* --- UPDATED: Date Filter Layout (Matching ReturnsPage) --- */}
+            <Grid size={{ xs: 12 }}>
+                <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
+                    {['today', 'week', 'month', 'year', 'all'].map((preset) => (
+                        <Button 
+                            key={preset}
+                            variant={datePreset === preset ? 'contained' : 'outlined'} 
+                            onClick={() => handleDatePreset(preset)}
+                            sx={{ textTransform: 'capitalize' }}
+                        >
+                            {preset === 'all' ? 'All Time' : preset}
+                        </Button>
+                    ))}
                 </ButtonGroup>
             </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+            </Grid>
+            {/* -------------------------------------------------------- */}
 
-            {/* Row 2: Search and Supplier */}
-            <Grid item size={{ xs: 12, md: 6 }}>
+            {/* Search Input moved here to balance the grid if needed, or keep it consistent */}
+            <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
-                label="Search by PO Number or Supplier"
+                label="Search PO or Supplier"
                 variant="outlined"
                 size="small"
                 value={searchTerm}
@@ -228,12 +262,16 @@ const PurchaseOrdersPage = () => {
                 fullWidth
                 InputProps={{
                     startAdornment: (
-                    <InputAdornment position="start"><SearchIcon /></InputAdornment>
+                    <InputAdornment position="start"><SearchIcon color="action" /></InputAdornment>
                     ),
                 }}
                 />
             </Grid>
-            <Grid item size={{ xs: 12, md: 6 }}>
+            
+            <Grid size={{ xs: 12 }} sx={{ my: 0.5 }}><Divider /></Grid>
+
+            {/* Row 3: Supplier, Status, Type */}
+            <Grid size={{ xs: 12, md: 4 }}>
                 <Autocomplete
                 options={suppliersList}
                 getOptionLabel={(option) => option.name}
@@ -244,9 +282,7 @@ const PurchaseOrdersPage = () => {
                 disabled={isFilterLoading}
                 />
             </Grid>
-            
-            {/* Row 3: Status and Type */}
-            <Grid item size={{ xs: 6, md: 6 }}>
+            <Grid size={{ xs: 6, md: 4 }}>
                 <FormControl size="small" fullWidth>
                 <InputLabel>Filter by Status</InputLabel>
                 <Select
@@ -265,7 +301,7 @@ const PurchaseOrdersPage = () => {
                 </Select>
                 </FormControl>
             </Grid>
-            <Grid item size={{ xs: 6, md: 6 }}>
+            <Grid size={{ xs: 6, md: 4 }}>
                 <FormControl size="small" fullWidth>
                 <InputLabel>Filter by Type</InputLabel>
                 <Select
@@ -285,11 +321,18 @@ const PurchaseOrdersPage = () => {
         {error ? (
             <Alert severity="error">{error}</Alert>
         ) : (
-            <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+            <Paper sx={{ width: '100%', overflow: 'hidden', borderRadius: 3, boxShadow: 3 }}>
+             <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-end', bgcolor: 'grey.50', borderBottom: 1, borderColor: 'divider' }}>
+                <Tooltip title="Refresh Data">
+                    <IconButton onClick={fetchData} size="small">
+                        <RefreshIcon />
+                    </IconButton>
+                </Tooltip>
+            </Box>
             <TableContainer>
                 <Table stickyHeader>
                 <TableHead>
-                    <TableRow>
+                    <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: 'grey.50', fontWeight: 700 } }}>
                     <TableCell>PO Number</TableCell>
                     <TableCell>Supplier</TableCell>
                     <TableCell>Order Type</TableCell>
@@ -300,31 +343,46 @@ const PurchaseOrdersPage = () => {
                     </TableRow>
                 </TableHead>
                 <TableBody>
-                    {filteredPurchaseOrders
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((po) => (
-                        <TableRow hover key={po._id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                        <TableCell>{po.poNumber}</TableCell>
-                        <TableCell>{po.supplier?.name || 'N/A'}</TableCell>
-                        <TableCell>
-                            <Chip 
-                            label={po.poType || 'Purchase'} 
-                            size="small" 
-                            color={po.poType === 'Consignment' ? 'info' : 'default'}
-                            />
-                        </TableCell>
-                        <TableCell><StatusChip status={po.status} /></TableCell>
-                        <TableCell>{new Date(po.orderDate).toLocaleDateString()}</TableCell>
-                        <TableCell align="right">{formatCurrency(po.totalAmount)}</TableCell>
-                        <TableCell align="center">
-                            <Tooltip title="View Details">
-                            <IconButton onClick={() => navigate(`/purchase-orders/${po._id}`)} color="primary">
-                                <VisibilityIcon />
-                            </IconButton>
-                            </Tooltip>
-                        </TableCell>
+                    {filteredPurchaseOrders.length > 0 ? (
+                        filteredPurchaseOrders
+                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                        .map((po) => (
+                            <TableRow hover key={po._id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                            <TableCell sx={{ fontWeight: 600, fontFamily: 'monospace' }}>{po.poNumber}</TableCell>
+                            <TableCell sx={{ fontWeight: 500 }}>{po.supplier?.name || 'N/A'}</TableCell>
+                            <TableCell>
+                                <Chip 
+                                label={po.poType || 'Purchase'} 
+                                size="small" 
+                                variant="outlined"
+                                color={po.poType === 'Consignment' ? 'info' : 'default'}
+                                sx={{ fontWeight: 600, fontSize: '0.75rem' }}
+                                />
+                            </TableCell>
+                            <TableCell><StatusChip status={po.status} /></TableCell>
+                            <TableCell>{new Date(po.orderDate).toLocaleDateString()}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600 }}>{formatCurrency(po.totalAmount)}</TableCell>
+                            <TableCell align="center">
+                                <Tooltip title="View Details">
+                                <IconButton 
+                                    onClick={() => navigate(`/purchase-orders/${po._id}`)} 
+                                    color="primary"
+                                    size="small"
+                                    sx={{ bgcolor: 'primary.50', '&:hover': { bgcolor: 'primary.100' } }}
+                                >
+                                    <VisibilityIcon fontSize="small" />
+                                </IconButton>
+                                </Tooltip>
+                            </TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                                No purchase orders found.
+                            </TableCell>
                         </TableRow>
-                    ))}
+                    )}
                 </TableBody>
                 </Table>
             </TableContainer>
