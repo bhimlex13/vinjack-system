@@ -1,5 +1,6 @@
 // client/src/pages/DashboardPage.js
 import React, { useEffect, useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom'; 
 import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
 import { Bar, Line } from 'react-chartjs-2';
@@ -75,25 +76,27 @@ const formatStatValue = (value) => {
 };
 
 // --- COMPONENT: StatCard ---
-const StatCard = ({ title, value, icon, color }) => {
+const StatCard = ({ title, value, icon, color, to }) => {
   const { display, tooltip } = formatStatValue(value);
   const theme = useTheme();
+  const navigate = useNavigate();
 
   return (
     <Tooltip title={<Typography variant="body2">{tooltip}</Typography>} placement="top" arrow>
       <Paper
         component={motion.div}
         whileHover={{ y: -5, boxShadow: theme.shadows[10] }}
+        whileTap={{ scale: 0.98 }}
         elevation={2}
+        onClick={() => to && navigate(to)} 
         sx={{
-          p: 3,
-          display: 'flex',
-          alignItems: 'center',
+          p: 0,
           height: '100%',
           width: '100%',
           borderRadius: 3,
           position: 'relative',
           overflow: 'hidden',
+          cursor: to ? 'pointer' : 'default',
           '&:before': {
             content: '""',
             position: 'absolute',
@@ -102,42 +105,45 @@ const StatCard = ({ title, value, icon, color }) => {
             width: '6px',
             height: '100%',
             backgroundColor: `${color}.main`,
+            zIndex: 1
           }
         }}
       >
-        <Box 
-          sx={{ 
-            color: `${color}.main`, 
-            fontSize: '2.2rem', 
-            mr: 2.5,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            p: 1.5,
-            borderRadius: '50%',
-            backgroundColor: (theme) => theme.palette.mode === 'light' ? `${color}.50` : 'rgba(255,255,255,0.05)'
-          }}
-        >
-          {icon}
-        </Box>
-        
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography color="textSecondary" variant="body2" fontWeight={600} textTransform="uppercase" letterSpacing={0.5} gutterBottom>
-            {title}
-          </Typography>
-          <Typography
-            variant="h5"
-            component="p"
-            sx={{
-              fontWeight: 800,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              color: 'text.primary'
+        <Box sx={{ p: 3, display: 'flex', alignItems: 'center', width: '100%', height: '100%' }}>
+            <Box 
+            sx={{ 
+                color: `${color}.main`, 
+                fontSize: '2.2rem', 
+                mr: 2.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                p: 1.5,
+                borderRadius: '50%',
+                backgroundColor: (theme) => theme.palette.mode === 'light' ? `${color}.50` : 'rgba(255,255,255,0.05)'
             }}
-          >
-            {display}
-          </Typography>
+            >
+            {icon}
+            </Box>
+            
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography color="textSecondary" variant="body2" fontWeight={600} textTransform="uppercase" letterSpacing={0.5} gutterBottom>
+                {title}
+            </Typography>
+            <Typography
+                variant="h5"
+                component="p"
+                sx={{
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                color: 'text.primary'
+                }}
+            >
+                {display}
+            </Typography>
+            </Box>
         </Box>
       </Paper>
     </Tooltip>
@@ -147,6 +153,9 @@ const StatCard = ({ title, value, icon, color }) => {
 // --- MAIN COMPONENT: DashboardPage ---
 const DashboardPage = () => {
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate(); // Hook for navigation
+  const theme = useTheme();
+  
   const [summary, setSummary] = useState(null);
   const [lowStockItems, setLowStockItems] = useState([]);
   const [salesTrend, setSalesTrend] = useState(null);
@@ -170,6 +179,16 @@ const DashboardPage = () => {
       y: 0,
       opacity: 1,
       transition: { type: 'spring', stiffness: 100, damping: 15 }
+    }
+  };
+
+  // Helper for clickable styling
+  const clickableSx = {
+    cursor: 'pointer',
+    transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+    '&:hover': {
+      transform: 'translateY(-4px)',
+      boxShadow: theme.shadows[8]
     }
   };
 
@@ -291,7 +310,7 @@ const DashboardPage = () => {
     datasets: [{
       label: 'Revenue',
       data: salesTrend?.map(d => d.totalSales) || [],
-      borderColor: '#2e7d32', // Success Greenish
+      borderColor: '#2e7d32',
       backgroundColor: (context) => {
         const ctx = context.chart.ctx;
         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
@@ -319,7 +338,6 @@ const DashboardPage = () => {
     interaction: { mode: 'nearest', axis: 'x', intersect: false }
   };
 
-  // --- RENDER ---
   if (isLoading) {
     return <LoadingSpinner text="Loading Dashboard..." />;
   }
@@ -371,7 +389,7 @@ const DashboardPage = () => {
         </Stack>
       </Box>
 
-      {/* Main Grid - Using 'size' prop for alignment stability */}
+      {/* Main Grid */}
       <Grid 
         container 
         spacing={3}
@@ -381,29 +399,32 @@ const DashboardPage = () => {
         animate="visible"
       >
         {/* --- STAT CARDS --- */}
-        {/* Force xs: 12 for full width on mobile */}
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
-          <StatCard title="Total Revenue" value={`₱${(summary?.totalRevenue)?.toFixed(2) || '0.00'}`} icon={<FaMoneyBillWave />} color="primary" />
+          <StatCard title="Total Revenue" value={`₱${(summary?.totalRevenue)?.toFixed(2) || '0.00'}`} icon={<FaMoneyBillWave />} color="primary" to="/reports" />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
-          <StatCard title="Total Profit" value={`₱${(summary?.totalProfit)?.toFixed(2) || '0.00'}`} icon={<MonetizationOnIcon />} color="info" />
+          <StatCard title="Total Profit" value={`₱${(summary?.totalProfit)?.toFixed(2) || '0.00'}`} icon={<MonetizationOnIcon />} color="info" to="/reports" />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
-          <StatCard title="Total Sales" value={summary?.totalSales || 0} icon={<FaShoppingCart />} color="success" />
+          <StatCard title="Total Sales" value={summary?.totalSales || 0} icon={<FaShoppingCart />} color="success" to="/transactions" />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
-          <StatCard title="Items Sold" value={summary?.totalQuantitySold || 0} icon={<ShoppingCartCheckoutIcon />} color="warning" />
+          <StatCard title="Items Sold" value={summary?.totalQuantitySold || 0} icon={<ShoppingCartCheckoutIcon />} color="warning" to="/transactions" />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
-          <StatCard title="Stock Units" value={summary?.totalStockQuantity || 0} icon={<FaWarehouse />} color="error" />
+          <StatCard title="Stock Units" value={summary?.totalStockQuantity || 0} icon={<FaWarehouse />} color="error" to="/inventory" />
         </Grid>
         <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
-          <StatCard title="Products (SKUs)" value={summary?.totalSKUs || 0} icon={<InventoryIcon />} color="secondary" />
+          <StatCard title="Products (SKUs)" value={summary?.totalSKUs || 0} icon={<InventoryIcon />} color="secondary" to="/inventory" />
         </Grid>
 
-        {/* --- REVENUE TREND CHART --- */}
+        {/* --- REVENUE TREND CHART (Link to Reports) --- */}
         <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
-          <Paper elevation={2} sx={{ p: 3, display: 'flex', flexDirection: 'column', height: 400, borderRadius: 3 }}>
+          <Paper 
+            elevation={2} 
+            sx={{ p: 3, display: 'flex', flexDirection: 'column', height: 400, borderRadius: 3, ...clickableSx }}
+            onClick={() => navigate('/reports')}
+          >
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'success.light', color: 'success.dark', mr: 1.5, display: 'flex' }}>
                     <ShowChartIcon fontSize="small" />
@@ -423,9 +444,13 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* --- TOP 5 SELLING PRODUCTS --- */}
+        {/* --- TOP 5 SELLING PRODUCTS (Link to Reports) --- */}
         <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
-          <Paper elevation={2} sx={{ p: 3, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3 }}>
+          <Paper 
+            elevation={2} 
+            sx={{ p: 3, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, ...clickableSx }}
+            onClick={() => navigate('/reports')}
+          >
              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'primary.light', color: 'primary.dark', mr: 1.5, display: 'flex' }}>
                     <BarChartIcon fontSize="small" />
@@ -444,9 +469,13 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* --- TOP 5 SELLING SERVICES --- */}
+        {/* --- TOP 5 SELLING SERVICES (Link to Reports) --- */}
         <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
-           <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+           <Paper 
+             elevation={2} 
+             sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
+             onClick={() => navigate('/reports')}
+           >
               <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'info.light', color: 'info.dark', mr: 1.5, display: 'flex' }}>
                     <BuildIcon fontSize="small" />
@@ -482,9 +511,13 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* --- SLOW MOVING PRODUCTS --- */}
+        {/* --- SLOW MOVING PRODUCTS (Link to Inventory) --- */}
         <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
-          <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+          <Paper 
+            elevation={2} 
+            sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
+            onClick={() => navigate('/inventory')}
+          >
              <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'warning.light', color: 'warning.dark', mr: 1.5, display: 'flex' }}>
                     <TrendingDownIcon fontSize="small" />
@@ -520,9 +553,13 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* --- INVENTORY BY CATEGORY --- */}
+        {/* --- INVENTORY BY CATEGORY (Link to Inventory) --- */}
         <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
-          <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+          <Paper 
+            elevation={2} 
+            sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
+            onClick={() => navigate('/inventory')}
+          >
              <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'secondary.light', color: 'secondary.dark', mr: 1.5, display: 'flex' }}>
                     <CategoryIcon fontSize="small" />
@@ -560,9 +597,13 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* --- LOW STOCK ITEMS --- */}
+        {/* --- LOW STOCK ITEMS (Link to Alerts) --- */}
         <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
-          <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+          <Paper 
+            elevation={2} 
+            sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
+            onClick={() => navigate('/alerts')}
+          >
               <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
                   <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'error.light', color: 'error.dark', mr: 1.5, display: 'flex' }}>
                     <WarningAmberIcon fontSize="small" />
@@ -602,9 +643,13 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* --- RECENT ACTIVITY --- */}
+        {/* --- RECENT ACTIVITY (Link to Audit Log) --- */}
         <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
-           <Paper elevation={2} sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+           <Paper 
+             elevation={2} 
+             sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
+             onClick={() => navigate('/audit-log')}
+           >
              <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'secondary.light', color: 'secondary.dark', mr: 1.5, display: 'flex' }}>
                     <ReceiptLongIcon fontSize="small" />
@@ -658,9 +703,13 @@ const DashboardPage = () => {
           </Paper>
         </Grid>
 
-        {/* --- PENDING PURCHASE ORDERS --- */}
+        {/* --- PENDING PURCHASE ORDERS (Link to POs) --- */}
         <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
-          <Paper elevation={2} sx={{ p: 0, height: 350, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
+          <Paper 
+            elevation={2} 
+            sx={{ p: 0, height: 350, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
+            onClick={() => navigate('/purchase-orders')}
+          >
              <Box sx={{ p: 3, pb: 2, display: 'flex', alignItems: 'center' }}>
                 <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'text.disabled', color: 'white', mr: 1.5, display: 'flex' }}>
                     <AssignmentIcon fontSize="small" />
