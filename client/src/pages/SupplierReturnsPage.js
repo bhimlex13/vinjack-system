@@ -5,9 +5,7 @@ import { toast } from 'react-toastify';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { getSupplierCompletedOrders } from '../api/supplierApi';
 import { motion, AnimatePresence } from 'framer-motion'; 
-// --- MODIFIED: Date Imports ---
 import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
-// --- END MODIFICATION ---
 
 import {
   Container, Typography, Button, Box, Paper, Dialog, DialogTitle,
@@ -16,28 +14,29 @@ import {
   Checkbox, FormControlLabel, Chip,
   FormHelperText,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  ButtonGroup // --- MODIFIED: Added ButtonGroup ---
+  ButtonGroup, Divider, Stack
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'; 
+import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const SupplierReturnsPage = () => {
-  const today = new Date().toISOString().split('T')[0]; // --- NEW ---
+  const today = new Date().toISOString().split('T')[0];
 
   const [returns, setReturns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { confirm } = useContext(ConfirmationContext);
 
-  // --- MODIFIED: Date Filter State ---
+  // --- Date Filter State ---
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [datePreset, setDatePreset] = useState('today');
-  // --- END MODIFICATION ---
 
   // Modal State
   const [modalLoading, setModalLoading] = useState(false);
@@ -82,7 +81,7 @@ const SupplierReturnsPage = () => {
     fetchReturns();
   }, [fetchReturns]);
 
-  // --- MODIFIED: Date Preset Handler ---
+  // --- Date Preset Handler (Matched with ReturnsPage) ---
   const handleDatePreset = (preset) => {
     const now = new Date();
     let start = now;
@@ -109,9 +108,8 @@ const SupplierReturnsPage = () => {
     setStartDate(format(start, 'yyyy-MM-dd'));
     setEndDate(format(end, 'yyyy-MM-dd'));
   };
-  // --- END MODIFICATION ---
 
-  // --- MODIFIED: Filter Returns by Date ---
+  // --- Filter Logic (Matched with ReturnsPage) ---
   const filteredReturns = useMemo(() => {
     return returns.filter(row => {
       const rowDate = new Date(row.returnDate || row.createdAt);
@@ -125,7 +123,6 @@ const SupplierReturnsPage = () => {
       return rowDate >= start && rowDate <= end;
     });
   }, [returns, startDate, endDate]);
-  // --- END MODIFICATION ---
 
   const fetchModalData = async () => {
     setModalLoading(true);
@@ -304,7 +301,11 @@ const SupplierReturnsPage = () => {
         const date = row.returnDate || row.createdAt;
         return date ? new Date(date) : null;
       },
-      renderCell: (params) => params.value ? params.value.toLocaleString() : 'N/A' 
+      renderCell: (params) => (
+        <Typography variant="body2" fontWeight={600}>
+            {params.value ? params.value.toLocaleDateString() : 'N/A'}
+        </Typography>
+      )
     },
     { 
       field: 'supplier', 
@@ -323,12 +324,12 @@ const SupplierReturnsPage = () => {
             <Typography 
               key={item._id} 
               variant="body2" 
-              sx={{ whiteSpace: 'normal' }} 
+              sx={{ whiteSpace: 'normal', mb: 0.5 }} 
               component="div" 
             >
-              {item.quantity}x {item.product?.name || 'Unknown Product'} ({item.reason})
+              <strong>{item.quantity}x</strong> {item.product?.name || 'Unknown Product'} ({item.reason})
               {item.wasConsigned && (
-                <Chip label="Consigned" size="small" color="info" sx={{ ml: 1 }} />
+                <Chip label="Consigned" size="small" color="info" sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} />
               )}
             </Typography>
           ))}
@@ -369,24 +370,31 @@ const SupplierReturnsPage = () => {
             maxWidth="lg"
             PaperComponent={motion.div}
             PaperProps={{
-              initial: { y: 50, opacity: 0 },
-              animate: { y: 0, opacity: 1 },
-              exit: { y: 50, opacity: 0 },
-              transition: { duration: 0.3 },
-              sx: { backgroundColor: 'background.paper', boxShadow: 24, borderRadius: 2 }
+              initial: { y: 20, opacity: 0, scale: 0.95 },
+              animate: { y: 0, opacity: 1, scale: 1 },
+              exit: { y: 20, opacity: 0, scale: 0.95 },
+              transition: { duration: 0.2 },
+              sx: { 
+                borderRadius: 3, 
+                overflow: 'hidden',
+                bgcolor: 'background.paper', // Added to fix transparency
+                boxShadow: 24 
+              }
             }}
           >
-            <DialogTitle>Log New Return to Supplier</DialogTitle>
+            <DialogTitle sx={{ bgcolor: 'error.main', color: 'white', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AssignmentReturnIcon /> Log New Return to Supplier
+            </DialogTitle>
             <DialogContent>
               {modalLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
                   <LoadingSpinner text="Preparing Form..." />
                 </Box>
               ) : (
-                <Box component="form" sx={{ mt: 2 }}>
-                  <Grid container spacing={2}>
+                <Box component="form" sx={{ mt: 3 }}>
+                  <Grid container spacing={3}>
                     
-                    <Grid item size={{ xs: 12, sm: 6 }}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <Autocomplete
                         options={suppliers}
                         getOptionLabel={(option) => option.name || ''}
@@ -397,11 +405,11 @@ const SupplierReturnsPage = () => {
                           setItemsToReturn([]); 
                           resetAddItemBar(); 
                         }}
-                        renderInput={(params) => <TextField {...params} label="Select Supplier" />}
+                        renderInput={(params) => <TextField {...params} label="Select Supplier" variant="outlined" />}
                       />
                     </Grid>
                     
-                    <Grid item size={{ xs: 12, sm: 6 }}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <Autocomplete
                         options={completedOrders}
                         getOptionLabel={(option) => option.name || ''}
@@ -432,102 +440,104 @@ const SupplierReturnsPage = () => {
                       <FormHelperText>Select an order to filter the product list.</FormHelperText>
                     </Grid>
 
-                    <Grid item size={{ xs: 12 }}>
-                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                        Add Items to Return
-                      </Typography>
+                    <Grid size={{ xs: 12 }}>
+                        <Divider textAlign="left"><Chip label="Add Items" size="small" /></Divider>
                     </Grid>
 
-                    <Grid item size={{ xs: 12 }}>
-                      <Grid container spacing={2} alignItems="center">
-                        <Grid item size={{ xs: 12, sm: 3 }}>
-                          <Autocomplete
-                            options={availableProducts}
-                            getOptionLabel={(option) => `${option.name} (${option.itemCode})` || ''}
-                            value={selectedProduct}
-                            disabled={!selectedSupplier}
-                            onChange={(e, newValue) => handleProductSelect(newValue)}
-                            renderInput={(params) => <TextField {...params} label="Select Product" size="small" />}
-                          />
-                        </Grid>
-                        <Grid item size={{ xs: 6, sm: 2 }}>
-                          <TextField
-                            label="Quantity"
-                            type="number"
-                            size="small"
-                            value={quantity}
-                            onChange={(e) => {
-                              const newQty = parseInt(e.target.value, 10) || 1;
-                              if (newQty > maxQuantity) {
-                                toast.warn(`Max quantity is ${maxQuantity}`);
-                                setQuantity(maxQuantity);
-                              } else {
-                                setQuantity(newQty);
-                              }
-                            }}
-                          />
-                        </Grid>
-                        <Grid item size={{ xs: 6, sm: 2 }}>
-                          <FormControl fullWidth size="small">
-                            <InputLabel>Reason</InputLabel>
-                            <Select
-                              label="Reason"
-                              value={reason}
-                              onChange={(e) => setReason(e.target.value)}
-                            >
-                              <MenuItem value="Defective">Defective</MenuItem>
-                              <MenuItem value="Wrong Item">Wrong Item</MenuItem>
-                              <MenuItem value="Overstock">Overstock</MenuItem>
-                              <MenuItem value="Other">Other</MenuItem>
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                        <Grid item size={{ xs: 6, sm: 3 }}>
-                          <Tooltip 
-                            title="Check this if the item being returned is from consignment stock."
-                            arrow
-                          >
-                            <FormControlLabel
-                              control={
-                                <Checkbox
-                                  checked={wasConsigned}
-                                  onChange={(e) => setWasConsigned(e.target.checked)}
-                                  disabled={!selectedProduct}
+                    {/* Add Item Bar */}
+                    <Grid size={{ xs: 12 }}>
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                            <Grid container spacing={2} alignItems="flex-start">
+                                <Grid size={{ xs: 12, md: 4 }}>
+                                <Autocomplete
+                                    options={availableProducts}
+                                    getOptionLabel={(option) => `${option.name} (${option.itemCode})` || ''}
+                                    value={selectedProduct}
+                                    disabled={!selectedSupplier}
+                                    onChange={(e, newValue) => handleProductSelect(newValue)}
+                                    renderInput={(params) => <TextField {...params} label="Select Product" size="small" />}
                                 />
-                              }
-                              label="Consigned?"
-                              sx={{ height: '100%' }}
-                            />
-                          </Tooltip>
-                        </Grid>
-                        <Grid item size={{ xs: 6, sm: 2 }}>
-                          <Button
-                            variant="contained"
-                            startIcon={<AddCircleOutlineIcon />}
-                            onClick={handleAddItem}
-                            disabled={!selectedProduct || quantity <= 0}
-                            fullWidth
-                            sx={{ height: '40px' }}
-                          >
-                            Add
-                          </Button>
-                        </Grid>
-                      </Grid>
+                                </Grid>
+                                <Grid size={{ xs: 6, md: 2 }}>
+                                <TextField
+                                    label="Quantity"
+                                    type="number"
+                                    size="small"
+                                    fullWidth
+                                    value={quantity}
+                                    onChange={(e) => {
+                                    const newQty = parseInt(e.target.value, 10) || 1;
+                                    if (newQty > maxQuantity) {
+                                        toast.warn(`Max quantity is ${maxQuantity}`);
+                                        setQuantity(maxQuantity);
+                                    } else {
+                                        setQuantity(newQty);
+                                    }
+                                    }}
+                                />
+                                </Grid>
+                                <Grid size={{ xs: 6, md: 2 }}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Reason</InputLabel>
+                                    <Select
+                                    label="Reason"
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                    >
+                                    <MenuItem value="Defective">Defective</MenuItem>
+                                    <MenuItem value="Wrong Item">Wrong Item</MenuItem>
+                                    <MenuItem value="Overstock">Overstock</MenuItem>
+                                    <MenuItem value="Other">Other</MenuItem>
+                                    </Select>
+                                </FormControl>
+                                </Grid>
+                                <Grid size={{ xs: 6, md: 2 }}>
+                                <Tooltip 
+                                    title="Check this if the item being returned is from consignment stock."
+                                    arrow
+                                >
+                                    <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                        checked={wasConsigned}
+                                        onChange={(e) => setWasConsigned(e.target.checked)}
+                                        disabled={!selectedProduct}
+                                        />
+                                    }
+                                    label="Consigned?"
+                                    sx={{ height: '100%', ml: 1 }}
+                                    />
+                                </Tooltip>
+                                </Grid>
+                                <Grid size={{ xs: 6, md: 2 }}>
+                                <Button
+                                    variant="contained"
+                                    startIcon={<AddCircleOutlineIcon />}
+                                    onClick={handleAddItem}
+                                    disabled={!selectedProduct || quantity <= 0}
+                                    fullWidth
+                                    sx={{ height: '40px' }}
+                                >
+                                    Add
+                                </Button>
+                                </Grid>
+                            </Grid>
+                        </Paper>
                     </Grid>
 
-                    <Grid item size={{ xs: 12 }}>
-                      <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                        Items to Return
+                    <Grid size={{ xs: 12 }}>
+                      <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ mt: 1 }}>
+                        Items to Return ({itemsToReturn.length})
                       </Typography>
-                      <TableContainer component={Paper} variant="outlined">
-                        <Table size="small">
+                      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 250, borderRadius: 2 }}>
+                        <Table size="small" stickyHeader>
                           <TableHead>
-                            <TableRow>
-                              <TableCell>Product</TableCell>
-                              <TableCell>Reason</TableCell>
-                              <TableCell>Consigned</TableCell>
-                              <TableCell align="right">Quantity</TableCell>
-                              <TableCell align="center">Remove</TableCell>
+                            <TableRow sx={{ bgcolor: 'grey.50' }}>
+                              <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Reason</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Consigned</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600 }}>Quantity</TableCell>
+                              <TableCell align="center" sx={{ fontWeight: 600 }}>Action</TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody component={AnimatePresence}>
@@ -538,10 +548,13 @@ const SupplierReturnsPage = () => {
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: 10 }}
+                                hover
                               >
                                 <TableCell>{item.product.name}</TableCell>
                                 <TableCell>{item.reason}</TableCell>
-                                <TableCell>{item.wasConsigned ? 'Yes' : 'No'}</TableCell>
+                                <TableCell>
+                                    {item.wasConsigned ? <Chip label="Yes" color="info" size="small" /> : 'No'}
+                                </TableCell>
                                 <TableCell align="right">{item.quantity}</TableCell>
                                 <TableCell align="center">
                                   <IconButton onClick={() => handleRemoveItem(item.product._id)} color="error" size="small">
@@ -552,7 +565,7 @@ const SupplierReturnsPage = () => {
                             ))}
                             {itemsToReturn.length === 0 && (
                               <TableRow>
-                                <TableCell colSpan={5} align="center">No items added yet.</TableCell>
+                                <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>No items added yet.</TableCell>
                               </TableRow>
                             )}
                           </TableBody>
@@ -560,7 +573,7 @@ const SupplierReturnsPage = () => {
                       </TableContainer>
                     </Grid>
 
-                    <Grid item size={{ xs: 12 }}>
+                    <Grid size={{ xs: 12 }}>
                       <TextField
                         label="Notes (Optional)"
                         value={notes}
@@ -577,9 +590,9 @@ const SupplierReturnsPage = () => {
               )}
             </DialogContent>
 
-            <DialogActions>
-              <Button onClick={() => setIsModalOpen(false)} disabled={modalLoading}>Cancel</Button>
-              <Button onClick={handleSubmitReturn} variant="contained" disabled={modalLoading}>
+            <DialogActions sx={{ p: 3, bgcolor: 'grey.50' }}>
+              <Button onClick={() => setIsModalOpen(false)} disabled={modalLoading} variant="outlined" color="inherit">Cancel</Button>
+              <Button onClick={handleSubmitReturn} variant="contained" disabled={modalLoading} color="error">
                 {modalLoading ? <LoadingSpinner text="" /> : 'Submit Return'}
               </Button>
             </DialogActions>
@@ -590,40 +603,78 @@ const SupplierReturnsPage = () => {
       {/* --- MAIN PAGE CONTENT --- */}
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
         
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-            Supplier Returns
-          </Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openModal}>
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+              <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'error.light', color: 'error.dark', display: 'flex' }}>
+                <AssignmentReturnIcon fontSize="medium" />
+              </Box>
+              <Box>
+                <Typography variant="h5" fontWeight={700}>Supplier Returns</Typography>
+                <Typography variant="body2" color="text.secondary">Track items returned to suppliers</Typography>
+              </Box>
+          </Stack>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openModal} sx={{ borderRadius: 2, fontWeight: 600, px: 3 }}>
             Log New Return
           </Button>
         </Box>
 
-        {/* --- MODIFIED: Date Filter Paper --- */}
-        <Paper sx={{ p: 2, mb: 2 }}>
+        {/* --- UPDATED: Date Filter Paper (Matching ReturnsPage) --- */}
+        <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item size={{ xs: 12 }}>
-              <ButtonGroup fullWidth variant="outlined" aria-label="date range presets">
-                <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
-                <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
-                <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
-                <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
-                <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
-              </ButtonGroup>
+            
+            {/* Standardized Date Preset Buttons */}
+            <Grid size={{ xs: 12 }}>
+                <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
+                    {['today', 'week', 'month', 'year', 'all'].map((preset) => (
+                        <Button 
+                            key={preset}
+                            variant={datePreset === preset ? 'contained' : 'outlined'} 
+                            onClick={() => handleDatePreset(preset)}
+                            sx={{ textTransform: 'capitalize', borderRadius: 2 }}
+                        >
+                            {preset === 'all' ? 'All Time' : preset}
+                        </Button>
+                    ))}
+                </ButtonGroup>
             </Grid>
-            <Grid item size={{ xs: 12, md: 6 }}>
+
+            {/* Date Inputs */}
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
             </Grid>
-            <Grid item size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
             </Grid>
           </Grid>
         </Paper>
-        {/* --- END MODIFICATION --- */}
+        {/* -------------------------------------------------------- */}
 
-        <Paper sx={{ height: '75vh', width: ' 100%' }}>
+        <Paper 
+            sx={{ 
+                height: '75vh', 
+                width: '100%', 
+                borderRadius: 3, 
+                boxShadow: 3, 
+                overflow: 'hidden',
+                '& .MuiDataGrid-columnHeaders': {
+                    backgroundColor: 'grey.50',
+                    fontWeight: 700,
+                    fontSize: '0.9rem'
+                },
+                '& .MuiDataGrid-row:hover': {
+                    backgroundColor: 'action.hover'
+                }
+            }}
+        >
+            <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-end', bgcolor: 'grey.50', borderBottom: 1, borderColor: 'divider' }}>
+                <Tooltip title="Refresh Data">
+                    <IconButton onClick={fetchReturns} size="small">
+                        <RefreshIcon />
+                    </IconButton>
+                </Tooltip>
+            </Box>
           <DataGrid
-            rows={filteredReturns} // --- MODIFIED: Using filteredReturns ---
+            rows={filteredReturns}
             columns={columns}
             loading={isLoading}
             getRowId={(row) => row._id}
@@ -635,7 +686,10 @@ const SupplierReturnsPage = () => {
             }}
             initialState={{
               sorting: { sortModel: [{ field: 'date', sort: 'desc' }] },
+              pagination: { paginationModel: { pageSize: 10 } },
             }}
+            pageSizeOptions={[10, 25, 50]}
+            disableRowSelectionOnClick
           />
         </Paper>
       </motion.div>

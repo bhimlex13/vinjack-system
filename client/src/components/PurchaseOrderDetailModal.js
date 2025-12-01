@@ -46,13 +46,13 @@ const PurchaseOrderDetailModal = ({ poData, open, onClose }) => {
           </Box>
           <Divider sx={{ my: 2 }} />
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid item size={{ xs: 12, md: 6 }}>
               <Typography variant="h6">Supplier Details</Typography>
               <Typography><strong>Name:</strong> {poData.supplier?.name || 'N/A'}</Typography>
               <Typography><strong>Contact:</strong> {poData.supplier?.contactPerson || 'N/A'}</Typography>
               <Typography><strong>Email:</strong> {poData.supplier?.email || 'N/A'}</Typography>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item size={{ xs: 12, md: 6 }}>
               <Typography variant="h6">Order Summary</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Typography><strong>Status:</strong></Typography> <StatusChip status={poData.status} />

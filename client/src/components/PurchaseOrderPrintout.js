@@ -25,13 +25,13 @@ const PurchaseOrderPrintout = React.forwardRef(({ poData }, ref) => {
 
       {/* PO Details and Supplier Info */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={6}>
+        <Grid item size={{ xs: 6 }}>
           <Typography variant="body1"><strong>To:</strong> {poData.supplier?.name}</Typography>
           <Typography variant="body2">{poData.supplier?.address || 'N/A'}</Typography>
           <Typography variant="body2"><strong>Contact:</strong> {poData.supplier?.contactPerson || 'N/A'}</Typography>
           <Typography variant="body2"><strong>Phone:</strong> {poData.supplier?.contactNumber || 'N/A'}</Typography>
         </Grid>
-        <Grid item xs={6} sx={{ textAlign: 'right' }}>
+        <Grid item size={{ xs: 6 }} sx={{ textAlign: 'right' }}>
           <Typography variant="body1"><strong>PO #:</strong> {poData.poNumber}</Typography>
           <Typography variant="body1"><strong>Date:</strong> {new Date(poData.orderDate).toLocaleDateString()}</Typography>
         </Grid>

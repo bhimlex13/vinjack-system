@@ -5,21 +5,20 @@ import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
 import ConfirmationContext from '../context/ConfirmationContext';
 import { toast } from 'react-toastify';
-import { motion, AnimatePresence } from 'framer-motion'; // --- NEW IMPORT ---
+import { motion, AnimatePresence } from 'framer-motion';
 
 // MUI Imports
 import {
   Box, Button, FormControl, InputLabel, Select, MenuItem, Grid, TextField,
   Typography, IconButton, Divider, Alert, Tooltip, Autocomplete,
-  TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper
+  TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, Chip
 } from '@mui/material';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SaveIcon from '@mui/icons-material/Save';
 
-// --- NEW IMPORT ---
 import LoadingSpinner from './LoadingSpinner';
 
-// Helper to format date to YYYY-MM-DD for the input
 const formatDateForInput = (date) => {
   const d = new Date(date);
   const year = d.getFullYear();
@@ -47,13 +46,11 @@ const RecordDeliveryForm = ({ onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isProductLoading, setIsProductLoading] = useState(false);
 
-  // --- FRAMER MOTION VARIANTS ---
   const rowVariants = {
     hidden: { opacity: 0, x: -20 },
     visible: { opacity: 1, x: 0 },
     exit: { opacity: 0, x: 20 }
   };
-  // ------------------------------
 
   useEffect(() => {
     const fetchData = async () => {
@@ -132,7 +129,6 @@ const RecordDeliveryForm = ({ onClose }) => {
 
   const handleAddItem = () => {
     setError('');
-    // --- VALIDATION ---
     if (!selectedProduct) {
         setError('Please select a product.');
         return;
@@ -145,7 +141,6 @@ const RecordDeliveryForm = ({ onClose }) => {
         setError('Please enter a valid cost.');
         return;
     }
-    // ------------------
 
     const numQuantity = Number(quantity);
     const numCost = Number(costAtTime);
@@ -204,19 +199,19 @@ const RecordDeliveryForm = ({ onClose }) => {
 
     const isConfirmed = await confirm(
         `Confirm ${deliveryType} Delivery`,
-        `Save ${deliveryType.toUpperCase()} delivery from ${supplierName} on ${formattedDate} with ${productsReceived.length} item(s) (Total: ₱${formattedTotal})? Stock levels will be updated.`
+        `Save ${deliveryType.toUpperCase()} delivery from ${supplierName} on ${formattedDate} with ${productsReceived.length} item(s) (Total: ₱${formattedTotal})?`
     );
 
     if (isConfirmed) {
       setIsLoading(true);
       try {
         await createDelivery(deliveryData);
-        toast.success('Direct delivery recorded successfully and stock updated!');
+        toast.success('Delivery recorded and stock updated!');
         onClose();
       } catch (err) {
         const errMsg = err.response?.data?.message || err.message || 'Failed to record delivery.';
         setError(`Failed to record delivery: ${errMsg}`);
-        toast.error(`Error: ${errMsg}`);
+        toast.error(errMsg);
       } finally {
         setIsLoading(false);
       }
@@ -228,22 +223,23 @@ const RecordDeliveryForm = ({ onClose }) => {
     return products.filter(p => !addedIds.has(p._id));
   }, [products, productsReceived]);
 
-  // --- LOADING SPINNER ON INIT ---
   if (isLoading && suppliers.length === 0) {
       return (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
-              <LoadingSpinner text="Loading form data..." />
+              <LoadingSpinner text="Loading form..." />
           </Box>
       );
   }
 
+  // --- MODIFIED: Added bgcolor: 'background.paper' to fix transparency issue ---
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, bgcolor: 'background.paper' }}>
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
       
+      {/* Top Controls - Using Grid V2 Syntax */}
       <Grid container spacing={2}>
-          <Grid item size={{ xs: 12, sm: 5 }}>
-              <FormControl fullWidth required margin="dense">
+          <Grid size={{ xs: 12, sm: 5 }}>
+              <FormControl fullWidth required size="small">
                 <InputLabel>Supplier</InputLabel>
                 <Select
                   value={selectedSupplier}
@@ -260,7 +256,7 @@ const RecordDeliveryForm = ({ onClose }) => {
                 </Select>
               </FormControl>
           </Grid>
-          <Grid item size={{ xs: 12, sm: 4 }}>
+          <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Delivery Date"
                 type="date"
@@ -269,12 +265,12 @@ const RecordDeliveryForm = ({ onClose }) => {
                 InputLabelProps={{ shrink: true }}
                 required
                 fullWidth
-                margin="dense"
+                size="small"
                 disabled={isLoading}
               />
           </Grid>
-          <Grid item size={{ xs: 12, sm: 3 }}>
-            <FormControl fullWidth required margin="dense">
+          <Grid size={{ xs: 12, sm: 3 }}>
+            <FormControl fullWidth required size="small">
               <InputLabel>Type</InputLabel>
               <Select
                 value={deliveryType}
@@ -289,12 +285,13 @@ const RecordDeliveryForm = ({ onClose }) => {
           </Grid>
       </Grid>
 
-      <Divider sx={{ my: 2 }}>
-        <Typography variant="overline">Add Products Received</Typography>
+      <Divider sx={{ my: 3 }}>
+        <Chip label="Add Products" size="small" />
       </Divider>
 
-      <Grid container spacing={1} alignItems="center" sx={{ mb: 2 }}>
-        <Grid item size={{ xs: 12, md: 5 }}>
+      {/* Add Product Section - Using Grid V2 Syntax */}
+      <Grid container spacing={2} alignItems="flex-start" sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+        <Grid size={{ xs: 12, md: 5 }}>
           <Autocomplete
             options={productOptions}
             getOptionLabel={(option) => `${option.name} (${option.itemCode})`}
@@ -308,7 +305,7 @@ const RecordDeliveryForm = ({ onClose }) => {
               <TextField
                 {...params}
                 label="Select Product"
-                helperText={!selectedSupplier ? "Select supplier first" : ""}
+                helperText={!selectedSupplier ? "Select a supplier first" : ""}
                 InputProps={{
                   ...params.InputProps,
                   endAdornment: (
@@ -322,7 +319,8 @@ const RecordDeliveryForm = ({ onClose }) => {
             )}
           />
         </Grid>
-        <Grid item size={{ xs: 4, md: 2 }}>
+        
+        <Grid size={{ xs: 6, md: 2 }}>
           <TextField
             label="Quantity"
             type="number"
@@ -334,9 +332,10 @@ const RecordDeliveryForm = ({ onClose }) => {
             disabled={isLoading || !selectedProduct}
           />
         </Grid>
-        <Grid item size={{ xs: 5, md: 3 }}>
+        
+        <Grid size={{ xs: 6, md: 3 }}>
           <TextField
-            label="Cost per Item (₱)"
+            label="Cost (₱)"
             type="number"
             value={costAtTime}
             onChange={handleCostChange}
@@ -346,42 +345,43 @@ const RecordDeliveryForm = ({ onClose }) => {
             disabled={isLoading || !selectedProduct}
           />
         </Grid>
-        <Grid item size={{ xs: 3, md: 2 }} sx={{ textAlign: 'center' }}>
-          <Tooltip title="Add Product to Delivery List">
-            <span>
-              <IconButton
-                color="primary"
-                onClick={handleAddItem}
-                disabled={!selectedProduct || !quantity || !costAtTime || isLoading || isProductLoading}
-                size="large"
-              >
-                <AddCircleIcon fontSize="inherit"/>
-              </IconButton>
-            </span>
-          </Tooltip>
+        
+        <Grid size={{ xs: 12, md: 2 }} sx={{ display: 'flex', justifyContent: { xs: 'flex-end', md: 'center' } }}>
+          <Button 
+            variant="contained" 
+            onClick={handleAddItem}
+            disabled={!selectedProduct || !quantity || !costAtTime || isLoading}
+            startIcon={<AddCircleIcon />}
+            size="small"
+            fullWidth
+            sx={{ height: 40 }} 
+          >
+            Add
+          </Button>
         </Grid>
       </Grid>
 
-      <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-        Items in this Delivery
+      {/* Items Table */}
+      <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, ml: 1, color: 'text.secondary' }}>
+        Items to Receive ({productsReceived.length})
       </Typography>
 
-      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 250, mb: 2 }}>
+      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 250, mb: 3, borderRadius: 2 }}>
         <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Product</TableCell>
-              <TableCell align="right">Quantity</TableCell>
-              <TableCell align="right">Unit Cost</TableCell>
-              <TableCell align="right">Subtotal</TableCell>
-              <TableCell align="center">Actions</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>Qty</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>Cost</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>Subtotal</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 600 }}>Action</TableCell>
             </TableRow>
           </TableHead>
           <TableBody component={AnimatePresence}>
             {productsReceived.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">
-                  <Typography color="text.secondary">No products added yet.</Typography>
+                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                  <Typography color="text.secondary" variant="body2">No products added to this delivery yet.</Typography>
                 </TableCell>
               </TableRow>
             ) : (
@@ -396,13 +396,15 @@ const RecordDeliveryForm = ({ onClose }) => {
                     exit="exit"
                     layout
                 >
-                  <TableCell>{item.product.name} ({item.product.itemCode})</TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight={500}>{item.product.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{item.product.itemCode}</Typography>
+                  </TableCell>
                   <TableCell align="right">{item.quantity}</TableCell>
                   <TableCell align="right">₱{Number(item.costAtTime).toFixed(2)}</TableCell>
-                  <TableCell align="right">₱{(item.quantity * item.costAtTime).toFixed(2)}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>₱{(item.quantity * item.costAtTime).toFixed(2)}</TableCell>
                   <TableCell align="center">
-                    <Tooltip title="Remove Item">
-                      <span>
+                    <Tooltip title="Remove">
                         <IconButton
                           onClick={() => handleRemoveItem(item.product._id)}
                           color="error"
@@ -411,16 +413,15 @@ const RecordDeliveryForm = ({ onClose }) => {
                         >
                           <DeleteIcon fontSize="small"/>
                         </IconButton>
-                      </span>
                     </Tooltip>
                   </TableCell>
                 </TableRow>
               ))
             )}
             {productsReceived.length > 0 && (
-                 <TableRow sx={{ '& td': { borderTop: '2px solid black', fontWeight: 'bold' } }}>
-                     <TableCell colSpan={3} align="right">Total Cost:</TableCell>
-                     <TableCell align="right">₱{totalCost.toFixed(2)}</TableCell>
+                 <TableRow sx={{ bgcolor: 'grey.50' }}>
+                     <TableCell colSpan={3} align="right" sx={{ fontWeight: 700 }}>Total Cost:</TableCell>
+                     <TableCell align="right" sx={{ fontWeight: 700, color: 'primary.main', fontSize: '1rem' }}>₱{totalCost.toFixed(2)}</TableCell>
                      <TableCell />
                  </TableRow>
              )}
@@ -428,14 +429,18 @@ const RecordDeliveryForm = ({ onClose }) => {
         </Table>
       </TableContainer>
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, gap: 1 }}>
-          <Button onClick={onClose} color="inherit" disabled={isLoading}>Cancel</Button>
+      {/* Action Buttons */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Button onClick={onClose} color="inherit" disabled={isLoading} variant="outlined">Cancel</Button>
           <Button
             type="submit"
             variant="contained"
+            color="success"
+            startIcon={isLoading ? null : <SaveIcon />}
             disabled={productsReceived.length === 0 || !selectedSupplier || !deliveryDate || isLoading}
+            sx={{ px: 3, fontWeight: 700 }}
           >
-            {isLoading ? <LoadingSpinner text="" /> : 'Save Delivery & Update Stock'}
+            {isLoading ? <LoadingSpinner text="" /> : 'Save Delivery'}
           </Button>
       </Box>
     </Box>

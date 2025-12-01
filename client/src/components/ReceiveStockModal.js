@@ -70,13 +70,11 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
     // If modal closes, reset the ref so it can reload next time
     if (!open) {
         loadedPoIdRef.current = null;
-        setReceivedItems([]); // Optional: clear state on close
+        setReceivedItems([]); 
     }
   }, [open, poData]);
   
   const handleQuantityChange = (productId, value) => {
-    // Allow positive numbers and empty string
-    // Note: input type="number" might return empty string for invalid chars, which is fine here
     if (value !== '' && parseInt(value) < 0) return;
 
     setReceivedItems(prevItems => prevItems.map(item => {
@@ -94,10 +92,8 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
         const maxReceivable = item.quantityOrdered - item.quantityAlreadyReceived;
 
         if (isNaN(val) || val < 0) val = 0;
-        // Validation: Don't allow receiving more than ordered (optional constraint)
+        
         if (val > maxReceivable) {
-            // Optional: Toast warning
-            // toast.warning(`Max receive amount is ${maxReceivable}`);
             val = maxReceivable;
         }
 
@@ -149,7 +145,7 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
         return;
       }
       
-      if (file.size > 5 * 1024 * 1024) { // 5MB Limit
+      if (file.size > 5 * 1024 * 1024) { 
         setImageError('File is too large (max 5MB).');
         return;
       }
@@ -311,14 +307,13 @@ const ReceiveStockModal = ({ open, onClose, poData, onSuccess }) => {
                         <TableCell align="center">{item.quantityAlreadyReceived}</TableCell>
                         <TableCell align="center">
                           <TextField
-                            type="number" // Restored type="number" for up/down spinners
+                            type="number" 
                             size="small"
                             value={item.quantityToReceive}
                             onChange={(e) => handleQuantityChange(item.productId, e.target.value)}
                             onBlur={() => handleInputBlur(item.productId)}
                             sx={{ maxWidth: 80 }}
                             disabled={isDisabled}
-                            // Removed pattern, not needed for type="number"
                           />
                         </TableCell>
                         <TableCell align="center">
