@@ -204,7 +204,7 @@ const ReturnsPage = () => {
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
         
         {/* Header */}
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
           <Stack direction="row" alignItems="center" spacing={2}>
               <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'warning.light', color: 'warning.dark', display: 'flex' }}>
                 <FaUndo size={24} />
@@ -214,7 +214,12 @@ const ReturnsPage = () => {
                 <Typography variant="body2" color="text.secondary">Manage customer returns and refunds</Typography>
               </Box>
           </Stack>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateModalOpen(true)} sx={{ fontWeight: 600, px: 3 }}>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            onClick={() => setIsCreateModalOpen(true)} 
+            sx={{ fontWeight: 600, px: 3, width: { xs: '100%', sm: 'auto' } }}
+          >
             Process Return
           </Button>
         </Box>
@@ -222,15 +227,17 @@ const ReturnsPage = () => {
         {/* Filters */}
         <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
           <Grid container spacing={2} alignItems="center">
-            {/* Standard V2 Grid Syntax */}
+            {/* Date Presets - Scrollable on mobile */}
             <Grid size={{ xs: 12 }}>
-              <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
-                <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
-                <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
-                <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
-                <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
-                <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
-              </ButtonGroup>
+              <Box sx={{ overflowX: 'auto', pb: 0.5, whiteSpace: 'nowrap' }}>
+                <ButtonGroup variant="outlined" aria-label="date range presets" size="small">
+                  <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
+                  <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
+                  <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
+                  <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
+                  <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
+                </ButtonGroup>
+              </Box>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />

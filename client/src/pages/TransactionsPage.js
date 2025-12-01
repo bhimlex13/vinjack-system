@@ -20,8 +20,6 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 
-// --- REMOVED: Unused LoadingSpinner import ---
-
 const TransactionsPage = () => {
   const today = new Date().toISOString().split('T')[0];
 
@@ -250,13 +248,20 @@ const TransactionsPage = () => {
             <Grid container spacing={2} alignItems="center">
             
             <Grid size={{ xs: 12 }}>
-                <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
-                <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
-                <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
-                <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
-                <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
-                <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
+              <Box sx={{ overflowX: 'auto', pb: 0.5, whiteSpace: 'nowrap' }}>
+                <ButtonGroup variant="outlined" aria-label="date range presets" size="small">
+                {['today', 'week', 'month', 'year', 'all'].map((preset) => (
+                    <Button 
+                        key={preset}
+                        variant={datePreset === preset ? 'contained' : 'outlined'} 
+                        onClick={() => handleDatePreset(preset)}
+                        sx={{ textTransform: 'capitalize' }}
+                    >
+                        {preset === 'all' ? 'All Time' : preset}
+                    </Button>
+                ))}
                 </ButtonGroup>
+              </Box>
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>

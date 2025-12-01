@@ -129,18 +129,18 @@ const UserManagementPage = () => {
     { field: 'username', headerName: 'Username', flex: 1, minWidth: 120 },
     { field: 'email', headerName: 'Email', flex: 1, minWidth: 200 },
     
-    // --- UPDATED ROLE COLUMN ---
+    // --- ROLE COLUMN ---
     { 
       field: 'role', 
       headerName: 'Role', 
       width: 160,
-      align: 'center',       // Horizontal Alignment for cell
-      headerAlign: 'center', // Horizontal Alignment for header
+      align: 'center',       
+      headerAlign: 'center', 
       renderCell: (params) => (
         <Stack 
             direction="row" 
             alignItems="center" 
-            justifyContent="center" // Force content to center
+            justifyContent="center" 
             spacing={1} 
             sx={{ width: '100%', height: '100%' }}
         >
@@ -150,7 +150,6 @@ const UserManagementPage = () => {
         </Stack>
       )
     },
-    // ---------------------------
 
     {
       field: 'status',
@@ -343,9 +342,15 @@ const UserManagementPage = () => {
             {/* --- TAB PANEL 1: MANAGE EMPLOYEES --- */}
             <TabPanel value={mainTab} index={0}>
                 <Box sx={{ p: 3, pt: 0 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    {/* Header - Stacked on Mobile */}
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 3, gap: 2 }}>
                         <Typography variant="h6" fontWeight={700}>Employee Directory</Typography>
-                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateModalOpen(true)}>
+                        <Button 
+                            variant="contained" 
+                            startIcon={<AddIcon />} 
+                            onClick={() => setIsCreateModalOpen(true)}
+                            sx={{ width: { xs: '100%', sm: 'auto' } }}
+                        >
                             Add New Employee
                         </Button>
                     </Box>
@@ -368,6 +373,11 @@ const UserManagementPage = () => {
                                     },
                                     '& .MuiDataGrid-row:hover': {
                                         backgroundColor: 'action.hover'
+                                    },
+                                    // ADDED: Centered cell content
+                                    '& .MuiDataGrid-cell': {
+                                        display: 'flex',
+                                        alignItems: 'center'
                                     }
                                 }}
                             />
@@ -379,10 +389,17 @@ const UserManagementPage = () => {
             {/* --- TAB PANEL 2: ROLE PERMISSIONS --- */}
             <TabPanel value={mainTab} index={1}>
                 <Box sx={{ p: 3, pt: 0 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-                        <Tabs value={currentPermRoleTab} onChange={handlePermRoleTabChange} sx={{ bgcolor: 'grey.100', borderRadius: 2, p: 0.5 }}>
-                        <Tab label="Admin Role" value="Admin" sx={{ minHeight: 40, borderRadius: 1.5 }} />
-                        <Tab label="Salesperson Role" value="Salesperson" sx={{ minHeight: 40, borderRadius: 1.5 }} />
+                    {/* Role Header - Stacked on Mobile */}
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 3, gap: 2 }}>
+                        <Tabs 
+                            value={currentPermRoleTab} 
+                            onChange={handlePermRoleTabChange} 
+                            variant="scrollable"
+                            scrollButtons="auto"
+                            sx={{ bgcolor: 'grey.100', borderRadius: 2, p: 0.5, width: { xs: '100%', sm: 'auto' } }}
+                        >
+                            <Tab label="Admin Role" value="Admin" sx={{ minHeight: 40, borderRadius: 1.5 }} />
+                            <Tab label="Salesperson Role" value="Salesperson" sx={{ minHeight: 40, borderRadius: 1.5 }} />
                         </Tabs>
                         <Button
                             variant="outlined"
@@ -391,6 +408,7 @@ const UserManagementPage = () => {
                             startIcon={<RestartAltIcon />}
                             onClick={initiateResetPerms} 
                             disabled={isPermsLoading || isPermsSaving}
+                            sx={{ width: { xs: '100%', sm: 'auto' } }}
                         >
                             Reset Defaults
                         </Button>
@@ -437,8 +455,9 @@ const UserManagementPage = () => {
 
                     <Divider sx={{ my: 3 }} />
                     
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                         <Alert severity="info" sx={{ py: 0, alignItems: 'center' }}>
+                    {/* Permissions Footer - Stacked on Mobile */}
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+                         <Alert severity="info" sx={{ py: 0, alignItems: 'center', width: { xs: '100%', md: 'auto' } }}>
                            'Super Admin' has all permissions by default.
                         </Alert>
                         <Button
@@ -448,7 +467,7 @@ const UserManagementPage = () => {
                             startIcon={isPermsSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
                             disabled={isPermsLoading || isPermsSaving}
                             onClick={initiateSavePerms} 
-                            sx={{ minWidth: 200 }}
+                            sx={{ minWidth: 200, width: { xs: '100%', md: 'auto' } }}
                         >
                             Save Changes
                         </Button>

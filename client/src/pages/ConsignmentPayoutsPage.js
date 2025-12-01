@@ -59,11 +59,10 @@ const OwedPayouts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   
-  // --- Date Filter State (Matched with ReturnsPage) ---
+  // --- Date Filter State ---
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [datePreset, setDatePreset] = useState('today');
-  // ----------------------------------------------------
 
   const { confirm } = useContext(ConfirmationContext);
 
@@ -104,7 +103,7 @@ const OwedPayouts = () => {
     fetchPayables();
   }, []);
 
-  // --- Date Preset Handler (Matched with ReturnsPage) ---
+  // --- Date Preset Handler ---
   const handleDatePreset = (preset) => {
     const now = new Date();
     let start = now;
@@ -131,7 +130,6 @@ const OwedPayouts = () => {
     setStartDate(format(start, 'yyyy-MM-dd'));
     setEndDate(format(end, 'yyyy-MM-dd'));
   };
-  // -----------------------------------------------------
 
   const handleMarkAsPaid = async (payable) => {
     const isConfirmed = await confirm(
@@ -153,7 +151,7 @@ const OwedPayouts = () => {
 
   const filteredPayables = useMemo(() => {
     return payables.filter(p => {
-      // --- Filter Logic (Matched with ReturnsPage) ---
+      // --- Filter Logic ---
       const saleDate = new Date(p.sale?.createdAt || p.createdAt);
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
@@ -161,7 +159,6 @@ const OwedPayouts = () => {
       end.setHours(23, 59, 59, 999);
 
       const dateMatch = saleDate >= start && saleDate <= end;
-      // -----------------------------------------------
 
       const supplierMatch = filterSupplier ? p.supplier?._id === filterSupplier : true;
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -239,18 +236,20 @@ const OwedPayouts = () => {
           
           {/* Standardized Date Preset Buttons */}
           <Grid size={{ xs: 12 }}>
-              <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
-                  {['today', 'week', 'month', 'year', 'all'].map((preset) => (
-                      <Button 
-                          key={preset}
-                          variant={datePreset === preset ? 'contained' : 'outlined'} 
-                          onClick={() => handleDatePreset(preset)}
-                          sx={{ textTransform: 'capitalize', borderRadius: 2 }}
-                      >
-                          {preset === 'all' ? 'All Time' : preset}
-                      </Button>
-                  ))}
-              </ButtonGroup>
+              <Box sx={{ overflowX: 'auto', pb: 0.5, whiteSpace: 'nowrap' }}>
+                <ButtonGroup variant="outlined" aria-label="date range presets" size="small">
+                    {['today', 'week', 'month', 'year', 'all'].map((preset) => (
+                        <Button 
+                            key={preset}
+                            variant={datePreset === preset ? 'contained' : 'outlined'} 
+                            onClick={() => handleDatePreset(preset)}
+                            sx={{ textTransform: 'capitalize', borderRadius: 2 }}
+                        >
+                            {preset === 'all' ? 'All Time' : preset}
+                        </Button>
+                    ))}
+                </ButtonGroup>
+              </Box>
           </Grid>
 
           {/* Date Inputs */}
@@ -264,36 +263,42 @@ const OwedPayouts = () => {
       </Paper>
       {/* ------------------------------------------- */}
 
-      {/* Filter and Search Bar */}
-      <Paper sx={{ p: 2, my: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <TextField
-          label="Search by Product or Supplier"
-          variant="outlined"
-          size="small"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{ flexGrow: 1 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel>Filter by Supplier</InputLabel>
-          <Select
-            value={filterSupplier}
-            label="Filter by Supplier"
-            onChange={(e) => setFilterSupplier(e.target.value)}
-          >
-            <MenuItem value=""><em>All Suppliers</em></MenuItem>
-            {allSuppliers.map(sup => (
-              <MenuItem key={sup._id} value={sup._id}>{sup.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+      {/* Filter and Search Bar - Responsive Grid */}
+      <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
+        <Grid container spacing={2} alignItems="center">
+            <Grid size={{ xs: 12, md: 8 }}>
+                <TextField
+                label="Search by Product or Supplier"
+                variant="outlined"
+                size="small"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                fullWidth
+                InputProps={{
+                    startAdornment: (
+                    <InputAdornment position="start">
+                        <SearchIcon />
+                    </InputAdornment>
+                    ),
+                }}
+                />
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl size="small" fullWidth>
+                <InputLabel>Filter by Supplier</InputLabel>
+                <Select
+                    value={filterSupplier}
+                    label="Filter by Supplier"
+                    onChange={(e) => setFilterSupplier(e.target.value)}
+                >
+                    <MenuItem value=""><em>All Suppliers</em></MenuItem>
+                    {allSuppliers.map(sup => (
+                    <MenuItem key={sup._id} value={sup._id}>{sup.name}</MenuItem>
+                    ))}
+                </Select>
+                </FormControl>
+            </Grid>
+        </Grid>
       </Paper>
 
       {/* Total Owed Box */}
@@ -305,7 +310,29 @@ const OwedPayouts = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Paper sx={{ height: '65vh', width: '100%' }}>
+      <Paper 
+        sx={{ 
+            height: '65vh', 
+            width: '100%', 
+            borderRadius: 3, 
+            boxShadow: 3, 
+            overflow: 'hidden',
+            '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: 'grey.50',
+                fontWeight: 700,
+                fontSize: '0.9rem'
+            },
+            '& .MuiDataGrid-row:hover': {
+                backgroundColor: 'action.hover'
+            },
+            // Added to vertically center-align cell content
+            '& .MuiDataGrid-cell': {
+                display: 'flex',
+                alignItems: 'center',
+                py: 1
+            }
+        }}
+      >
         <DataGrid
           rows={filteredPayables}
           columns={columns}
@@ -314,7 +341,6 @@ const OwedPayouts = () => {
           initialState={{
             sorting: { sortModel: [{ field: 'saleDate', sort: 'desc' }] },
           }}
-          sx={{ '& .MuiDataGrid-cell': { py: 1 } }}
         />
       </Paper>
     </Box>

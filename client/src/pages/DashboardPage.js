@@ -153,7 +153,7 @@ const StatCard = ({ title, value, icon, color, to }) => {
 // --- MAIN COMPONENT: DashboardPage ---
 const DashboardPage = () => {
   const { user } = useContext(AuthContext);
-  const navigate = useNavigate(); // Hook for navigation
+  const navigate = useNavigate(); 
   const theme = useTheme();
   
   const [summary, setSummary] = useState(null);
@@ -245,7 +245,7 @@ const DashboardPage = () => {
     fetchData();
   }, [timeRange, user]);
 
-  const handleTimeRangeChange = (event, newTimeRange) => {
+  const handleTimeRangeChange = (_, newTimeRange) => {
     if (newTimeRange !== null) {
       setTimeRange(newTimeRange);
     }
@@ -346,7 +346,7 @@ const DashboardPage = () => {
     <Container maxWidth="xl" sx={{ pb: 4 }}>
       {/* Header Section */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 4, gap: 2 }}>
-        <Box>
+        <Box sx={{ mb: { xs: 2, sm: 0 }, width: { xs: '100%', sm: 'auto' } }}>
             <Typography variant="h4" component="h1" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.5px' }}>
             Dashboard
             </Typography>
@@ -355,7 +355,13 @@ const DashboardPage = () => {
             </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        {/* Filters - Responsive Fix applied here */}
+        <Stack 
+          direction="row" 
+          spacing={1.5} 
+          alignItems="center" 
+          sx={{ width: { xs: '100%', sm: 'auto' } }}
+        >
             <ToggleButtonGroup 
                 color="primary" 
                 value={timeRange} 
@@ -365,6 +371,8 @@ const DashboardPage = () => {
                 sx={{ 
                     backgroundColor: 'background.paper',
                     boxShadow: 1,
+                    width: { xs: '100%', sm: 'auto' }, // Full width on mobile, auto on desktop
+                    display: 'flex',
                     '& .MuiToggleButton-root': {
                         border: 'none',
                         borderRadius: '8px !important',
@@ -373,6 +381,7 @@ const DashboardPage = () => {
                         margin: '4px',
                         fontWeight: 600,
                         textTransform: 'none',
+                        flex: { xs: 1, sm: 'none' }, // Even width on mobile, natural width on desktop
                         '&.Mui-selected': {
                             backgroundColor: 'primary.main',
                             color: 'white',
@@ -399,27 +408,27 @@ const DashboardPage = () => {
         animate="visible"
       >
         {/* --- STAT CARDS --- */}
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Total Revenue" value={`₱${(summary?.totalRevenue)?.toFixed(2) || '0.00'}`} icon={<FaMoneyBillWave />} color="primary" to="/reports" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Total Profit" value={`₱${(summary?.totalProfit)?.toFixed(2) || '0.00'}`} icon={<MonetizationOnIcon />} color="info" to="/reports" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Total Sales" value={summary?.totalSales || 0} icon={<FaShoppingCart />} color="success" to="/transactions" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Items Sold" value={summary?.totalQuantitySold || 0} icon={<ShoppingCartCheckoutIcon />} color="warning" to="/transactions" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Stock Units" value={summary?.totalStockQuantity || 0} icon={<FaWarehouse />} color="error" to="/inventory" />
         </Grid>
-        <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, sm: 6, md: 4, lg: 2 }} component={motion.div} variants={itemVariants}>
           <StatCard title="Products (SKUs)" value={summary?.totalSKUs || 0} icon={<InventoryIcon />} color="secondary" to="/inventory" />
         </Grid>
 
         {/* --- REVENUE TREND CHART (Link to Reports) --- */}
-        <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
           <Paper 
             elevation={2} 
             sx={{ p: 3, display: 'flex', flexDirection: 'column', height: 400, borderRadius: 3, ...clickableSx }}
@@ -445,7 +454,7 @@ const DashboardPage = () => {
         </Grid>
 
         {/* --- TOP 5 SELLING PRODUCTS (Link to Reports) --- */}
-        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
           <Paper 
             elevation={2} 
             sx={{ p: 3, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, ...clickableSx }}
@@ -470,7 +479,7 @@ const DashboardPage = () => {
         </Grid>
 
         {/* --- TOP 5 SELLING SERVICES (Link to Reports) --- */}
-        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
            <Paper 
              elevation={2} 
              sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
@@ -512,7 +521,7 @@ const DashboardPage = () => {
         </Grid>
 
         {/* --- SLOW MOVING PRODUCTS (Link to Inventory) --- */}
-        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
           <Paper 
             elevation={2} 
             sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
@@ -554,7 +563,7 @@ const DashboardPage = () => {
         </Grid>
 
         {/* --- INVENTORY BY CATEGORY (Link to Inventory) --- */}
-        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
           <Paper 
             elevation={2} 
             sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
@@ -598,7 +607,7 @@ const DashboardPage = () => {
         </Grid>
 
         {/* --- LOW STOCK ITEMS (Link to Alerts) --- */}
-        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
           <Paper 
             elevation={2} 
             sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
@@ -644,7 +653,7 @@ const DashboardPage = () => {
         </Grid>
 
         {/* --- RECENT ACTIVITY (Link to Audit Log) --- */}
-        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12, md: 6 }} component={motion.div} variants={itemVariants}>
            <Paper 
              elevation={2} 
              sx={{ p: 0, height: 450, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}
@@ -704,7 +713,7 @@ const DashboardPage = () => {
         </Grid>
 
         {/* --- PENDING PURCHASE ORDERS (Link to POs) --- */}
-        <Grid item size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
+        <Grid size={{ xs: 12 }} component={motion.div} variants={itemVariants}>
           <Paper 
             elevation={2} 
             sx={{ p: 0, height: 350, display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', ...clickableSx }}

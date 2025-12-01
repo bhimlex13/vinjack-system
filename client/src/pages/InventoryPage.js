@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box, Button, Typography, TextField, Select, MenuItem, FormControl, InputLabel,
   Avatar, Paper, InputAdornment, Dialog, DialogTitle, DialogContent,
-  Container, Tooltip, IconButton, Stack, Chip 
+  Container, Tooltip, IconButton, Stack, Chip, Grid
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
@@ -187,7 +187,13 @@ const InventoryPage = () => {
       headerAlign: 'center',
       renderCell: (params) => (
         (user?.role === 'Super Admin' || user?.role === 'Admin') && (
-          <Stack direction="row" spacing={1} justifyContent="center">
+          <Stack 
+            direction="row" 
+            spacing={1} 
+            justifyContent="center" 
+            alignItems="center"
+            sx={{ width: '100%', height: '100%' }}
+          >
             <Tooltip title="View History">
               <IconButton size="small" onClick={() => setHistoryProduct(params.row)} sx={{ color: 'info.main', bgcolor: 'info.50' }}>
                 <HistoryIcon fontSize="small" />
@@ -267,10 +273,10 @@ const InventoryPage = () => {
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
         
         {/* Header */}
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
           <Stack direction="row" alignItems="center" spacing={2}>
               <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'secondary.light', color: 'secondary.dark', display: 'flex' }}>
-                <InventoryIcon size={24} />
+                <InventoryIcon sx={{ fontSize: 24 }} />
               </Box>
               <Box>
                 <Typography variant="h5" fontWeight={700}>Inventory Management</Typography>
@@ -279,58 +285,85 @@ const InventoryPage = () => {
           </Stack>
           
           {user && (user.role === 'Super Admin' || user.role === 'Admin') && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={openProductModalForAdd} sx={{ fontWeight: 600, px: 3 }}>
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />} 
+              onClick={openProductModalForAdd} 
+              sx={{ fontWeight: 600, px: 3, width: { xs: '100%', sm: 'auto' } }}
+            >
               Add Product
             </Button>
           )}
         </Box>
 
         {/* Filters */}
-        <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <TextField 
-            label="Search Products" 
-            placeholder="Search by name or code..."
-            variant="outlined" 
-            size="small" 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
-            sx={{ flexGrow: 1, minWidth: '250px' }} 
-            InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon color="action"/></InputAdornment>), sx: { borderRadius: 2 } }}
-          />
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Category</InputLabel>
-            <Select value={filterCategory} label="Category" onChange={(e) => setFilterCategory(e.target.value)} sx={{ borderRadius: 2 }}>
-              <MenuItem value=""><em>All Categories</em></MenuItem>
-              {categories.map(cat => <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Brand</InputLabel>
-            <Select value={filterBrand} label="Brand" onChange={(e) => setFilterBrand(e.target.value)} sx={{ borderRadius: 2 }}>
-              <MenuItem value=""><em>All Brands</em></MenuItem>
-              {brands.map(brand => <MenuItem key={brand._id} value={brand._id}>{brand.name}</MenuItem>)}
-            </Select>
-          </FormControl>
-          
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Status</InputLabel>
-            <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)} sx={{ borderRadius: 2 }}>
-              <MenuItem value=""><em>All Statuses</em></MenuItem>
-              <MenuItem value="active">Active Only</MenuItem>
-              <MenuItem value="inactive">Archived Only</MenuItem>
-            </Select>
-          </FormControl>
+        <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
+          <Grid container spacing={2}>
+            {/* Search - Full width on mobile, 4 cols on desktop */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField 
+                label="Search Products" 
+                placeholder="Search by name or code..."
+                variant="outlined" 
+                size="small" 
+                fullWidth
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                InputProps={{ 
+                  startAdornment: (<InputAdornment position="start"><SearchIcon color="action"/></InputAdornment>), 
+                  sx: { borderRadius: 2 } 
+                }}
+              />
+            </Grid>
+            
+            {/* Category - Full width mobile, half tablet, 2 cols desktop */}
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Category</InputLabel>
+                <Select value={filterCategory} label="Category" onChange={(e) => setFilterCategory(e.target.value)} sx={{ borderRadius: 2 }}>
+                  <MenuItem value=""><em>All Categories</em></MenuItem>
+                  {categories.map(cat => <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            {/* Brand */}
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Brand</InputLabel>
+                <Select value={filterBrand} label="Brand" onChange={(e) => setFilterBrand(e.target.value)} sx={{ borderRadius: 2 }}>
+                  <MenuItem value=""><em>All Brands</em></MenuItem>
+                  {brands.map(brand => <MenuItem key={brand._id} value={brand._id}>{brand.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            {/* Status */}
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)} sx={{ borderRadius: 2 }}>
+                  <MenuItem value=""><em>All Statuses</em></MenuItem>
+                  <MenuItem value="active">Active Only</MenuItem>
+                  <MenuItem value="inactive">Archived Only</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
 
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Stock Level</InputLabel>
-            <Select value={filterStockLevel} label="Stock Level" onChange={(e) => setFilterStockLevel(e.target.value)} sx={{ borderRadius: 2 }}>
-              <MenuItem value=""><em>All Levels</em></MenuItem>
-              <MenuItem value="Healthy">Healthy</MenuItem>
-              <MenuItem value="Low">Low</MenuItem>
-              <MenuItem value="Critical">Critical</MenuItem>
-              <MenuItem value="Out of Stock">Out of Stock</MenuItem>
-            </Select>
-          </FormControl>
+            {/* Stock Level */}
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Stock Level</InputLabel>
+                <Select value={filterStockLevel} label="Stock Level" onChange={(e) => setFilterStockLevel(e.target.value)} sx={{ borderRadius: 2 }}>
+                  <MenuItem value=""><em>All Levels</em></MenuItem>
+                  <MenuItem value="Healthy">Healthy</MenuItem>
+                  <MenuItem value="Low">Low</MenuItem>
+                  <MenuItem value="Critical">Critical</MenuItem>
+                  <MenuItem value="Out of Stock">Out of Stock</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
         </Paper>
         
         {/* Data Grid */}

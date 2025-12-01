@@ -78,7 +78,7 @@ const PayoutHistory = () => {
     fetchHistory();
   }, []);
 
-  // --- Date Preset Handler (Matches ReturnsPage Logic) ---
+  // --- Date Preset Handler ---
   const handleDatePreset = (preset) => {
     const now = new Date();
     let start = now;
@@ -177,20 +177,22 @@ const PayoutHistory = () => {
       <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
         <Grid container spacing={2} alignItems="center">
           
-          {/* Row 1: Date Presets */}
+          {/* Row 1: Date Presets - Scrollable on mobile */}
           <Grid size={{ xs: 12 }}>
-            <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
-                {['today', 'week', 'month', 'year', 'all'].map((preset) => (
-                    <Button 
-                        key={preset}
-                        variant={datePreset === preset ? 'contained' : 'outlined'} 
-                        onClick={() => handleDatePreset(preset)}
-                        sx={{ textTransform: 'capitalize' }}
-                    >
-                        {preset === 'all' ? 'All Time' : preset}
-                    </Button>
-                ))}
-            </ButtonGroup>
+            <Box sx={{ overflowX: 'auto', pb: 0.5, whiteSpace: 'nowrap' }}>
+                <ButtonGroup variant="outlined" aria-label="date range presets" size="small">
+                    {['today', 'week', 'month', 'year', 'all'].map((preset) => (
+                        <Button 
+                            key={preset}
+                            variant={datePreset === preset ? 'contained' : 'outlined'} 
+                            onClick={() => handleDatePreset(preset)}
+                            sx={{ textTransform: 'capitalize' }}
+                        >
+                            {preset === 'all' ? 'All Time' : preset}
+                        </Button>
+                    ))}
+                </ButtonGroup>
+            </Box>
           </Grid>
 
           {/* Row 2: Date Inputs */}
@@ -241,7 +243,29 @@ const PayoutHistory = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Paper sx={{ height: '65vh', width: '100%', borderRadius: 3, boxShadow: 3, overflow: 'hidden' }}>
+      <Paper 
+        sx={{ 
+            height: '65vh', 
+            width: '100%', 
+            borderRadius: 3, 
+            boxShadow: 3, 
+            overflow: 'hidden',
+            '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: 'grey.50',
+                fontWeight: 700,
+                fontSize: '0.9rem'
+            },
+            '& .MuiDataGrid-row:hover': {
+                backgroundColor: 'action.hover'
+            },
+            // Added to vertically center-align cell content
+            '& .MuiDataGrid-cell': {
+                display: 'flex',
+                alignItems: 'center',
+                py: 1.5
+            }
+        }}
+      >
         <DataGrid
           rows={filteredPayables}
           columns={columns}
@@ -250,17 +274,7 @@ const PayoutHistory = () => {
           initialState={{
             sorting: { sortModel: [{ field: 'paidDate', sort: 'desc' }] },
           }}
-          sx={{ 
-            border: 'none',
-            '& .MuiDataGrid-columnHeaders': {
-                backgroundColor: 'grey.50',
-                fontWeight: 700,
-                fontSize: '0.9rem'
-            },
-            '& .MuiDataGrid-row:hover': {
-                backgroundColor: 'action.hover'
-            }
-          }}
+          sx={{ border: 'none' }}
         />
       </Paper>
     </Box>

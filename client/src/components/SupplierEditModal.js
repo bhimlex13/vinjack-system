@@ -7,26 +7,26 @@ import {
   updateSupplierProductCatalog 
 } from '../api/supplierApi'; 
 import { toast } from 'react-toastify';
-import { motion } from 'framer-motion'; // Added for dialog transition
+import { motion } from 'framer-motion'; 
 
 // MUI Imports
 import {
-  Box, Button, TextField, Alert, Dialog, DialogTitle, DialogContent, DialogActions,
+  Box, Button, TextField, Alert, Dialog, DialogTitle, DialogContent,
   FormControl, InputLabel, Select, MenuItem, Tabs, Tab, Grid, Paper,
-  Typography, InputAdornment, List, ListItem, ListItemText, IconButton,
+  Typography, InputAdornment, List, ListItem, IconButton,
   CircularProgress, Card, CardContent, CardMedia, Avatar,
-  CardActionArea, Chip, Stack, Tooltip,
+  CardActionArea, Chip, Tooltip,
   TableContainer, Table, TableHead, TableRow, TableCell, TableBody,
   Link as MuiLink 
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import NoPhotographyIcon from '@mui/icons-material/NoPhotography';
-import SaveIcon from '@mui/icons-material/Save'; // Added Save Icon
+import SaveIcon from '@mui/icons-material/Save'; 
 import { grey } from '@mui/material/colors';
 import { Link } from 'react-router-dom';
 
-import LoadingSpinner from './LoadingSpinner'; // If you want consistent spinners
+import LoadingSpinner from './LoadingSpinner'; 
 
 // --- TabPanel Component ---
 function TabPanel(props) {
@@ -38,7 +38,7 @@ function TabPanel(props) {
       id={`supplier-tabpanel-${index}`}
       aria-labelledby={`supplier-tab-${index}`}
       {...other}
-      style={{ height: '100%' }} // Ensure height fill
+      style={{ height: '100%' }} 
     >
       {value === index && (
         <Box sx={{ pt: 3, pb: 3, height: '100%', overflowY: 'auto' }}>
@@ -167,7 +167,7 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
   return (
     <Grid container spacing={2} sx={{ height: '100%' }}>
       {/* Left Side: Product Selection */}
-      <Grid item size={{ xs: 12, md: 7 }} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Grid size={{ xs: 12, md: 7 }} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <TextField
           fullWidth
           placeholder="Search All Products..."
@@ -182,7 +182,7 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
         <Paper variant="outlined" sx={{ mt: 2, flex: 1, overflowY: 'auto', p: 1, bgcolor: 'grey.50', borderRadius: 2 }}>
           <Grid container spacing={1}>
             {availableProducts.length > 0 ? availableProducts.map(product => (
-              <Grid item size={{ xs: 12, sm: 6, md: 4 }} key={product._id}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={product._id}>
                 <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                   <CardActionArea 
                     onClick={() => handleAddProduct(product)}
@@ -223,7 +223,7 @@ const ProductCatalogEditor = ({ supplier, onClose }) => {
       </Grid>
 
       {/* Right Side: Catalog List */}
-      <Grid item size={{ xs: 12, md: 5 }} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Grid size={{ xs: 12, md: 5 }} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Typography variant="subtitle1" fontWeight={700} color="text.secondary">
             Current Catalog ({catalog.length})
@@ -517,11 +517,11 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
           <Box component="form" onSubmit={handleInfoSubmit} sx={{ p: 3, height: '100%', overflowY: 'auto' }}>
             <Grid container spacing={3}>
               {error && (
-                <Grid item size={{ xs: 12 }}>
+                <Grid size={{ xs: 12 }}>
                   <Alert severity="error">{error}</Alert>
                 </Grid>
               )}
-              <Grid item size={{ xs: 12, sm: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   autoFocus
                   required
@@ -532,7 +532,7 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
                   onChange={handleChange}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, sm: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   name="email"
                   label="Email Address"
@@ -542,7 +542,7 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
                   onChange={handleChange}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, sm: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   name="contactPerson"
                   label="Contact Person"
@@ -551,7 +551,7 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
                   onChange={handleChange}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, sm: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   name="contactNumber"
                   label="Contact Number"
@@ -560,7 +560,7 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
                   onChange={handleChange}
                 />
               </Grid>
-              <Grid item size={{ xs: 12 }}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   name="address"
                   label="Address"
@@ -569,7 +569,7 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
                   onChange={handleChange}
                 />
               </Grid>
-              <Grid item size={{ xs: 12, sm: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <FormControl fullWidth>
                   <InputLabel id="defaultPaymentTerms-select-label">Default Payment Terms</InputLabel>
                   <Select
@@ -585,7 +585,7 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item size={{ xs: 12, sm: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <FormControl fullWidth>
                   <InputLabel id="status-select-label">Status</InputLabel>
                   <Select
@@ -602,12 +602,31 @@ const SupplierEditModal = ({ open, onClose, onFormSubmit, supplierToEdit }) => {
                 </FormControl>
               </Grid>
             </Grid>
-            <DialogActions sx={{ pt: 4, pr: 0 }}>
-              <Button onClick={onClose} variant="outlined" color="inherit">Cancel</Button>
-              <Button type="submit" variant="contained" disabled={isSavingInfo} sx={{ fontWeight: 600 }}>
-                {isSavingInfo ? <CircularProgress size={24} /> : (currentSupplier ? 'Update Details' : 'Create & Continue')}
-              </Button>
-            </DialogActions>
+            
+            {/* ACTION BUTTONS: STACKED ON MOBILE, ROW ON DESKTOP */}
+            <Grid container spacing={2} sx={{ mt: 4, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Grid size={{ xs: 12, sm: 'auto' }} sx={{ ml: { sm: 'auto' }, order: { xs: 2, sm: 1 } }}>
+                    <Button 
+                        onClick={onClose} 
+                        variant="outlined" 
+                        color="inherit" 
+                        fullWidth
+                    >
+                        Cancel
+                    </Button>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 'auto' }} sx={{ order: { xs: 1, sm: 2 } }}>
+                    <Button 
+                        type="submit" 
+                        variant="contained" 
+                        disabled={isSavingInfo} 
+                        sx={{ fontWeight: 600 }}
+                        fullWidth
+                    >
+                        {isSavingInfo ? <CircularProgress size={24} /> : (currentSupplier ? 'Update Details' : 'Create & Continue')}
+                    </Button>
+                </Grid>
+            </Grid>
           </Box>
         </TabPanel>
 

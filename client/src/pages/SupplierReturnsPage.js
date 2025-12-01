@@ -9,7 +9,7 @@ import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } 
 
 import {
   Container, Typography, Button, Box, Paper, Dialog, DialogTitle,
-  DialogContent, DialogActions, Grid, TextField, Autocomplete,
+  DialogContent, Grid, TextField, Autocomplete,
   IconButton, CircularProgress, Tooltip, FormControl, InputLabel, Select, MenuItem,
   Checkbox, FormControlLabel, Chip,
   FormHelperText,
@@ -81,7 +81,7 @@ const SupplierReturnsPage = () => {
     fetchReturns();
   }, [fetchReturns]);
 
-  // --- Date Preset Handler (Matched with ReturnsPage) ---
+  // --- Date Preset Handler ---
   const handleDatePreset = (preset) => {
     const now = new Date();
     let start = now;
@@ -109,7 +109,7 @@ const SupplierReturnsPage = () => {
     setEndDate(format(end, 'yyyy-MM-dd'));
   };
 
-  // --- Filter Logic (Matched with ReturnsPage) ---
+  // --- Filter Logic ---
   const filteredReturns = useMemo(() => {
     return returns.filter(row => {
       const rowDate = new Date(row.returnDate || row.createdAt);
@@ -324,12 +324,15 @@ const SupplierReturnsPage = () => {
             <Typography 
               key={item._id} 
               variant="body2" 
-              sx={{ whiteSpace: 'normal', mb: 0.5 }} 
+              sx={{ whiteSpace: 'normal', mb: 0.5, lineHeight: 1.3 }} 
               component="div" 
             >
-              <strong>{item.quantity}x</strong> {item.product?.name || 'Unknown Product'} ({item.reason})
+              <strong>{item.quantity}x</strong> {item.product?.name || 'Unknown Product'} 
+              <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                ({item.reason})
+              </Typography>
               {item.wasConsigned && (
-                <Chip label="Consigned" size="small" color="info" sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} />
+                <Chip label="Consigned" size="small" color="info" sx={{ ml: 1, height: 18, fontSize: '0.65rem' }} />
               )}
             </Typography>
           ))}
@@ -377,7 +380,7 @@ const SupplierReturnsPage = () => {
               sx: { 
                 borderRadius: 3, 
                 overflow: 'hidden',
-                bgcolor: 'background.paper', // Added to fix transparency
+                bgcolor: 'background.paper', 
                 boxShadow: 24 
               }
             }}
@@ -505,11 +508,11 @@ const SupplierReturnsPage = () => {
                                         />
                                     }
                                     label="Consigned?"
-                                    sx={{ height: '100%', ml: 1 }}
+                                    sx={{ height: '100%', ml: 1, span: { fontSize: '0.85rem' } }}
                                     />
                                 </Tooltip>
                                 </Grid>
-                                <Grid size={{ xs: 6, md: 2 }}>
+                                <Grid size={{ xs: 12, md: 2 }}>
                                 <Button
                                     variant="contained"
                                     startIcon={<AddCircleOutlineIcon />}
@@ -590,12 +593,19 @@ const SupplierReturnsPage = () => {
               )}
             </DialogContent>
 
-            <DialogActions sx={{ p: 3, bgcolor: 'grey.50' }}>
-              <Button onClick={() => setIsModalOpen(false)} disabled={modalLoading} variant="outlined" color="inherit">Cancel</Button>
-              <Button onClick={handleSubmitReturn} variant="contained" disabled={modalLoading} color="error">
-                {modalLoading ? <LoadingSpinner text="" /> : 'Submit Return'}
-              </Button>
-            </DialogActions>
+            {/* Modal Actions - Responsive */}
+            <Grid container spacing={2} sx={{ p: 3, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'divider' }}>
+                <Grid size={{ xs: 12, sm: 'auto' }} sx={{ ml: { sm: 'auto' }, order: { xs: 2, sm: 1 } }}>
+                    <Button onClick={() => setIsModalOpen(false)} disabled={modalLoading} variant="outlined" color="inherit" fullWidth>
+                        Cancel
+                    </Button>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 'auto' }} sx={{ order: { xs: 1, sm: 2 } }}>
+                    <Button onClick={handleSubmitReturn} variant="contained" disabled={modalLoading} color="error" fullWidth>
+                        {modalLoading ? <LoadingSpinner text="" /> : 'Submit Return'}
+                    </Button>
+                </Grid>
+            </Grid>
           </Dialog>
         )}
       </AnimatePresence>
@@ -603,7 +613,8 @@ const SupplierReturnsPage = () => {
       {/* --- MAIN PAGE CONTENT --- */}
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
         
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Header - Responsive */}
+        <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
           <Stack direction="row" alignItems="center" spacing={2}>
               <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'error.light', color: 'error.dark', display: 'flex' }}>
                 <AssignmentReturnIcon fontSize="medium" />
@@ -613,32 +624,37 @@ const SupplierReturnsPage = () => {
                 <Typography variant="body2" color="text.secondary">Track items returned to suppliers</Typography>
               </Box>
           </Stack>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openModal} sx={{ borderRadius: 2, fontWeight: 600, px: 3 }}>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            onClick={openModal} 
+            sx={{ borderRadius: 2, fontWeight: 600, px: 3, width: { xs: '100%', sm: 'auto' } }}
+          >
             Log New Return
           </Button>
         </Box>
 
-        {/* --- UPDATED: Date Filter Paper (Matching ReturnsPage) --- */}
+        {/* --- Date Filter --- */}
         <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
           <Grid container spacing={2} alignItems="center">
-            
-            {/* Standardized Date Preset Buttons */}
+            {/* Scrollable Date Presets */}
             <Grid size={{ xs: 12 }}>
-                <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
-                    {['today', 'week', 'month', 'year', 'all'].map((preset) => (
-                        <Button 
-                            key={preset}
-                            variant={datePreset === preset ? 'contained' : 'outlined'} 
-                            onClick={() => handleDatePreset(preset)}
-                            sx={{ textTransform: 'capitalize', borderRadius: 2 }}
-                        >
-                            {preset === 'all' ? 'All Time' : preset}
-                        </Button>
-                    ))}
-                </ButtonGroup>
+                <Box sx={{ overflowX: 'auto', pb: 0.5, whiteSpace: 'nowrap' }}>
+                    <ButtonGroup variant="outlined" aria-label="date range presets" size="small">
+                        {['today', 'week', 'month', 'year', 'all'].map((preset) => (
+                            <Button 
+                                key={preset}
+                                variant={datePreset === preset ? 'contained' : 'outlined'} 
+                                onClick={() => handleDatePreset(preset)}
+                                sx={{ textTransform: 'capitalize', borderRadius: 2 }}
+                            >
+                                {preset === 'all' ? 'All Time' : preset}
+                            </Button>
+                        ))}
+                    </ButtonGroup>
+                </Box>
             </Grid>
 
-            {/* Date Inputs */}
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
             </Grid>
@@ -647,8 +663,8 @@ const SupplierReturnsPage = () => {
             </Grid>
           </Grid>
         </Paper>
-        {/* -------------------------------------------------------- */}
 
+        {/* Data Grid */}
         <Paper 
             sx={{ 
                 height: '75vh', 
@@ -663,6 +679,11 @@ const SupplierReturnsPage = () => {
                 },
                 '& .MuiDataGrid-row:hover': {
                     backgroundColor: 'action.hover'
+                },
+                '& .MuiDataGrid-cell': {
+                    display: 'flex',       
+                    alignItems: 'center',  // Vertically align cell content
+                    py: 1.5
                 }
             }}
         >
@@ -679,11 +700,6 @@ const SupplierReturnsPage = () => {
             loading={isLoading}
             getRowId={(row) => row._id}
             getRowHeight={() => 'auto'}
-            sx={{
-              '& .MuiDataGrid-cell': {
-                py: 1.5
-              }
-            }}
             initialState={{
               sorting: { sortModel: [{ field: 'date', sort: 'desc' }] },
               pagination: { paginationModel: { pageSize: 10 } },

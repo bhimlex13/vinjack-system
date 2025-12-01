@@ -11,7 +11,7 @@ import {
   Container, Typography, Box, Paper, Grid, TextField, Button, Autocomplete,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton,
   Alert, FormControl, InputLabel, Select, MenuItem, 
-  RadioGroup, FormControlLabel, Radio, FormLabel,
+  RadioGroup, FormControlLabel, Radio,
   Dialog, DialogTitle, DialogContent, DialogActions, Divider, List, ListItem, ListItemIcon, ListItemText
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -51,8 +51,8 @@ const InstructionModal = ({ open, onClose }) => (
 
       <Typography variant="h6" gutterBottom color="primary">Consignment Methods</Typography>
       <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
-          <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', height: '100%' }}>
             <Typography variant="subtitle1" fontWeight="bold">1. System Generated</Typography>
             <Typography variant="body2" color="text.secondary" paragraph>
               Best for a fully digital workflow.
@@ -65,8 +65,8 @@ const InstructionModal = ({ open, onClose }) => (
             </ul>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', height: '100%' }}>
             <Typography variant="subtitle1" fontWeight="bold">2. Upload Signed PDF</Typography>
             <Typography variant="body2" color="text.secondary" paragraph>
               Best if you already have a contract.
@@ -90,7 +90,6 @@ const CreatePurchaseOrderPage = () => {
   const navigate = useNavigate();
   const { confirm } = useContext(ConfirmationContext);
 
-  // --- UPDATED: Default state is TRUE so it pops up on visit ---
   const [openHelp, setOpenHelp] = useState(true);
 
   // Form State
@@ -348,11 +347,18 @@ const CreatePurchaseOrderPage = () => {
       <InstructionModal open={openHelp} onClose={() => setOpenHelp(false)} />
       
       <motion.div initial="hidden" animate="visible" variants={pageVariants}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        
+        {/* Header - Responsive */}
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 3, gap: 1 }}>
             <Typography variant="h4" component="h1" fontWeight={700}>
                 Create New Purchase Order
             </Typography>
-            <Button startIcon={<HelpOutlineIcon />} onClick={() => setOpenHelp(true)} variant="text">
+            <Button 
+                startIcon={<HelpOutlineIcon />} 
+                onClick={() => setOpenHelp(true)} 
+                variant="text"
+                sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-start', sm: 'center' } }}
+            >
                 Guide & Instructions
             </Button>
         </Box>
@@ -361,7 +367,7 @@ const CreatePurchaseOrderPage = () => {
             <Grid container spacing={3}>
                 
                 {/* Step 1: Supplier Selection */}
-                <Grid item size={{ xs: 12, md: supplier ? 6 : 12 }}>
+                <Grid size={{ xs: 12, md: supplier ? 6 : 12 }}>
                     <Typography variant="h6" gutterBottom fontWeight={600}>Step 1: Select Supplier</Typography>
                     <Autocomplete
                         options={suppliersList}
@@ -376,7 +382,7 @@ const CreatePurchaseOrderPage = () => {
                 {/* Step 2: Order Type */}
                 <AnimatePresence>
                     {supplier && (
-                        <Grid item size={{ xs: 12, md: 6 }} component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
+                        <Grid size={{ xs: 12, md: 6 }} component={motion.div} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
                             <Typography variant="h6" gutterBottom fontWeight={600}>Step 2: Order Type</Typography>
                             <FormControl fullWidth>
                                 <InputLabel>Order Type</InputLabel>
@@ -397,7 +403,7 @@ const CreatePurchaseOrderPage = () => {
                 {/* Step 3: Consignment Method (Only for Consignment) */}
                 <AnimatePresence>
                     {supplier && poType === 'Consignment' && (
-                        <Grid item size={{ xs: 12 }} component={motion.div} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                        <Grid size={{ xs: 12 }} component={motion.div} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
                             <Paper variant="outlined" sx={{ p: 2, bgcolor: 'primary.50', borderColor: 'primary.main' }}>
                                 <Typography variant="h6" gutterBottom fontWeight={600}>Step 3: Select Consignment Method</Typography>
                                 <FormControl component="fieldset">
@@ -418,7 +424,7 @@ const CreatePurchaseOrderPage = () => {
                 {/* Step 4: Method Details (Terms OR Upload) */}
                 <AnimatePresence>
                     {supplier && poType === 'Consignment' && (
-                        <Grid item size={{ xs: 12 }} component={motion.div} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                        <Grid size={{ xs: 12 }} component={motion.div} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
                             <Paper variant="outlined" sx={{ p: 2, backgroundColor: '#fcfcfc' }}>
                                 {consignmentMethod === 'System' ? (
                                     <>
@@ -459,13 +465,13 @@ const CreatePurchaseOrderPage = () => {
 
                 {/* Step 5 (or 3): Add Items */}
                 {supplier && (
-                    <Grid item size={{ xs: 12 }} component={motion.div} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <Grid size={{ xs: 12 }} component={motion.div} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                         <Typography variant="h6" gutterBottom fontWeight={600}>
                             {poType === 'Consignment' ? 'Step 5: Add Items' : 'Step 3: Add Items'}
                         </Typography>
                         
                         <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-                            <Grid item size={{ xs: 12, sm: 6, md: 5 }}>
+                            <Grid size={{ xs: 12, md: 5 }}>
                                 <Autocomplete
                                 options={supplierProducts.filter(p => !items.some(item => item.product._id === p._id))}
                                 getOptionLabel={(option) => `${option.name} (${option.itemCode})`}
@@ -498,7 +504,7 @@ const CreatePurchaseOrderPage = () => {
                                 )}
                                 />
                             </Grid>
-                            <Grid item size={{ xs: 6, sm: 3, md: 2 }}>
+                            <Grid size={{ xs: 6, md: 2 }}>
                                 <TextField 
                                 label="Quantity" 
                                 type="number" 
@@ -509,7 +515,7 @@ const CreatePurchaseOrderPage = () => {
                                 onFocus={handleFocus} 
                                 />
                             </Grid>
-                            <Grid item size={{ xs: 6, sm: 3, md: 3 }}>
+                            <Grid size={{ xs: 6, md: 3 }}>
                                 <TextField 
                                 label="Unit Cost (₱)" 
                                 type="number" 
@@ -523,7 +529,7 @@ const CreatePurchaseOrderPage = () => {
                                 inputProps={{ step: "0.01", min: 0 }} 
                                 />
                             </Grid>
-                            <Grid item size={{ xs: 12, sm: 12, md: 2 }}>
+                            <Grid size={{ xs: 12, md: 2 }}>
                                 <Button
                                     variant="contained"
                                     startIcon={<AddCircleIcon />}
@@ -583,7 +589,7 @@ const CreatePurchaseOrderPage = () => {
                             </Table>
                         </TableContainer>
 
-                        <Grid item size={{ xs: 12 }}>
+                        <Grid size={{ xs: 12 }}>
                             <TextField 
                                 label="Notes (Optional)" 
                                 multiline 
@@ -595,11 +601,29 @@ const CreatePurchaseOrderPage = () => {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
-                            <Button variant="outlined" color="inherit" onClick={() => navigate('/purchase-orders')}>Cancel</Button>
-                            <Button variant="contained" onClick={handleSubmit} disabled={loading || items.length === 0 || !supplier}>
-                            {loading ? <LoadingSpinner text="" /> : `Create ${poType} Order`}
-                            </Button>
+                        {/* Action Buttons - Stacked on Mobile, Right on Desktop */}
+                        <Grid container spacing={2} sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                            <Grid size={{ xs: 12, sm: 'auto' }} sx={{ ml: { sm: 'auto' }, order: { xs: 2, sm: 1 } }}>
+                                <Button 
+                                    variant="outlined" 
+                                    color="inherit" 
+                                    onClick={() => navigate('/purchase-orders')}
+                                    fullWidth
+                                >
+                                    Cancel
+                                </Button>
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 'auto' }} sx={{ order: { xs: 1, sm: 2 } }}>
+                                <Button 
+                                    variant="contained" 
+                                    onClick={handleSubmit} 
+                                    disabled={loading || items.length === 0 || !supplier}
+                                    fullWidth
+                                    size="large"
+                                >
+                                    {loading ? <LoadingSpinner text="" /> : `Create ${poType} Order`}
+                                </Button>
+                            </Grid>
                         </Grid>
                     </Grid>
                 )}

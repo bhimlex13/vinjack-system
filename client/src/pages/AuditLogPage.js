@@ -323,23 +323,29 @@ const AuditLogPage = () => {
           </Box>
 
           <Grid container spacing={2} alignItems="center">
+            
+            {/* Date Presets - Scrollable for mobile */}
             <Grid size={{ xs: 12 }}>
-              <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
-                <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
-                <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
-                <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
-                <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
-                <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
-              </ButtonGroup>
+              <Box sx={{ overflowX: 'auto', pb: 0.5, whiteSpace: 'nowrap' }}>
+                <ButtonGroup variant="outlined" aria-label="date range presets" size="small">
+                  <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
+                  <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
+                  <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
+                  <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
+                  <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
+                </ButtonGroup>
+              </Box>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 2.5 }}>
+            {/* Date Inputs */}
+            <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
               <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(0); }} InputLabelProps={{ shrink: true }} size="small" />
             </Grid>
-            <Grid size={{ xs: 12, md: 2.5 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
               <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(0); }} InputLabelProps={{ shrink: true }} size="small" />
             </Grid>
 
+            {/* Search */}
             <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 fullWidth label="Search in Details" variant="outlined" size="small"
@@ -347,6 +353,8 @@ const AuditLogPage = () => {
                 InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon color="action" /></InputAdornment>), }}
               />
             </Grid>
+
+            {/* Dropdown Filters */}
             <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Filter by User</InputLabel>

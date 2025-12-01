@@ -56,11 +56,10 @@ const PurchaseOrdersPage = () => {
   const [filterPoType, setFilterPoType] = useState('');
   const [filterSupplier, setFilterSupplier] = useState(null); 
   
-  // --- UPDATED: Date Filter State (Matching ReturnsPage) ---
+  // Date Filter State
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [datePreset, setDatePreset] = useState('today');
-  // --------------------------------------------------------
   
   const [suppliersList, setSuppliersList] = useState([]); 
   const [isFilterLoading, setIsFilterLoading] = useState(true); 
@@ -117,7 +116,6 @@ const PurchaseOrdersPage = () => {
     // eslint-disable-next-line
   }, [socket]);
   
-  // --- UPDATED: Date Preset Handler (Matching ReturnsPage) ---
   const handleDatePreset = (preset) => {
     const now = new Date();
     let start = now;
@@ -145,11 +143,9 @@ const PurchaseOrdersPage = () => {
     setEndDate(format(end, 'yyyy-MM-dd'));
     setPage(0);
   };
-  // -----------------------------------------------------------
 
   const filteredPurchaseOrders = useMemo(() => {
     return purchaseOrders.filter(po => {
-      // --- UPDATED: Date Logic (Matching ReturnsPage) ---
       const poDate = new Date(po.orderDate);
       const start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
@@ -157,7 +153,6 @@ const PurchaseOrdersPage = () => {
       end.setHours(23, 59, 59, 999);
       
       const dateMatch = poDate >= start && poDate <= end;
-      // --------------------------------------------------
 
       const statusMatch = filterStatus ? po.status === filterStatus : true;
       const typeMatch = filterPoType ? po.poType === filterPoType : true;
@@ -218,7 +213,7 @@ const PurchaseOrdersPage = () => {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={() => navigate('/purchase-orders/new')}
-              sx={{ fontWeight: 600, px: 3, borderRadius: 2 }}
+              sx={{ fontWeight: 600, px: 3, borderRadius: 2, width: { xs: '100%', sm: 'auto' } }}
             >
               Create Purchase Order
             </Button>
@@ -228,30 +223,33 @@ const PurchaseOrdersPage = () => {
         <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
             <Grid container spacing={2} alignItems="center">
             
-            {/* --- UPDATED: Date Filter Layout (Matching ReturnsPage) --- */}
+            {/* Date Presets - Scrollable container for mobile */}
             <Grid size={{ xs: 12 }}>
-                <ButtonGroup fullWidth variant="outlined" aria-label="date range presets" size="small">
-                    {['today', 'week', 'month', 'year', 'all'].map((preset) => (
-                        <Button 
-                            key={preset}
-                            variant={datePreset === preset ? 'contained' : 'outlined'} 
-                            onClick={() => handleDatePreset(preset)}
-                            sx={{ textTransform: 'capitalize' }}
-                        >
-                            {preset === 'all' ? 'All Time' : preset}
-                        </Button>
-                    ))}
-                </ButtonGroup>
+                <Box sx={{ overflowX: 'auto', pb: 0.5, whiteSpace: 'nowrap' }}>
+                    <ButtonGroup variant="outlined" aria-label="date range presets" size="small">
+                        {['today', 'week', 'month', 'year', 'all'].map((preset) => (
+                            <Button 
+                                key={preset}
+                                variant={datePreset === preset ? 'contained' : 'outlined'} 
+                                onClick={() => handleDatePreset(preset)}
+                                sx={{ textTransform: 'capitalize' }}
+                            >
+                                {preset === 'all' ? 'All Time' : preset}
+                            </Button>
+                        ))}
+                    </ButtonGroup>
+                </Box>
             </Grid>
+
+            {/* Date Inputs */}
             <Grid size={{ xs: 12, md: 4 }}>
               <TextField fullWidth label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <TextField fullWidth label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
             </Grid>
-            {/* -------------------------------------------------------- */}
 
-            {/* Search Input moved here to balance the grid if needed, or keep it consistent */}
+            {/* Search Input */}
             <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
                 label="Search PO or Supplier"
@@ -282,7 +280,7 @@ const PurchaseOrdersPage = () => {
                 disabled={isFilterLoading}
                 />
             </Grid>
-            <Grid size={{ xs: 6, md: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <FormControl size="small" fullWidth>
                 <InputLabel>Filter by Status</InputLabel>
                 <Select
@@ -301,7 +299,7 @@ const PurchaseOrdersPage = () => {
                 </Select>
                 </FormControl>
             </Grid>
-            <Grid size={{ xs: 6, md: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <FormControl size="small" fullWidth>
                 <InputLabel>Filter by Type</InputLabel>
                 <Select

@@ -100,7 +100,7 @@ const Row = ({ item, poStatus, formatCurrency }) => {
               </Typography>
               <Grid container spacing={1}>
                  {item.serialNumbers && item.serialNumbers.map((sn, index) => (
-                     <Grid item key={index}>
+                     <Grid size="auto" key={index}>
                          <Chip label={sn} size="small" variant="outlined" sx={{ bgcolor: 'white' }} />
                      </Grid>
                  ))}
@@ -129,7 +129,9 @@ const PurchaseOrderDetailPage = () => {
   
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isImageViewOpen, setIsImageViewOpen] = useState(false);
-  const [imageViewUrl, setImageViewUrl] = useState('');
+  
+  // FIXED: Removed unused setImageViewUrl
+  const [imageViewUrl] = useState(''); 
 
   const [countersignFile, setCountersignFile] = useState(null);
   const [isCountersigning, setIsCountersigning] = useState(false);
