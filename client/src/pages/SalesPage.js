@@ -12,7 +12,7 @@ import CustomerForm from '../components/CustomerForm';
 import MotorcycleForm from '../components/MotorcycleForm';
 import { grey } from '@mui/material/colors';
 import { io } from 'socket.io-client';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 // MUI Imports
 import {
@@ -35,7 +35,6 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import BuildIcon from '@mui/icons-material/Build';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import CloseIcon from '@mui/icons-material/Close';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { FaUserTag } from 'react-icons/fa';
 
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -102,30 +101,6 @@ const SalesPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  // --- VARIANTS ---
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0, scale: 0.95 },
-    visible: { y: 0, opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 100, damping: 12 } },
-    exit: { opacity: 0, scale: 0.9, transition: { duration: 0.2 } }
-  };
-
-  const cartItemVariants = {
-    hidden: { opacity: 0, x: 20, scale: 0.9 },
-    visible: { opacity: 1, x: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } },
-    exit: { opacity: 0, x: -20, transition: { duration: 0.2 } }
-  };
-
-  const expandVariants = {
-    hidden: { opacity: 0, height: 0, overflow: 'hidden' },
-    visible: { opacity: 1, height: 'auto', transition: { duration: 0.3 } },
-    exit: { opacity: 0, height: 0 }
-  };
-
   // --- SOCKET IO & EFFECTS ---
   useEffect(() => {
     const socket = io(process.env.REACT_APP_API_URL);
@@ -138,6 +113,7 @@ const SalesPage = () => {
       }
     });
     return () => socket.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer]);
 
   useEffect(() => {
@@ -304,14 +280,66 @@ const SalesPage = () => {
         return newCart;
       }
       
-      if (newQuantity <= existingItem.stock) {
-         setProducts(prevProducts => prevProducts.map(p => p._id === product._id ? { ...p, quantity: p.quantity - amount } : p));
-        const newCart = [...prevCart];
-        newCart[existingItemIndex] = { ...existingItem, cartQuantity: newQuantity };
-        return newCart;
+      const productInState = products.find(p => p._id === product._id);
+      
+      if (amount > 0) {
+          if (productInState.quantity >= amount) {
+             setProducts(prevProducts => prevProducts.map(p => p._id === product._id ? { ...p, quantity: p.quantity - amount } : p));
+             const newCart = [...prevCart];
+             newCart[existingItemIndex] = { ...existingItem, cartQuantity: newQuantity };
+             return newCart;
+          }
+      } 
+      else {
+           setProducts(prevProducts => prevProducts.map(p => p._id === product._id ? { ...p, quantity: p.quantity + Math.abs(amount) } : p));
+           const newCart = [...prevCart];
+           newCart[existingItemIndex] = { ...existingItem, cartQuantity: newQuantity };
+           return newCart;
       }
+
       return prevCart;
     });
+  };
+
+  const handleManualQuantityChange = (product, value) => {
+      if (product.isSerialized) return;
+      if (value === '') {
+          setCartItems(prev => prev.map(item => item._id === product._id ? { ...item, cartQuantity: '' } : item));
+          return;
+      }
+
+      const newQty = parseInt(value);
+      if (isNaN(newQty) || newQty < 0) return; 
+
+      setCartItems(prevCart => {
+        const existingItem = prevCart.find(item => item.type === 'product' && item._id === product._id);
+        if (!existingItem) return prevCart;
+
+        const currentQty = existingItem.cartQuantity === '' ? 0 : existingItem.cartQuantity;
+        const diff = newQty - currentQty;
+
+        if (diff === 0) return prevCart;
+
+        const productInState = products.find(p => p._id === product._id);
+        
+        if (diff > 0 && productInState.quantity < diff) {
+            const maxAddable = productInState.quantity;
+            const finalQty = currentQty + maxAddable;
+            if (maxAddable > 0) {
+                 setProducts(prevProducts => prevProducts.map(p => p._id === product._id ? { ...p, quantity: p.quantity - maxAddable } : p));
+                 return prevCart.map(item => item._id === product._id ? { ...item, cartQuantity: finalQty } : item);
+            }
+            return prevCart;
+        }
+
+        setProducts(prevProducts => prevProducts.map(p => p._id === product._id ? { ...p, quantity: p.quantity - diff } : p));
+        
+        if (newQty === 0) {
+            return prevCart.filter(item => item._id !== product._id);
+        }
+
+        return prevCart.map(item => item._id === product._id ? { ...item, cartQuantity: newQty } : item);
+      });
   };
 
   const removeSerializedItem = (product) => {
@@ -321,9 +349,10 @@ const SalesPage = () => {
 
   const calculateTotal = useMemo(() => {
     return cartItems.reduce((total, item) => {
-      if (item.type === 'product') return total + item.price * item.cartQuantity;
-      if (item.type === 'service') return total + item.charge;
-      return total;
+        const qty = item.cartQuantity === '' ? 0 : item.cartQuantity;
+        if (item.type === 'product') return total + item.price * qty;
+        if (item.type === 'service') return total + item.charge;
+        return total;
     }, 0);
   }, [cartItems]);
 
@@ -350,6 +379,12 @@ const SalesPage = () => {
 
   const handleCompleteSale = async () => {
     if (cartItems.length === 0) return;
+    const hasInvalidQty = cartItems.some(item => item.type === 'product' && (item.cartQuantity === '' || item.cartQuantity === 0));
+    if (hasInvalidQty) {
+        alert("Please ensure all items have a valid quantity.");
+        return;
+    }
+
     const isConfirmed = await confirm(`Complete sale for a total of ₱${calculateTotal.toFixed(2)}? This action cannot be undone.`);
     if (isConfirmed) {
       const saleData = {
@@ -403,7 +438,7 @@ const SalesPage = () => {
     textTransform: 'none',
     color: 'text.secondary',
     backgroundColor: 'action.hover',
-    whiteSpace: 'nowrap', // Prevent text wrapping in toggle buttons
+    whiteSpace: 'nowrap', 
     '&.Mui-selected, &.Mui-selected:hover': {
       color: 'white',
       backgroundColor: 'primary.main',
@@ -412,83 +447,64 @@ const SalesPage = () => {
   };
 
   // --- CART CONTENT COMPONENT (REUSABLE) ---
-  const CartContent = ({ onCloseMobile }) => (
+  const CartContent = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header for Mobile Drawer */}
-      {isMobile && (
-        <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            p: 2,
-            borderBottom: '1px solid', 
-            borderColor: 'divider',
-            bgcolor: 'background.paper',
-            position: 'sticky',
-            top: 0,
-            zIndex: 10
-        }}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-             <IconButton onClick={onCloseMobile} size="small"><ArrowBackIcon /></IconButton>
-             <Typography variant="h6" fontWeight={800} color="primary">Cart</Typography>
-          </Stack>
-          <IconButton onClick={onCloseMobile} size="medium" sx={{ bgcolor: 'action.hover' }}>
-            <CloseIcon />
-          </IconButton>
-        </Box>
-      )}
-
-      <Box sx={{ p: isMobile ? 2 : 0, flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Customer Section - Wrapped in LayoutGroup to prevent layout thrashing */}
-        <LayoutGroup>
-            <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
-                <FaUserTag style={{ marginRight: '8px' }} /> Customer Info
-                </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                <Autocomplete 
-                    sx={{ flexGrow: 1 }} 
-                    options={customers} 
-                    getOptionLabel={(option) => option.name} 
-                    value={selectedCustomer}
-                    onChange={(event, newValue) => { setSelectedCustomer(newValue); }}
-                    isOptionEqualToValue={(option, value) => option?._id === value?._id}
-                    renderInput={(params) => <TextField {...params} placeholder="Select Customer" size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />}
-                />
-                <Button variant="soft" color="primary" size="medium" onClick={() => setIsCustomerModalOpen(true)} sx={{ minWidth: 'auto', px: 2, borderRadius: 2 }}>New</Button>
-                </Stack>
-                
-                <AnimatePresence>
-                {selectedCustomer && (
-                    <motion.div variants={expandVariants} initial="hidden" animate="visible" exit="exit" layout>
-                    <Box sx={{ mt: 1.5 }}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                        <Autocomplete 
-                            sx={{ flexGrow: 1 }} 
-                            options={customerMotorcycles} 
-                            loading={isFetchingMotorcycles} 
-                            getOptionLabel={(option) => `${option.make} ${option.model} (${option.plateNumber || 'No Plate'})`}
-                            value={selectedMotorcycle} 
-                            onChange={(event, newValue) => { setSelectedMotorcycle(newValue); }} 
-                            isOptionEqualToValue={(option, value) => option?._id === value?._id}
-                            renderInput={(params) => (
-                            <TextField 
-                                {...params} 
-                                placeholder="Select Motorcycle (Optional)" 
-                                size="small" 
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                                InputProps={{ ...params.InputProps, endAdornment: (<>{isFetchingMotorcycles ? <CircularProgress color="inherit" size={20} /> : null}{params.InputProps.endAdornment}</>) }}
-                            />
-                            )}
+      {/* ADDED: pt: isMobile ? 10 : 0 
+         This adds ~80px top padding when in mobile view to prevent the content 
+         from being hidden behind the navbar.
+      */}
+      <Box sx={{ 
+          p: isMobile ? 2 : 0, 
+          pt: isMobile ? 10 : 0, 
+          flexGrow: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          overflow: 'hidden' 
+      }}>
+        {/* Customer Section */}
+        <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
+            <FaUserTag style={{ marginRight: '8px' }} /> Customer Info
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+            <Autocomplete 
+                sx={{ flexGrow: 1 }} 
+                options={customers} 
+                getOptionLabel={(option) => option.name} 
+                value={selectedCustomer}
+                onChange={(event, newValue) => { setSelectedCustomer(newValue); }}
+                isOptionEqualToValue={(option, value) => option?._id === value?._id}
+                renderInput={(params) => <TextField {...params} placeholder="Select Customer" size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />}
+            />
+            <Button variant="soft" color="primary" size="medium" onClick={() => setIsCustomerModalOpen(true)} sx={{ minWidth: 'auto', px: 2, borderRadius: 2 }}>New</Button>
+            </Stack>
+            
+            {selectedCustomer && (
+                <Box sx={{ mt: 1.5 }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Autocomplete 
+                        sx={{ flexGrow: 1 }} 
+                        options={customerMotorcycles} 
+                        loading={isFetchingMotorcycles} 
+                        getOptionLabel={(option) => `${option.make} ${option.model} (${option.plateNumber || 'No Plate'})`}
+                        value={selectedMotorcycle} 
+                        onChange={(event, newValue) => { setSelectedMotorcycle(newValue); }} 
+                        isOptionEqualToValue={(option, value) => option?._id === value?._id}
+                        renderInput={(params) => (
+                        <TextField 
+                            {...params} 
+                            placeholder="Select Motorcycle (Optional)" 
+                            size="small" 
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                            InputProps={{ ...params.InputProps, endAdornment: (<>{isFetchingMotorcycles ? <CircularProgress color="inherit" size={20} /> : null}{params.InputProps.endAdornment}</>) }}
                         />
-                        <Button variant="soft" color="secondary" size="medium" onClick={() => setIsMotorcycleModalOpen(true)} sx={{ minWidth: 'auto', px: 2, borderRadius: 2 }}>New</Button>
-                        </Stack>
-                    </Box>
-                    </motion.div>
-                )}
-                </AnimatePresence>
-            </Box>
-        </LayoutGroup>
+                        )}
+                    />
+                    <Button variant="soft" color="secondary" size="medium" onClick={() => setIsMotorcycleModalOpen(true)} sx={{ minWidth: 'auto', px: 2, borderRadius: 2 }}>New</Button>
+                    </Stack>
+                </Box>
+            )}
+        </Box>
 
         <Divider sx={{ mb: 2 }} />
 
@@ -520,17 +536,10 @@ const SalesPage = () => {
             </Box>
             ) : (
             <List disablePadding>
-                <AnimatePresence mode='popLayout' initial={false}>
                 {cartItems.map(item => (
                     <ListItem 
                     key={item._id}
                     disablePadding
-                    component={motion.li}
-                    layout // Enable Layout animation for smoother reordering/entry
-                    variants={cartItemVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
                     sx={{ 
                         mb: 1.5, 
                         border: '1px solid', 
@@ -568,23 +577,37 @@ const SalesPage = () => {
                         } 
                         secondary={
                         <Typography variant="body2" color="primary.main" fontWeight="bold">
-                            ₱{item.type === 'product' ? (item.price * item.cartQuantity).toFixed(2) : item.charge.toFixed(2)}
+                            ₱{item.type === 'product' ? (item.price * (item.cartQuantity || 0)).toFixed(2) : item.charge.toFixed(2)}
                         </Typography>
                         }
                     />
 
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         {item.type === 'product' && !item.isSerialized ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 50 }}>
-                            <IconButton size="small" onClick={() => updateQuantity(item, -1)} sx={{ p: 0.5 }}>
-                            <RemoveIcon fontSize="small" />
+                        <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 50, overflow: 'hidden' }}>
+                            <IconButton size="small" onClick={() => updateQuantity(item, -1)} sx={{ p: 0.5, borderRadius: 0, '&:hover': { bgcolor: 'action.hover' } }}>
+                                <RemoveIcon fontSize="small" />
                             </IconButton>
-                            {/* Key on quantity forces animate update */}
-                            <motion.div key={item.cartQuantity} initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
-                                <Typography sx={{ mx: 1, fontWeight: 'bold', minWidth: '16px', textAlign: 'center', fontSize: '0.9rem' }}>{item.cartQuantity}</Typography>
-                            </motion.div>
-                            <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock} sx={{ p: 0.5 }}>
-                            <AddIcon fontSize="small" />
+                            
+                            <Box sx={{ width: '40px', display: 'flex', justifyContent: 'center' }}>
+                                <input
+                                    type="number"
+                                    value={item.cartQuantity}
+                                    onChange={(e) => handleManualQuantityChange(item, e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        border: 'none',
+                                        textAlign: 'center',
+                                        fontWeight: 'bold',
+                                        fontSize: '0.9rem',
+                                        outline: 'none',
+                                        background: 'transparent'
+                                    }}
+                                />
+                            </Box>
+
+                            <IconButton size="small" onClick={() => updateQuantity(item, 1)} disabled={item.cartQuantity >= item.stock} sx={{ p: 0.5, borderRadius: 0, '&:hover': { bgcolor: 'action.hover' } }}>
+                                <AddIcon fontSize="small" />
                             </IconButton>
                         </Box>
                         ) : (
@@ -595,7 +618,6 @@ const SalesPage = () => {
                     </Box>
                     </ListItem>
                 ))}
-                </AnimatePresence>
             </List>
             )}
         </Box>
@@ -631,7 +653,7 @@ const SalesPage = () => {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4, height: isMobile ? 'auto' : 'calc(100vh - 120px)' }}>
-      {/* Grid Container using Standard SIZE prop syntax (v6 compatible) */}
+      {/* Grid Container */}
       <Grid container spacing={3} sx={{ height: '100%' }}>
         
         {/* --- LEFT COLUMN: PRODUCTS --- */}
@@ -662,16 +684,15 @@ const SalesPage = () => {
 
             {/* --- RESPONSIVE FILTERS WITH HORIZONTAL SCROLLING --- */}
             <Box sx={{ mb: 2 }}>
-                {/* Unified Filter Layout for Mobile AND Desktop */}
                 <>
                   <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ ml: 1 }}>CATEGORIES</Typography>
                   <Box sx={{ 
                       display: 'flex', 
-                      flexWrap: 'nowrap', // Prevent wrapping
-                      overflowX: 'auto',  // Enable horizontal scroll
+                      flexWrap: 'nowrap', 
+                      overflowX: 'auto', 
                       gap: 0.5, 
                       mb: 1.5, 
-                      pb: 1, // Padding for scrollbar
+                      pb: 1, 
                       '::-webkit-scrollbar': { height: '4px' },
                       '::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '4px' }
                   }}>
@@ -707,25 +728,11 @@ const SalesPage = () => {
 
             {/* Product Grid */}
             <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
-              <Grid 
-                container 
-                spacing={2}
-                component={motion.div}
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                key={searchTerm + "-" + selectedCategory + "-" + selectedBrand}
-              >
-                <AnimatePresence mode="popLayout">
+              <Grid container spacing={2}>
                   {filteredProducts.map(product => (
-                    // Using SIZE prop syntax
                     <Grid 
-                      item // Optional in v2/v6 but safe to keep for compatibility if types are loose
-                      key={product._id} 
                       size={{ xs: 12, sm: 6, md: 4, lg: 3 }}
-                      component={motion.div}
-                      variants={itemVariants}
-                      layout 
+                      key={product._id} 
                     > 
                       <Card 
                         component={motion.div}
@@ -786,7 +793,6 @@ const SalesPage = () => {
                       </Card>
                     </Grid>
                   ))}
-                </AnimatePresence>
               </Grid>
             </Box>
           </Paper>
@@ -812,23 +818,27 @@ const SalesPage = () => {
       {isMobile && (
         <>
           <Fab 
-            color="primary" 
-            aria-label="cart"
-            onClick={() => setIsMobileCartOpen(true)}
-            sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}
+            color={isMobileCartOpen ? "error" : "primary"} // CHANGED to ERROR (Red) for Close
+            aria-label={isMobileCartOpen ? "close" : "cart"}
+            onClick={() => setIsMobileCartOpen(!isMobileCartOpen)}
+            sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1300 }} 
           >
-            <Badge badgeContent={cartItems.reduce((acc, item) => acc + (item.type === 'product' ? item.cartQuantity : 1), 0)} color="error">
-              <ShoppingCartIcon />
-            </Badge>
+            {isMobileCartOpen ? (
+                <CloseIcon />
+            ) : (
+                <Badge badgeContent={cartItems.reduce((acc, item) => acc + (item.type === 'product' ? (item.cartQuantity || 0) : 1), 0)} color="error">
+                  <ShoppingCartIcon />
+                </Badge>
+            )}
           </Fab>
 
           <Drawer
             anchor="right"
             open={isMobileCartOpen}
             onClose={() => setIsMobileCartOpen(false)}
-            PaperProps={{ sx: { width: '100%', maxWidth: '100%' } }} // Full width on mobile
+            PaperProps={{ sx: { width: '100%', maxWidth: '100%' } }} 
           >
-            <CartContent onCloseMobile={() => setIsMobileCartOpen(false)} />
+            <CartContent />
           </Drawer>
         </>
       )}
@@ -846,7 +856,7 @@ const SalesPage = () => {
                              return !inCart || !inCart.serialNumbers.includes(s.serialNumber);
                         })
                         .map((serial, index) => (
-                        <Grid item size={{ xs: 12, sm: 6 }} key={index}>
+                        <Grid size={{ xs: 12, sm: 6 }} key={index}>
                            <FormControlLabel
                               control={
                                 <Checkbox 
