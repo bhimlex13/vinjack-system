@@ -4,43 +4,26 @@ import api from '../../api/axios';
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-// --- MODIFIED: Added 'format' ---
 import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
-// --- END MODIFICATION ---
+import { motion } from 'framer-motion';
 
 // MUI Imports
 import {
-  Typography,
-  Paper,
-  TextField,
-  Button,
-  Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Alert,
-  List,
-  ListItem,
-  ListItemText,
-  Box,
-  CircularProgress,
-  Autocomplete,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  ButtonGroup, 
-  Stack,
-  Tooltip
+  Typography, Paper, TextField, Button, Grid, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Alert, Box, Autocomplete, FormControl, 
+  InputLabel, Select, MenuItem, ButtonGroup, Stack, useTheme, Chip
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
 
-// This component is rendered inside the ReportsPage tab
+// Icons for Stat Cards
+import { FaMoneyBillWave, FaCoins, FaChartLine } from 'react-icons/fa';
+
+import LoadingSpinner from '../LoadingSpinner';
+
 const SalesReport = () => {
+  const theme = useTheme();
   const [reportData, setReportData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,14 +37,18 @@ const SalesReport = () => {
   const [filterSupplier, setFilterSupplier] = useState(null);
   const [filterUser, setFilterUser] = useState(null); 
 
-  // State for dropdown data
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [users, setUsers] = useState([]);
   const [isFilterLoading, setIsFilterLoading] = useState(true);
 
-  // Effect to load filter data
+  // Animation Variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.3 } }
+  };
+
   useEffect(() => {
     const fetchFilterData = async () => {
       setIsFilterLoading(true);
@@ -77,7 +64,7 @@ const SalesReport = () => {
         setSuppliers(suppRes.data);
         setUsers(userRes.data);
       } catch (err) {
-        toast.error('Failed to load filter data. Some filters may not work.');
+        toast.error('Failed to load filter data.');
       } finally {
         setIsFilterLoading(false);
       }
@@ -85,28 +72,21 @@ const SalesReport = () => {
     fetchFilterData();
   }, []);
 
-  // Handler for date preset buttons
   const handleDatePreset = (preset) => {
     const now = new Date();
     let start = startOfDay(now);
     let end = endOfDay(now);
     setDatePreset(preset); 
 
-    if (preset === 'week') {
-      start = startOfWeek(now);
-    } else if (preset === 'month') {
-      start = startOfMonth(now);
-    } else if (preset === 'year') {
-      start = startOfYear(now);
-    } else if (preset === 'all') {
-      start = new Date(0); // Epoch start for "all time"
-    }
+    if (preset === 'week') start = startOfWeek(now);
+    else if (preset === 'month') start = startOfMonth(now);
+    else if (preset === 'year') start = startOfYear(now);
+    else if (preset === 'all') start = new Date(0);
     
     setStartDate(start);
     setEndDate(end);
   };
 
-  // Auto-fetching function
   const fetchReportData = useCallback(async () => {
     if (!startDate || !endDate || startDate > endDate) {
       setError('Please select a valid date range.');
@@ -128,7 +108,6 @@ const SalesReport = () => {
       
       const response = await api.get(`/reports/sales?${params.toString()}`);
       setReportData(response.data);
-
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to generate report.');
     } finally {
@@ -136,28 +115,21 @@ const SalesReport = () => {
     }
   }, [startDate, endDate, filterCustomer, filterProduct, filterSupplier, filterUser]);
 
-  // useEffect to trigger fetchReportData on filter change
   useEffect(() => {
     fetchReportData();
   }, [fetchReportData]);
 
-  // Profit calculation
   const reportSummary = useMemo(() => {
-    if (reportData.length === 0) {
-      return { totalRevenue: 0, totalCost: 0, totalProfit: 0 };
-    }
+    if (reportData.length === 0) return { totalRevenue: 0, totalCost: 0, totalProfit: 0 };
     const totalRevenue = reportData.reduce((sum, sale) => sum + sale.totalAmount, 0);
     const totalCost = reportData.reduce((sum, sale) => {
-      const saleCost = sale.items.reduce((itemSum, item) => {
-        return itemSum + (item.costOfGoodsSold || 0) * item.quantity;
-      }, 0);
+      const saleCost = sale.items.reduce((itemSum, item) => itemSum + (item.costOfGoodsSold || 0) * item.quantity, 0);
       return sum + saleCost;
     }, 0);
     const totalProfit = totalRevenue - totalCost;
     return { totalRevenue, totalCost, totalProfit };
   }, [reportData]);
 
-  // Download CSV Function
   const handleDownloadCSV = () => {
     if (reportData.length === 0) {
       toast.warn("No data to download.");
@@ -191,40 +163,27 @@ const SalesReport = () => {
     document.body.removeChild(link);
   };
 
-  // --- MODIFIED: Helper function to get filter text for PDF ---
   const getFilterSummary = () => {
     let filters = [];
-    
-    // Date Filter
-    if (datePreset === 'all') {
-      filters.push('Date: All Time');
-    } else if (format(startDate, 'MM/dd/yyyy') === format(endDate, 'MM/dd/yyyy')) {
-      filters.push(`Date: ${format(startDate, 'MM/dd/yyyy')}`);
-    } else {
-      filters.push(`Date Range: ${format(startDate, 'MM/dd/yyyy')} - ${format(endDate, 'MM/dd/yyyy')}`);
-    }
+    if (datePreset === 'all') filters.push('Date: All Time');
+    else if (format(startDate, 'MM/dd/yyyy') === format(endDate, 'MM/dd/yyyy')) filters.push(`Date: ${format(startDate, 'MM/dd/yyyy')}`);
+    else filters.push(`Date Range: ${format(startDate, 'MM/dd/yyyy')} - ${format(endDate, 'MM/dd/yyyy')}`);
 
-    // Other filters
     if (filterCustomer) filters.push(`Customer: ${filterCustomer.name}`);
     if (filterProduct) filters.push(`Product: ${filterProduct.name}`);
     if (filterSupplier) filters.push(`Supplier: ${filterSupplier.name}`);
     if (filterUser) filters.push(`User: ${filterUser.fullName}`);
     return filters.join(' | ');
   };
-  // --- END MODIFICATION ---
   
-  // --- MODIFIED: Download PDF Function ---
   const handleDownloadPDF = () => {
     if (reportData.length === 0) {
       toast.warn("No data to download.");
       return;
     }
-
     const doc = new jsPDF();
-    // --- NEW: Set document title ---
     const filename = `sales_report_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.setProperties({ title: filename });
-    // --- END NEW ---
 
     const { totalRevenue, totalCost, totalProfit } = reportSummary;
     const tableColumn = ["Date", "Customer", "Items", "Services", "Recorded By", "Revenue", "Cost", "Profit"];
@@ -235,7 +194,6 @@ const SalesReport = () => {
       const services = sale.services.map(service => `1x ${service.service?.name || 'N/A'}`).join('\n');
       const saleCost = sale.items.reduce((sum, item) => sum + (item.costOfGoodsSold || 0) * item.quantity, 0);
       const saleProfit = sale.totalAmount - saleCost;
-
       const row = [
         new Date(sale.createdAt).toLocaleString(),
         sale.customer?.name || 'Walk-in',
@@ -252,13 +210,9 @@ const SalesReport = () => {
     doc.setFontSize(18);
     doc.text("Sales & Profitability Report", 14, 22);
     doc.setFontSize(11);
-    doc.text(`Filters: ${getFilterSummary()}`, 14, 30); // Uses new function
+    doc.text(`Filters: ${getFilterSummary()}`, 14, 30);
 
-    autoTable(doc, { 
-      head: [tableColumn], 
-      body: tableRows, 
-      startY: 35 
-    });
+    autoTable(doc, { head: [tableColumn], body: tableRows, startY: 35 });
     
     const finalY = doc.lastAutoTable.finalY || 50;
     doc.setFontSize(12);
@@ -269,203 +223,222 @@ const SalesReport = () => {
     doc.setFont("helvetica", "bold");
     doc.text(`Total Gross Profit: P${totalProfit.toFixed(2)}`, 14, finalY + 36);
 
-    doc.output('dataurlnewwindow'); // Opens in a new tab
+    doc.output('dataurlnewwindow');
   };
-  // --- END MODIFICATION ---
 
-  const SummaryCard = ({ title, value, profit = false }) => (
-    <Grid item size={{ xs: 12, sm: 4 }}>
-      <Paper sx={{ p: 2, textAlign: 'center' }}>
-        <Typography variant="subtitle1" color="text.secondary">{title}</Typography>
-        <Typography variant="h5" sx={{ fontWeight: 'bold', color: profit ? (value >= 0 ? 'success.main' : 'error.main') : 'text.primary' }}>
-          {`₱${value.toFixed(2)}`}
-        </Typography>
+  // --- FIXED: SummaryCard with explicit animation ---
+  const SummaryCard = ({ title, value, color, icon }) => (
+    <Grid size={{ xs: 12, sm: 4 }}>
+      <Paper 
+        component={motion.div}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        elevation={2} 
+        sx={{ 
+          p: 3, 
+          display: 'flex', 
+          alignItems: 'center', 
+          borderRadius: 3,
+          position: 'relative',
+          overflow: 'hidden',
+          '&:before': {
+            content: '""',
+            position: 'absolute',
+            top: 0, left: 0, width: '6px', height: '100%',
+            backgroundColor: `${color}.main`
+          }
+        }}
+      >
+        <Box sx={{ p: 2, borderRadius: '50%', bgcolor: `${color}.50`, color: `${color}.main`, mr: 2 }}>
+          {icon}
+        </Box>
+        <Box>
+          <Typography variant="body2" color="textSecondary" fontWeight={600} textTransform="uppercase">{title}</Typography>
+          <Typography variant="h5" fontWeight={800}>
+            {`₱${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          </Typography>
+        </Box>
       </Paper>
     </Grid>
   );
 
-  const renderFilters = () => (
-    <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2} alignItems="center">
-          {/* Row 1: Date Presets */}
-          <Grid item size={{ xs: 12, md: 7 }}>
-            <ButtonGroup fullWidth>
-              <Button variant={datePreset === 'today' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('today')}>Today</Button>
-              <Button variant={datePreset === 'week' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('week')}>This Week</Button>
-              <Button variant={datePreset === 'month' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('month')}>This Month</Button>
-              <Button variant={datePreset === 'year' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('year')}>This Year</Button>
-              <Button variant={datePreset === 'all' ? 'contained' : 'outlined'} onClick={() => handleDatePreset('all')}>All Time</Button>
-            </ButtonGroup>
-          </Grid>
-          
-          {/* Row 1: Download Buttons */}
-          <Grid item size={{ xs: 12, md: 5 }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} fullWidth>
-              <Button 
-                variant="outlined" 
-                onClick={handleDownloadCSV} 
-                disabled={isLoading || reportData.length === 0}
-                startIcon={<DownloadIcon />}
-                fullWidth
-              >
-                Download CSV (Excel)
-              </Button>
-              <Button 
-                variant="outlined" 
-                color="secondary"
-                onClick={handleDownloadPDF} 
-                disabled={isLoading || reportData.length === 0}
-                startIcon={<PictureAsPdfIcon />}
-                fullWidth
-              >
-                Preview PDF
-              </Button>
-            </Stack>
-          </Grid>
-
-          {/* Row 2: Entity Filters */}
-          <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
-            <Autocomplete
-              options={products}
-              getOptionLabel={(option) => `${option.name} (${option.itemCode})`}
-              value={filterProduct}
-              onChange={(e, newValue) => {
-                setFilterProduct(newValue);
-                if (newValue) setFilterSupplier(null); 
-              }}
-              isOptionEqualToValue={(o, v) => o._id === v._id}
-              renderInput={(params) => <TextField {...params} label="Filter by Product" size="small" />}
-              disabled={isFilterLoading || !!filterSupplier}
-            />
-          </Grid>
-          <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
-            <Autocomplete
-              options={suppliers}
-              getOptionLabel={(option) => option.name}
-              value={filterSupplier}
-              onChange={(e, newValue) => {
-                setFilterSupplier(newValue);
-                if (newValue) setFilterProduct(null); 
-              }}
-              isOptionEqualToValue={(o, v) => o._id === v._id}
-              renderInput={(params) => <TextField {...params} label="Filter by Supplier" size="small" />}
-              disabled={isFilterLoading || !!filterProduct}
-            />
-          </Grid>
-          <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
-            <Autocomplete
-              options={customers}
-              getOptionLabel={(option) => option.name}
-              value={filterCustomer}
-              onChange={(e, newValue) => setFilterCustomer(newValue)}
-              isOptionEqualToValue={(o, v) => o._id === v._id}
-              renderInput={(params) => <TextField {...params} label="Filter by Customer" size="small" />}
-              disabled={isFilterLoading}
-            />
-          </Grid>
-          <Grid item size={{ xs: 12, sm: 6, md: 3 }}>
-            <FormControl fullWidth size="small" disabled={isFilterLoading}>
-              <InputLabel>Filter by User</InputLabel>
-              <Select
-                value={filterUser ? filterUser._id : ''}
-                label="Filter by User"
-                onChange={(e) => setFilterUser(users.find(u => u._id === e.target.value) || null)}
-              >
-                <MenuItem value=""><em>All Users</em></MenuItem>
-                {users.map(user => (
-                  <MenuItem key={user._id} value={user._id}>{user.fullName}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-    </Paper>
-  );
-
   return (
-    <Box>
-      {isFilterLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-          <CircularProgress />
-          <Typography sx={{ ml: 2 }}>Loading filters...</Typography>
+    <motion.div variants={containerVariants} initial="hidden" animate="visible">
+      {/* Filters Section */}
+      <Paper sx={{ p: 3, mb: 3, borderRadius: 3, boxShadow: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+           <FilterAltIcon color="action" sx={{ mr: 1 }} />
+           <Typography variant="h6" fontWeight={700}>Report Filters</Typography>
         </Box>
-      ) : (
-        renderFilters()
-      )}
+        
+        {isFilterLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+            <LoadingSpinner text="Loading Filters..." />
+          </Box>
+        ) : (
+          <Grid container spacing={2} alignItems="center">
+            <Grid size={{ xs: 12, md: 7 }}>
+              <ButtonGroup fullWidth variant="outlined" size="medium">
+                {['today', 'week', 'month', 'year', 'all'].map((p) => (
+                  <Button 
+                    key={p} 
+                    variant={datePreset === p ? 'contained' : 'outlined'} 
+                    onClick={() => handleDatePreset(p)}
+                    sx={{ textTransform: 'capitalize' }}
+                  >
+                    {p === 'all' ? 'All Time' : p}
+                  </Button>
+                ))}
+              </ButtonGroup>
+            </Grid>
+            
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Stack direction="row" spacing={1}>
+                <Button 
+                  variant="outlined" color="primary" fullWidth startIcon={<DownloadIcon />} 
+                  onClick={handleDownloadCSV} disabled={isLoading || reportData.length === 0}
+                >
+                  CSV
+                </Button>
+                <Button 
+                  variant="contained" color="secondary" fullWidth startIcon={<PictureAsPdfIcon />} 
+                  onClick={handleDownloadPDF} disabled={isLoading || reportData.length === 0}
+                >
+                  PDF
+                </Button>
+              </Stack>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Autocomplete
+                options={products}
+                getOptionLabel={(option) => `${option.name} (${option.itemCode})`}
+                value={filterProduct}
+                onChange={(e, newValue) => { setFilterProduct(newValue); if(newValue) setFilterSupplier(null); }}
+                isOptionEqualToValue={(o, v) => o._id === v._id}
+                renderInput={(params) => <TextField {...params} label="Product" size="small" />}
+                disabled={!!filterSupplier}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Autocomplete
+                options={suppliers}
+                getOptionLabel={(option) => option.name}
+                value={filterSupplier}
+                onChange={(e, newValue) => { setFilterSupplier(newValue); if(newValue) setFilterProduct(null); }}
+                isOptionEqualToValue={(o, v) => o._id === v._id}
+                renderInput={(params) => <TextField {...params} label="Supplier" size="small" />}
+                disabled={!!filterProduct}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Autocomplete
+                options={customers}
+                getOptionLabel={(option) => option.name}
+                value={filterCustomer}
+                onChange={(e, newValue) => setFilterCustomer(newValue)}
+                isOptionEqualToValue={(o, v) => o._id === v._id}
+                renderInput={(params) => <TextField {...params} label="Customer" size="small" />}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>User</InputLabel>
+                <Select
+                  value={filterUser ? filterUser._id : ''}
+                  label="User"
+                  onChange={(e) => setFilterUser(users.find(u => u._id === e.target.value) || null)}
+                >
+                  <MenuItem value=""><em>All Users</em></MenuItem>
+                  {users.map(user => <MenuItem key={user._id} value={user._id}>{user.fullName}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        )}
+      </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
-          <CircularProgress />
+        <Box sx={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+           <LoadingSpinner text="Generating Report..." />
         </Box>
       ) : (
         <>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <SummaryCard title="Total Revenue" value={reportSummary.totalRevenue} />
-            <SummaryCard title="Cost of Goods Sold" value={reportSummary.totalCost} />
-            <SummaryCard title="Gross Profit" value={reportSummary.totalProfit} profit />
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            <SummaryCard title="Total Revenue" value={reportSummary.totalRevenue} color="primary" icon={<FaMoneyBillWave size={24} />} />
+            <SummaryCard title="Cost of Goods" value={reportSummary.totalCost} color="warning" icon={<FaCoins size={24} />} />
+            <SummaryCard title="Gross Profit" value={reportSummary.totalProfit} color="success" icon={<FaChartLine size={24} />} />
           </Grid>
 
-          {reportData.length > 0 ? (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead sx={{ backgroundColor: 'action.hover' }}>
+          <Paper elevation={3} sx={{ borderRadius: 3, overflow: 'hidden' }}>
+            <TableContainer sx={{ maxHeight: 600 }}>
+              <Table stickyHeader>
+                <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Customer</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Items Sold</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Recorded By</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Total Revenue</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Total Profit</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Customer</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Items / Services</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Recorded By</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Revenue</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, bgcolor: 'grey.100' }}>Profit</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {reportData.map((sale) => {
+                  {reportData.length > 0 ? reportData.map((sale) => {
                     const saleCost = sale.items.reduce((sum, item) => sum + (item.costOfGoodsSold || 0) * item.quantity, 0);
                     const saleProfit = sale.totalAmount - saleCost;
                     
                     return (
                       <TableRow key={sale._id} hover>
-                        <TableCell>{new Date(sale.createdAt).toLocaleString()}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                          <Typography variant="body2" fontWeight={600}>{new Date(sale.createdAt).toLocaleDateString()}</Typography>
+                          <Typography variant="caption" color="textSecondary">{new Date(sale.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
+                        </TableCell>
                         <TableCell>{sale.customer?.name || 'Walk-in'}</TableCell>
                         <TableCell>
-                          <List dense disablePadding>
-                            {sale.items.map(item => (
-                              <ListItem key={item._id} disableGutters sx={{ p: 0 }}>
-                                <ListItemText 
-                                  primary={`${item.quantity}x ${item.product?.name || 'N/A'}`} 
-                                  secondary={`@ ₱${item.priceAtTime.toFixed(2)}`}
-                                />
-                              </ListItem>
+                           <Box sx={{ maxHeight: 80, overflowY: 'auto', pr: 1 }}>
+                            {sale.items.map((item, idx) => (
+                                <Box key={`i-${idx}`} sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', mb: 0.5 }}>
+                                    <span><b>{item.quantity}x</b> {item.product?.name || 'Unknown'}</span>
+                                </Box>
                             ))}
-                            {sale.services.map(service => (
-                              <ListItem key={service._id} disableGutters sx={{ p: 0 }}>
-                                 <ListItemText 
-                                  primary={`1x ${service.service?.name || 'N/A'}`} 
-                                  secondary={`@ ₱${service.priceAtTime.toFixed(2)}`}
-                                />
-                              </ListItem>
+                            {sale.services.map((svc, idx) => (
+                                <Box key={`s-${idx}`} sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'info.main' }}>
+                                    <span><b>1x</b> {svc.service?.name || 'Unknown'} (Svc)</span>
+                                </Box>
                             ))}
-                          </List>
+                           </Box>
                         </TableCell>
                         <TableCell>{sale.recordedBy?.fullName || 'N/A'}</TableCell>
-                        <TableCell>{`₱${sale.totalAmount.toFixed(2)}`}</TableCell>
-                        <TableCell sx={{ color: saleProfit >= 0 ? 'success.main' : 'error.main', fontWeight: 'bold' }}>
-                          {`₱${saleProfit.toFixed(2)}`}
+                        <TableCell align="right">{`₱${sale.totalAmount.toFixed(2)}`}</TableCell>
+                        <TableCell align="right">
+                          <Chip 
+                            label={`₱${saleProfit.toFixed(2)}`} 
+                            size="small" 
+                            color={saleProfit >= 0 ? "success" : "error"} 
+                            variant="outlined"
+                            sx={{ fontWeight: 700 }}
+                          />
                         </TableCell>
                       </TableRow>
                     );
-                  })}
+                  }) : (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                        <Typography color="textSecondary">No sales records found for this period.</Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
-          ) : (
-             <Alert severity="info">No sales data found for the selected filters.</Alert>
-          )}
+          </Paper>
         </>
       )}
-    </Box>
+    </motion.div>
   );
 };
 

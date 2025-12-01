@@ -8,18 +8,25 @@ import AdminConfirmPasswordModal from '../components/AdminConfirmPasswordModal';
 import { toast } from 'react-toastify';
 import AuthContext from '../context/AuthContext'; 
 import ConfirmationContext from '../context/ConfirmationContext'; 
+import { motion } from 'framer-motion';
 
 // MUI Imports
 import { 
   Box, Button, Typography, Paper, Chip, Grid,
   Tabs, Tab, 
   Checkbox, FormControlLabel, FormGroup, Divider, Alert, Skeleton, 
-  CircularProgress 
+  CircularProgress, Container, IconButton, Tooltip, Stack 
 } from '@mui/material'; 
 import { DataGrid } from '@mui/x-data-grid';
 import { Add as AddIcon } from '@mui/icons-material';
 import SaveIcon from '@mui/icons-material/Save'; 
 import RestartAltIcon from '@mui/icons-material/RestartAlt'; 
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import EditIcon from '@mui/icons-material/Edit';
+import SecurityIcon from '@mui/icons-material/Security';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+
+import LoadingSpinner from '../components/LoadingSpinner';
 
 // Helper function
 const groupPermissions = (permissions) => {
@@ -77,6 +84,12 @@ const UserManagementPage = () => {
   const { user: currentUser } = useContext(AuthContext);
   const { confirm } = useContext(ConfirmationContext);
 
+  // Animation Variants
+  const pageVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+  };
+
   // --- FUNCTIONS FOR USER MANAGEMENT ---
   const fetchUsers = useCallback(async () => {
     setIsUsersLoading(true);
@@ -112,37 +125,69 @@ const UserManagementPage = () => {
   };
 
   const employeeColumns = [
-    { field: 'fullName', headerName: 'Full Name', flex: 1 },
-    { field: 'username', headerName: 'Username', flex: 1 },
-    { field: 'email', headerName: 'Email', flex: 1 },
-    { field: 'role', headerName: 'Role', width: 150 },
+    { field: 'fullName', headerName: 'Full Name', flex: 1, minWidth: 150 },
+    { field: 'username', headerName: 'Username', flex: 1, minWidth: 120 },
+    { field: 'email', headerName: 'Email', flex: 1, minWidth: 200 },
+    
+    // --- UPDATED ROLE COLUMN ---
+    { 
+      field: 'role', 
+      headerName: 'Role', 
+      width: 160,
+      align: 'center',       // Horizontal Alignment for cell
+      headerAlign: 'center', // Horizontal Alignment for header
+      renderCell: (params) => (
+        <Stack 
+            direction="row" 
+            alignItems="center" 
+            justifyContent="center" // Force content to center
+            spacing={1} 
+            sx={{ width: '100%', height: '100%' }}
+        >
+           {params.value === 'Super Admin' && <SecurityIcon fontSize="small" color="error" />}
+           {params.value === 'Admin' && <VerifiedUserIcon fontSize="small" color="primary" />}
+           <Typography variant="body2" fontWeight={500}>{params.value}</Typography>
+        </Stack>
+      )
+    },
+    // ---------------------------
+
     {
       field: 'status',
       headerName: 'Status',
-      width: 150,
+      width: 120,
+      align: 'center',       
+      headerAlign: 'center', 
       renderCell: (params) => (
         <Chip 
           label={params.value}
           color={params.value === 'active' ? 'success' : 'error'}
           size="small"
-          sx={{ textTransform: 'capitalize' }}
+          variant="outlined"
+          sx={{ textTransform: 'capitalize', fontWeight: 600 }}
         />
       )
     },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 100,
       sortable: false,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => (
-        <Button 
-          variant="outlined" 
-          size="small" 
-          onClick={() => openEditModal(params.row)}
-          disabled={params.row.role === 'Super Admin'}
-        >
-          Edit
-        </Button>
+        <Tooltip title="Edit User">
+          <span>
+            <IconButton 
+              color="primary" 
+              size="small"
+              onClick={() => openEditModal(params.row)}
+              disabled={params.row.role === 'Super Admin'}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
       )
     }
   ];
@@ -192,8 +237,6 @@ const UserManagementPage = () => {
     });
   };
 
-  // --- NEW: Security Handlers for Permissions ---
-
   const initiateSavePerms = () => {
     setPermAction('SAVE');
     setIsPermModalOpen(true);
@@ -238,16 +281,10 @@ const UserManagementPage = () => {
   };
 
   const groupedPerms = useMemo(() => groupPermissions(allPermissions), [allPermissions]);
-  
-  // Note: currentPerms is not explicitly used in render because we check the Set directly in checkboxes,
-  // but keeping logic consistent.
-  // const currentPerms = currentTab === 'Admin' ? adminPermissions : salespersonPermissions; 
-
-  // Derived state for the checkboxes to use the correct set based on the Tab
   const activePermissionSet = currentPermRoleTab === 'Admin' ? adminPermissions : salespersonPermissions;
 
   return (
-    <Box sx={{ p: 3, width: '100%' }}>
+    <Container maxWidth="xl" sx={{ pb: 4 }}>
       {/* --- MODALS --- */}
       {isEditModalOpen && (
         <EditUserModal 
@@ -272,123 +309,155 @@ const UserManagementPage = () => {
       )}
       {newCredentials && <CredentialsDisplayModal credentials={newCredentials} onClose={() => setNewCredentials(null)} />}
 
-      {/* --- Permission Security Modal --- */}
       <AdminConfirmPasswordModal
         open={isPermModalOpen}
         onClose={() => setIsPermModalOpen(false)}
         onConfirm={handleConfirmPermAction}
       />
 
-      {/* --- PAGE HEADER --- */}
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 2 }}>
-        User & Security Management
-      </Typography>
-
-      {/* --- MAIN TABS --- */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={mainTab} onChange={handleMainTabChange} aria-label="User management tabs">
-          <Tab label="Manage Employees" id="user-mgmt-tab-0" />
-          <Tab label="Role Permissions" id="user-mgmt-tab-1" />
-        </Tabs>
-      </Box>
-
-      {/* --- TAB PANEL 1: MANAGE EMPLOYEES --- */}
-      <TabPanel value={mainTab} index={0}>
-        <Grid container spacing={4}>
-          <Grid item size={{ xs: 12 }}>
-            <Paper sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h5">Manage Employees</Typography>
-                  <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateModalOpen(true)}>
-                    Add New Employee
-                  </Button>
-              </Box>
-              <Box sx={{ height: 'auto', width: '100%' }}>
-                  <DataGrid
-                    rows={managedUsers}
-                    columns={employeeColumns}
-                    loading={isUsersLoading}
-                    getRowId={(row) => row._id}
-                    autoHeight
-                  />
-              </Box>
-            </Paper>
-          </Grid>
-        </Grid>
-      </TabPanel>
-
-      {/* --- TAB PANEL 2: ROLE PERMISSIONS --- */}
-      <TabPanel value={mainTab} index={1}>
-        <Paper sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
-            <Tabs value={currentPermRoleTab} onChange={handlePermRoleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tab label="Admin Role" value="Admin" />
-              <Tab label="Salesperson Role" value="Salesperson" />
-            </Tabs>
-            <Button
-              variant="outlined"
-              color="warning"
-              startIcon={<RestartAltIcon />}
-              onClick={initiateResetPerms} 
-              disabled={isPermsLoading || isPermsSaving}
-              sx={{ mt: { xs: 2, md: 0 } }}
-            >
-              Reset All to Default
-            </Button>
+      <motion.div initial="hidden" animate="visible" variants={pageVariants}>
+        {/* --- PAGE HEADER --- */}
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'primary.light', color: 'primary.dark', mr: 2, boxShadow: 2 }}>
+            <ManageAccountsIcon fontSize="large" />
           </Box>
-          <Divider sx={{ mb: 3 }} />
-          {isPermsLoading ? (
-            <Grid container spacing={3}>
-              {[...Array(4)].map((_, i) => (
-                <Grid item size={{ xs: 12, md: 6, lg: 4 }} key={i}>
-                  <Skeleton variant="text" width="40%" height={40} />
-                  <Skeleton variant="rectangular" width="100%" height={120} />
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Grid container spacing={3}>
-              {Object.keys(groupedPerms).map((category) => (
-                <Grid item size={{ xs: 12, md: 6, lg: 4 }} key={category}>
-                  <Typography variant="h6" gutterBottom>{category}</Typography>
-                  <FormGroup>
-                    {groupedPerms[category].map((perm) => (
-                      <FormControlLabel
-                        key={perm.key}
-                        control={
-                          <Checkbox
-                            checked={activePermissionSet.has(perm.key)}
-                            onChange={handlePermissionChange}
-                            name={perm.key}
-                          />
-                        }
-                        label={perm.description}
-                      />
-                    ))}
-                  </FormGroup>
-                </Grid>
-              ))}
-            </Grid>
-          )}
-          <Divider sx={{ my: 3 }} />
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button
-              variant="contained"
-              color="primary"
-              size="large"
-              startIcon={isPermsSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-              disabled={isPermsLoading || isPermsSaving}
-              onClick={initiateSavePerms} 
-            >
-              Save {currentPermRoleTab} Permissions
-            </Button>
+          <Box>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 800, letterSpacing: '-0.5px' }}>
+              User Management
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Manage employees, roles, and security permissions
+            </Typography>
           </Box>
-          <Alert severity="info" sx={{ mt: 3 }}>
-            <strong>Note:</strong> 'Super Admin' role always has all permissions by default and cannot be changed.
-          </Alert>
+        </Box>
+
+        {/* --- MAIN TABS --- */}
+        <Paper sx={{ borderRadius: 3, boxShadow: 2, overflow: 'hidden' }}>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50', px: 2 }}>
+                <Tabs value={mainTab} onChange={handleMainTabChange} aria-label="User management tabs">
+                <Tab label="Manage Employees" id="user-mgmt-tab-0" sx={{ fontWeight: 600 }} />
+                <Tab label="Role Permissions" id="user-mgmt-tab-1" sx={{ fontWeight: 600 }} />
+                </Tabs>
+            </Box>
+
+            {/* --- TAB PANEL 1: MANAGE EMPLOYEES --- */}
+            <TabPanel value={mainTab} index={0}>
+                <Box sx={{ p: 3, pt: 0 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Typography variant="h6" fontWeight={700}>Employee Directory</Typography>
+                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsCreateModalOpen(true)}>
+                            Add New Employee
+                        </Button>
+                    </Box>
+                    
+                    <Box sx={{ height: 500, width: '100%' }}>
+                        {isUsersLoading ? (
+                           <LoadingSpinner text="Loading Users..." />
+                        ) : (
+                            <DataGrid
+                                rows={managedUsers}
+                                columns={employeeColumns}
+                                getRowId={(row) => row._id}
+                                disableRowSelectionOnClick
+                                sx={{
+                                    border: '1px solid #e0e0e0',
+                                    borderRadius: 2,
+                                    '& .MuiDataGrid-columnHeaders': {
+                                        backgroundColor: 'grey.50',
+                                        fontWeight: 700,
+                                    },
+                                    '& .MuiDataGrid-row:hover': {
+                                        backgroundColor: 'action.hover'
+                                    }
+                                }}
+                            />
+                        )}
+                    </Box>
+                </Box>
+            </TabPanel>
+
+            {/* --- TAB PANEL 2: ROLE PERMISSIONS --- */}
+            <TabPanel value={mainTab} index={1}>
+                <Box sx={{ p: 3, pt: 0 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+                        <Tabs value={currentPermRoleTab} onChange={handlePermRoleTabChange} sx={{ bgcolor: 'grey.100', borderRadius: 2, p: 0.5 }}>
+                        <Tab label="Admin Role" value="Admin" sx={{ minHeight: 40, borderRadius: 1.5 }} />
+                        <Tab label="Salesperson Role" value="Salesperson" sx={{ minHeight: 40, borderRadius: 1.5 }} />
+                        </Tabs>
+                        <Button
+                            variant="outlined"
+                            color="warning"
+                            size="small"
+                            startIcon={<RestartAltIcon />}
+                            onClick={initiateResetPerms} 
+                            disabled={isPermsLoading || isPermsSaving}
+                        >
+                            Reset Defaults
+                        </Button>
+                    </Box>
+                    
+                    {isPermsLoading ? (
+                        <Grid container spacing={3}>
+                            {[...Array(6)].map((_, i) => (
+                                <Grid size={{ xs: 12, md: 6, lg: 4 }} key={i}>
+                                <Skeleton variant="rectangular" width="100%" height={150} sx={{ borderRadius: 2 }} />
+                                </Grid>
+                            ))}
+                        </Grid>
+                    ) : (
+                        <Grid container spacing={3}>
+                            {Object.keys(groupedPerms).map((category) => (
+                                <Grid size={{ xs: 12, md: 6, lg: 4 }} key={category}>
+                                <Paper variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2 }}>
+                                    <Typography variant="subtitle1" fontWeight={700} color="primary.main" gutterBottom sx={{ borderBottom: '1px dashed #e0e0e0', pb: 1, mb: 1 }}>
+                                        {category}
+                                    </Typography>
+                                    <FormGroup>
+                                        {groupedPerms[category].map((perm) => (
+                                            <FormControlLabel
+                                            key={perm.key}
+                                            control={
+                                                <Checkbox
+                                                checked={activePermissionSet.has(perm.key)}
+                                                onChange={handlePermissionChange}
+                                                name={perm.key}
+                                                size="small"
+                                                />
+                                            }
+                                            label={<Typography variant="body2">{perm.description}</Typography>}
+                                            sx={{ mb: 0.5 }}
+                                            />
+                                        ))}
+                                    </FormGroup>
+                                </Paper>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    )}
+
+                    <Divider sx={{ my: 3 }} />
+                    
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <Alert severity="info" sx={{ py: 0, alignItems: 'center' }}>
+                           'Super Admin' has all permissions by default.
+                        </Alert>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            size="large"
+                            startIcon={isPermsSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                            disabled={isPermsLoading || isPermsSaving}
+                            onClick={initiateSavePerms} 
+                            sx={{ minWidth: 200 }}
+                        >
+                            Save Changes
+                        </Button>
+                    </Box>
+                </Box>
+            </TabPanel>
         </Paper>
-      </TabPanel>
-    </Box>
+      </motion.div>
+    </Container>
   );
 };
 
