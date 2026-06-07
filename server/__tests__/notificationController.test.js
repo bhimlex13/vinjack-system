@@ -29,11 +29,11 @@ beforeEach(async () => {
     jest.clearAllMocks();
 
     // Create mock users
-    const userDoc = await new User({ username: 'testuser', password: 'password', email: 'notify@test.com', role: 'Owner', fullName: 'Notify Tester' }).save();
+    const userDoc = await new User({ username: 'testuser', password: 'password', email: 'notify@test.com', role: 'Super Admin', fullName: 'Notify Tester' }).save();
     mockUserId = userDoc._id;
     mockUser = { _id: mockUserId, id: mockUserId.toString(), username: 'testuser', fullName: 'Notify Tester' }; // This is req.user
 
-    const otherUserDoc = await new User({ username: 'otheruser', password: 'password', email: 'other@test.com', role: 'Clerk', fullName: 'Other User' }).save();
+    const otherUserDoc = await new User({ username: 'otheruser', password: 'password', email: 'other@test.com', role: 'Salesperson', fullName: 'Other User' }).save();
     otherUserId = otherUserDoc._id;
 
     // --- USE VALID ENUM VALUES ---

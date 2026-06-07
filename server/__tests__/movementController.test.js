@@ -32,7 +32,7 @@ beforeEach(async () => {
     jest.clearAllMocks();
 
     // Create mock data
-    const userDoc = await new User({ username: 'testuser', password: 'password', email: 'move@test.com', role: 'Owner', fullName: 'Movement Tester' }).save();
+    const userDoc = await new User({ username: 'testuser', password: 'password', email: 'move@test.com', role: 'Super Admin', fullName: 'Movement Tester' }).save();
     mockUserId = userDoc._id;
     mockUser = { _id: mockUserId, id: mockUserId.toString(), username: 'testuser', fullName: 'Movement Tester' };
 

@@ -446,9 +446,52 @@ const saveDashboardPreferences = async (req, res) => {
   }
 };
 
+// @desc    Login as a demo admin account (for visitors/capstone demo)
+// @route   POST /api/users/demo-login
+const demoLogin = async (req, res) => {
+  try {
+    const DEMO_USERNAME = 'demo_admin';
+    let user = await User.findOne({ username: DEMO_USERNAME });
+
+    if (!user) {
+      user = await User.create({
+        fullName: 'Demo Admin',
+        username: DEMO_USERNAME,
+        email: 'demo@vinjack.com',
+        password: crypto.randomBytes(32).toString('hex'),
+        role: 'Super Admin',
+        status: 'active',
+        mustChangePassword: false,
+      });
+    }
+
+    if (user.status !== 'active') {
+      user.status = 'active';
+      await user.save();
+    }
+
+    logAction(user, 'DEMO_LOGIN', 'Demo account accessed by a visitor.', { entityType: 'User', entityId: user._id });
+
+    res.json({
+      _id: user._id,
+      fullName: user.fullName,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id),
+      mustChangePassword: false,
+      dashboardPreferences: user.dashboardPreferences,
+      permissions: ['SUPER_ADMIN_ALL'],
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   createUserByAdmin,
   loginUser,
+  demoLogin,
   forceChangePassword,
   getMe,
   getAllUsers,

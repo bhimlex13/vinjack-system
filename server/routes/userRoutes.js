@@ -4,6 +4,7 @@ const router = express.Router();
 const {
     createUserByAdmin,
     loginUser,
+    demoLogin,
     forceChangePassword,
     getAllUsers,
     updateUser,
@@ -19,6 +20,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Public routes
 router.post('/login', loginUser);
+router.post('/demo-login', demoLogin);
 
 // --- User's own profile routes (accessible to all logged-in users) ---
 router.get('/me', protect, getMe);

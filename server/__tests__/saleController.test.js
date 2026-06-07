@@ -56,7 +56,7 @@ beforeEach(async () => {
     password: 'password123', 
     fullName: 'Test Clerk',
     email: 'clerk@test.com',
-    role: 'Clerk',
+    role: 'Salesperson',
     status: 'active'
   }).save();
   

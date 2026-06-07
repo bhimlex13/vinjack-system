@@ -53,7 +53,7 @@ beforeEach(async () => {
     password: hashedPassword, // This is now a real hash
     fullName: 'Test User',
     email: 'test@test.com',
-    role: 'Owner',
+    role: 'Super Admin',
     status: 'active'
   }).save();
 });
@@ -70,7 +70,7 @@ describe('getAllUsers', () => {
       password: hashedPassword,
       fullName: 'Clerk Test',
       email: 'clerk@test.com',
-      role: 'Clerk',
+      role: 'Salesperson',
       status: 'active'
     }).save();
     
@@ -103,7 +103,7 @@ describe('loginUser', () => {
 
   afterEach(() => {
     // Restore the original function after each test
-    bcryptCompareSpy.mockRestore();
+    if(bcryptCompareSpy) bcryptCompareSpy.mockRestore();
   });
 
   test('Should login a user with correct credentials', async () => {
@@ -156,7 +156,7 @@ describe('loginUser', () => {
       password: hashedPassword,
       fullName: 'Inactive User',
       email: 'inactive@test.com',
-      role: 'Mechanic',
+      role: 'Admin',
       status: 'inactive'
     }).save();
 

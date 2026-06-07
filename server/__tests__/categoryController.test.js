@@ -56,7 +56,7 @@ beforeEach(async () => {
     password: 'password123', 
     fullName: 'Test User',
     email: 'user@test.com',
-    role: 'Owner'
+    role: 'Super Admin'
   }).save();
 
   testCategory = await new Category({ name: 'Test Category', description: 'A test desc' }).save();
