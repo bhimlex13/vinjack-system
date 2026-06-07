@@ -26,7 +26,7 @@ import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 
 // Custom Components
-import LoadingSpinner from '../components/LoadingSpinner'; // Import your new spinner
+import DinoGame from '../components/DinoGame';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -142,7 +142,7 @@ const LoginPage = () => {
                     exit={{ opacity: 0 }}
                     style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
                   >
-                    <LoadingSpinner text={isDemoLoading ? "Setting up Demo..." : "Verifying Credentials..."} />
+                    <DinoGame />
                   </motion.div>
                 ) : (
                   // --- FORM STATE ---

@@ -12,7 +12,7 @@ import WarningModal from './components/WarningModal';
 import ForceChangePasswordModal from './components/ForceChangePasswordModal';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/MainLayout';
-import LoadingSpinner from './components/LoadingSpinner'; // Import the new spinner
+import DinoGame from './components/DinoGame';
 
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -54,10 +54,9 @@ const InnerApp = () => {
   }, [user, isInitializing]); 
 
   if (isInitializing) {
-    // Replaced simple div with the new animated spinner
     return (
       <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <LoadingSpinner text="Starting VinJack System..." />
+        <DinoGame />
       </div>
     );
   }
