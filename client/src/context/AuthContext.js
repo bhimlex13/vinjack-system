@@ -20,7 +20,8 @@ const AuthContext = createContext({
     ...initialState,
     socket: null, // --- NEW: Expose socket in context
     login: () => Promise.resolve(),
-    logout: () => {}, 
+    demoLogin: () => Promise.resolve(),
+    logout: () => {},
     passwordChangeCompleted: () => {},
     markNotificationsAsRead: () => Promise.resolve(),
     hasPermission: () => false, 
@@ -239,6 +240,19 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const demoLogin = async () => {
+    try {
+      const res = await api.post('/users/demo-login');
+      localStorage.setItem('user', JSON.stringify(res.data));
+      api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      dispatch({ type: 'LOGIN_SUCCESS', payload: res.data });
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Network error.';
+      return { success: false, message: errorMessage };
+    }
+  };
+
   const passwordChangeCompleted = () => {
     dispatch({ type: 'PASSWORD_CHANGED' });
   };
@@ -264,8 +278,9 @@ export const AuthProvider = ({ children }) => {
       value={{ 
         ...state, 
         socket, // --- NEW: Expose socket to children
-        login, 
-        logout, 
+        login,
+        demoLogin,
+        logout,
         passwordChangeCompleted, 
         markNotificationsAsRead, 
         hasPermission 

@@ -44,7 +44,7 @@ beforeEach(async () => {
     password: 'password123', 
     fullName: 'Test User One',
     email: 'user1@test.com',
-    role: 'Clerk',
+    role: 'Salesperson',
     status: 'active'
   }).save();
   
@@ -53,7 +53,7 @@ beforeEach(async () => {
     password: 'password123', 
     fullName: 'Test User Two',
     email: 'user2@test.com',
-    role: 'Owner',
+    role: 'Super Admin',
     status: 'active'
   }).save();
 

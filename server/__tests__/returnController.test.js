@@ -43,7 +43,7 @@ beforeEach(async () => {
     jest.clearAllMocks();
 
     // Create mock data
-    const userDoc = await new User({ username: 'returnUser', password: 'password', email: 'return@test.com', role: 'Clerk', fullName: 'Return Clerk' }).save();
+    const userDoc = await new User({ username: 'returnUser', password: 'password', email: 'return@test.com', role: 'Salesperson', fullName: 'Return Clerk' }).save();
     mockUserId = userDoc._id;
     mockUser = { _id: mockUserId, id: mockUserId.toString(), username: 'returnUser', fullName: 'Return Clerk' };
     product1 = await new Product({ name: 'Returned Item A', itemCode: 'RA001', brand: new mongoose.Types.ObjectId(), category: new mongoose.Types.ObjectId(), cost: 50, price: 100, quantity: 10, maxStock: 20 }).save();

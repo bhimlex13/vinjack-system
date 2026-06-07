@@ -102,7 +102,7 @@ beforeEach(async () => {
     password: 'hashedpassword',
     fullName: 'Test Manager',
     email: 'manager@test.com',
-    role: 'Owner',
+    role: 'Super Admin',
     status: 'active'
   }).save();
 

@@ -16,12 +16,14 @@ import {
   Checkbox,
   InputAdornment,
   Grid,
-  Alert
+  Alert,
+  Divider
 } from '@mui/material';
 
 // Icon Imports
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 
 // Custom Components
 import LoadingSpinner from '../components/LoadingSpinner'; // Import your new spinner
@@ -32,7 +34,8 @@ const LoginPage = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useContext(AuthContext);
+  const [isDemoLoading, setIsDemoLoading] = useState(false);
+  const { login, demoLogin } = useContext(AuthContext);
   const navigate = useNavigate();
 
   // Client-Side Validation
@@ -51,6 +54,18 @@ const LoginPage = () => {
     }
     setError('');
     return true;
+  };
+
+  const handleDemoLogin = async () => {
+    setError('');
+    setIsDemoLoading(true);
+    const result = await demoLogin();
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setIsDemoLoading(false);
+      setError(result.message || 'Failed to start demo session.');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -118,7 +133,7 @@ const LoginPage = () => {
               }}
             >
               <AnimatePresence mode="wait">
-                {isLoading ? (
+                {(isLoading || isDemoLoading) ? (
                   // --- LOADING STATE: Show the "Building Motorcycle" Animation ---
                   <motion.div
                     key="loader"
@@ -127,7 +142,7 @@ const LoginPage = () => {
                     exit={{ opacity: 0 }}
                     style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
                   >
-                    <LoadingSpinner text="Verifying Credentials..." />
+                    <LoadingSpinner text={isDemoLoading ? "Setting up Demo..." : "Verifying Credentials..."} />
                   </motion.div>
                 ) : (
                   // --- FORM STATE ---
@@ -243,7 +258,34 @@ const LoginPage = () => {
                             Sign In
                           </Button>
                         </Grid>
-                        
+
+                        <Grid item size={{ xs: 12 }}>
+                          <Divider sx={{ my: 0.5 }}>
+                            <Typography variant="body2" color="text.secondary">or</Typography>
+                          </Divider>
+                        </Grid>
+
+                        <Grid item size={{ xs: 12 }}>
+                          <Button
+                            fullWidth
+                            variant="outlined"
+                            size="large"
+                            startIcon={<PlayArrowRoundedIcon />}
+                            onClick={handleDemoLogin}
+                            sx={{
+                              py: 1.5,
+                              fontSize: '1rem',
+                              fontWeight: 'bold',
+                              borderRadius: '8px',
+                              textTransform: 'none',
+                              borderWidth: 2,
+                              '&:hover': { borderWidth: 2 }
+                            }}
+                          >
+                            Login as Demo Admin
+                          </Button>
+                        </Grid>
+
                       </Grid>
                     </Box>
                   </motion.div>

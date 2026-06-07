@@ -34,7 +34,7 @@ describe('User Model Unit Tests', () => {
     const validUserData = {
       username: 'test_owner',
       password: 'password123',
-      role: 'Owner',
+      role: 'Super Admin',
       fullName: 'Test Owner Name', // <-- ADDED
       email: 'owner@test.com',   // <-- ADDED
     };
@@ -55,7 +55,7 @@ describe('User Model Unit Tests', () => {
   test('Should fail to save a user without a username', async () => {
     const invalidUserData = {
       password: 'password123',
-      role: 'Clerk',
+      role: 'Salesperson',
       fullName: 'Test Clerk Name', // <-- ADDED
       email: 'clerk@test.com',   // <-- ADDED
     };
@@ -80,7 +80,7 @@ describe('User Model Unit Tests', () => {
   test('Should fail to save a user without a password', async () => {
     const invalidUserData = {
       username: 'test_clerk',
-      role: 'Clerk',
+      role: 'Salesperson',
       fullName: 'Test Clerk Name', // <-- ADDED
       email: 'clerk@test.com',   // <-- ADDED
     };
@@ -113,7 +113,7 @@ describe('User Model Unit Tests', () => {
 
     // Assertions
     expect(savedUser._id).toBeDefined();
-    expect(savedUser.role).toBe('Clerk');
+    expect(savedUser.role).toBe('Salesperson');
   });
 
   // Test Case 5: Duplicate username error

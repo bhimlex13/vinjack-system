@@ -3,6 +3,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const { getProducts, deleteProduct } = require('../controllers/productController'); // Adjust path
 const Product = require('../models/productModel'); // Adjust path
 const Category = require('../models/categoryModel'); // Adjust path
+const Supplier = require('../models/supplierModel'); // Fix missing schema
 const Brand = require('../models/brandModel'); // Adjust path
 
 // Mock the logger

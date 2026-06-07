@@ -50,7 +50,7 @@ beforeEach(async () => {
 
     // Create mock user
     const userDoc = await new User({
-        username: 'settingsUser', password: 'password', email: 'settings@test.com', role: 'Owner', fullName: 'Settings Tester',
+        username: 'settingsUser', password: 'password', email: 'settings@test.com', role: 'Super Admin', fullName: 'Settings Tester',
         emailSettings: { notificationsEnabled: true, notificationTime: '09:00' }
     }).save();
     mockUserId = userDoc._id;
@@ -71,7 +71,7 @@ describe('Settings Controller Unit Tests', () => {
             expect(res.json).toHaveBeenCalledWith({ notificationsEnabled: true, notificationTime: '09:00' });
         });
         test('Should return default settings if user has none (200)', async () => {
-            const userNoSettingsDoc = await new User({ username: 'nosettings', password: 'pw', email: 'noset@test.com', role: 'Clerk', fullName: 'No Settings' }).save();
+            const userNoSettingsDoc = await new User({ username: 'nosettings', password: 'pw', email: 'noset@test.com', role: 'Salesperson', fullName: 'No Settings' }).save();
             req.user = { _id: userNoSettingsDoc._id, id: userNoSettingsDoc._id.toString() };
             await settingsController.getSettings(req, res);
             expect(res.json).toHaveBeenCalledWith({ notificationsEnabled: true, notificationTime: '08:00' });
