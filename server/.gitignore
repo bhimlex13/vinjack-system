@@ -1,2 +1,13 @@
 # Ignores all node_modules directories
 node_modules/
+
+# Secrets and environment variables
+.env
+
+# Google Cloud credentials and other JSON config not meant for source control
+*.json
+!package.json
+!package-lock.json
+
+# Local backups
+backups/
