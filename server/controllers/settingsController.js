@@ -109,12 +109,11 @@ const updateGlobalSetting = async (req, res) => { /* ... unchanged ... */
     res.status(400).json({ message: 'Error updating setting', error: error.message });
   }
 };
-const triggerManualBackupToGCS = async (req, res) => { /* ... unchanged ... */
+const triggerManualBackupToGCS = async (req, res) => {
   try {
-    console.log(`[${new Date().toLocaleString()}] User ${req.user.username} initiated manual backup to GCS...`);
-    const backupFileName = await backupDatabaseToGCS();
-    logAction(req.user, 'DATA_BACKUP_GCS_MANUAL', `Performed manual data backup to GCS. Filename: ${backupFileName}`);
-    res.status(200).json({ message: `Manual backup successful. File '${backupFileName}' uploaded to Google Cloud Storage.` });
+    console.log(`[${new Date().toLocaleString()}] User ${req.user.username} clicked manual backup...`);
+    logAction(req.user, 'DATA_BACKUP_GCS_MANUAL_ATTEMPT', `Attempted manual data backup to GCS but feature is disabled.`);
+    res.status(402).json({ message: `Cloud Backup is currently disabled as it requires a premium cloud storage subscription. Please upgrade your plan.` });
   } catch (error) {
     console.error('Error triggering manual backup to GCS:', error);
     res.status(500).json({ message: 'Server error during manual backup to GCS.', error: error.message });
@@ -155,46 +154,11 @@ const updateBackupSettings = async (req, res) => { /* ... unchanged ... */
     res.status(400).json({ message: 'Error updating backup settings', error: error.message });
   }
 };
-const restoreBackup = async (req, res) => { /* ... unchanged ... */
-  const { fileName } = req.body;
-  if (!fileName || typeof fileName !== 'string' || !fileName.endsWith('.gz')) {
-    return res.status(400).json({ message: 'Invalid or missing backup filename provided.' });
-  }
-  console.log(`Restore request initiated by ${req.user.username} for GCS file: ${fileName}`);
-  let downloadedFilePath = null;
-  try {
-    logAction(
-      req.user,
-      'DATA_RESTORE_INITIATED',
-      `Initiated database restore from GCS file: ${fileName}. Current data will be overwritten.`,
-      { entityType: 'System' }
-    );
-    downloadedFilePath = await downloadBackupFromGCS(fileName);
-    await restoreDatabase(downloadedFilePath);
-    console.log(`[${new Date().toLocaleString()}] User ${req.user.username} successfully completed database restore from GCS file ${fileName}.`);
-    res.status(200).json({ message: `Database restore from '${fileName}' successful. All data has been overwritten.` });
-  } catch (error) {
-    console.error(`Restore from GCS failed: ${error.message}`);
-    logAction(
-      req.user,
-      'DATA_RESTORE_FAILED',
-      `Failed to restore database from GCS file: ${fileName}. Error: ${error.message}`,
-      { entityType: 'System' }
-    );
-    if (downloadedFilePath && require('fs').existsSync(downloadedFilePath)) {
-      try { require('fs').unlinkSync(downloadedFilePath); } catch(e) { console.error('Error during manual cleanup of downloaded restore file:', e);}
-    }
-    res.status(500).json({ message: error.message || 'An error occurred during the database restore process.' });
-  }
+const restoreBackup = async (req, res) => {
+  res.status(402).json({ message: 'Cloud Restore is currently disabled as it requires a premium cloud storage subscription. Please upgrade your plan.' });
 };
-const listGCSBackups = async (req, res) => { /* ... unchanged ... */
-    try {
-        const backupFiles = await listBackupsFromGCS();
-        res.status(200).json(backupFiles);
-    } catch (error) {
-        console.error('Error fetching backup list from GCS:', error);
-        res.status(500).json({ message: error.message || 'Failed to retrieve backup list.' });
-    }
+const listGCSBackups = async (req, res) => {
+  res.status(402).json({ message: 'Cloud Backup Listing is currently disabled as it requires a premium cloud storage subscription.' });
 };
 
 module.exports = {
