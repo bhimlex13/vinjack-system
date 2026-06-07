@@ -2,7 +2,6 @@
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { Storage } = require('@google-cloud/storage');
 require('dotenv').config();
 
 const keyFilePath = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirname, '..', 'gen-lang-client-0866222620-bb13cf2fa838.json');
@@ -20,17 +19,7 @@ const tempDownloadDir = path.join(localBackupDir, 'downloads'); // For temporary
 });
 
 
-let storage;
-try {
-  if (!fs.existsSync(keyFilePath)) {
-    throw new Error(`Service account key file not found at: ${keyFilePath}. Please ensure the path is correct.`);
-  }
-  storage = new Storage({ keyFilename: keyFilePath });
-  console.log('Google Cloud Storage client initialized successfully.');
-} catch (err) {
-  console.error('Failed to initialize Google Cloud Storage client:', err.message);
-  storage = null; // Ensure storage is null if init fails
-}
+let storage = null;
 
 // --- NEW: Define binary paths based on environment ---
 // Render sets the RENDER variable to 'true' in its environment
