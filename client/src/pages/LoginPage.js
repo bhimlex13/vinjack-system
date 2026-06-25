@@ -27,7 +27,7 @@ import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 
 // Custom Components
-import DinoGame from '../components/DinoGame';
+
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
