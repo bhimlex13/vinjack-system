@@ -12,8 +12,7 @@ import WarningModal from './components/WarningModal';
 import ForceChangePasswordModal from './components/ForceChangePasswordModal';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/MainLayout';
-import DinoGame from './components/DinoGame';
-
+import { CircularProgress, Typography } from '@mui/material';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import InventoryPage from './pages/InventoryPage';
@@ -55,8 +54,11 @@ const InnerApp = () => {
 
   if (isInitializing) {
     return (
-      <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <DinoGame />
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f2f5' }}>
+        <CircularProgress size={60} />
+        <Typography variant="h6" sx={{ mt: 3, color: 'text.secondary', fontWeight: 500 }}>
+          Initializing...
+        </Typography>
       </div>
     );
   }

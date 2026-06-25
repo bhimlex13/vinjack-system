@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box, Button, FormControl, InputLabel, Select, MenuItem, Grid, TextField,
   Typography, IconButton, Divider, Alert, Tooltip, Autocomplete,
-  TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, Chip
+  TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, Chip, CircularProgress
 } from '@mui/material';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -307,7 +307,7 @@ const RecordDeliveryForm = ({ onClose }) => {
                   ...params.InputProps,
                   endAdornment: (
                     <>
-                      {isProductLoading ? <LoadingSpinner text="" /> : null} 
+                      {isProductLoading ? <CircularProgress size={20} color="inherit" /> : null} 
                       {params.InputProps.endAdornment}
                     </>
                   ),
@@ -449,7 +449,7 @@ const RecordDeliveryForm = ({ onClose }) => {
                 fullWidth
                 sx={{ px: 3, fontWeight: 700 }}
               >
-                {isLoading ? <LoadingSpinner text="" /> : 'Save Delivery'}
+                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Save Delivery'}
               </Button>
           </Grid>
       </Grid>

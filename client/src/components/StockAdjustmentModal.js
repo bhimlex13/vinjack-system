@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 // MUI Imports
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
-  ToggleButtonGroup, ToggleButton, Box, Typography, Alert, Grid
+  ToggleButtonGroup, ToggleButton, Box, Typography, Alert, Grid, CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -139,7 +139,7 @@ const StockAdjustmentModal = ({ product, onClose, onSuccess }) => {
             disabled={loading} 
             startIcon={loading ? null : (adjustmentType === 'increase' ? <AddIcon /> : <RemoveIcon />)}
         >
-          {loading ? <LoadingSpinner text="" /> : 'Submit Adjustment'} 
+          {loading ? <CircularProgress size={24} color="inherit" /> : 'Submit Adjustment'} 
         </Button>
       </DialogActions>
     </Dialog>

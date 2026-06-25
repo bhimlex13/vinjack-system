@@ -17,7 +17,8 @@ import {
   InputAdornment,
   Grid,
   Alert,
-  Divider
+  Divider,
+  CircularProgress
 } from '@mui/material';
 
 // Icon Imports
@@ -117,44 +118,47 @@ const LoginPage = () => {
           overflow: 'hidden',
         }}
       >
-        <Grid container sx={{ height: '100%' }}>
-          
-          {/* --- Left Column: Form / Spinner --- */}
-          <Grid item size={{ xs: 12, md: 5 }}>
-            <Box
-              sx={{
-                p: { xs: 3, sm: 6 },
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                height: '100%',
-                backgroundColor: '#ffffff',
-                position: 'relative'
-              }}
+        <AnimatePresence mode="wait">
+          {(isLoading || isDemoLoading) ? (
+            <motion.div
+              key="loading-spinner"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
+              style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f2f5' }}
             >
-              <AnimatePresence mode="wait">
-                {(isLoading || isDemoLoading) ? (
-                  // --- LOADING STATE: Show the "Building Motorcycle" Animation ---
-                  <motion.div
-                    key="loader"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+              <CircularProgress size={60} />
+              <Typography variant="h6" sx={{ mt: 3, color: 'text.secondary', fontWeight: 500 }}>
+                {isDemoLoading ? 'Starting Demo Session...' : 'Logging in...'}
+              </Typography>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="login-content"
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
+              style={{ width: '100%', height: '100%' }}
+            >
+              <Grid container sx={{ height: '100%' }}>
+                
+                {/* --- Left Column: Form --- */}
+                <Grid item size={{ xs: 12, md: 5 }}>
+                  <Box
+                    sx={{
+                      p: { xs: 3, sm: 6 },
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      height: '100%',
+                      backgroundColor: '#ffffff',
+                      position: 'relative'
+                    }}
                   >
-                    <DinoGame />
-                  </motion.div>
-                ) : (
-                  // --- FORM STATE ---
-                  <motion.div
-                    key="form"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                    style={{ width: '100%' }}
-                  >
-                    {/* Logo Section */}
+                    <Box sx={{ width: '100%' }}>
+                      {/* Logo Section */}
                     <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                       <Box
                         component="img"
@@ -286,11 +290,11 @@ const LoginPage = () => {
                           </Button>
                         </Grid>
 
+
+
                       </Grid>
                     </Box>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  </Box>
             </Box>
           </Grid>
 
@@ -349,6 +353,9 @@ const LoginPage = () => {
             
           </Grid>
         </Grid>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Paper>
     </Box>
   );

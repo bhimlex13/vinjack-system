@@ -21,7 +21,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Divider,
   Dialog, DialogContent, DialogActions, Chip, Link as MuiLink, IconButton,
   Tooltip, Card, CardContent, CardActions, Collapse,
-  Stepper, Step, StepLabel, Stack
+  Stepper, Step, StepLabel, Stack, CircularProgress
 } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
@@ -542,7 +542,7 @@ const PurchaseOrderDetailPage = () => {
                             onClick={handleCountersignSubmit}
                             disabled={!countersignFile || isCountersigning}
                         >
-                            {isCountersigning ? <LoadingSpinner text=""/> : "Countersign & Approve"}
+                            {isCountersigning ? <CircularProgress size={24} color="inherit" /> : "Countersign & Approve"}
                         </Button>
                     </Box>
                 )}

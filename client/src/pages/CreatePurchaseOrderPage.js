@@ -12,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton,
   Alert, FormControl, InputLabel, Select, MenuItem, 
   RadioGroup, FormControlLabel, Radio,
-  Dialog, DialogTitle, DialogContent, DialogActions, Divider, List, ListItem, ListItemIcon, ListItemText
+  Dialog, DialogTitle, DialogContent, DialogActions, Divider, List, ListItem, ListItemIcon, ListItemText, CircularProgress
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
@@ -495,7 +495,7 @@ const CreatePurchaseOrderPage = () => {
                                         ...params.InputProps,
                                         endAdornment: (
                                         <>
-                                            {isProductLoading ? <LoadingSpinner text="" /> : null}
+                                            {isProductLoading ? <CircularProgress size={20} color="inherit" /> : null}
                                             {params.InputProps.endAdornment}
                                         </>
                                         ),
@@ -621,7 +621,7 @@ const CreatePurchaseOrderPage = () => {
                                     fullWidth
                                     size="large"
                                 >
-                                    {loading ? <LoadingSpinner text="" /> : `Create ${poType} Order`}
+                                    {loading ? <CircularProgress size={24} color="inherit" /> : `Create ${poType} Order`}
                                 </Button>
                             </Grid>
                         </Grid>

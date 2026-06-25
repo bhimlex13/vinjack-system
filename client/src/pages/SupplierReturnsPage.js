@@ -602,7 +602,7 @@ const SupplierReturnsPage = () => {
                 </Grid>
                 <Grid size={{ xs: 12, sm: 'auto' }} sx={{ order: { xs: 1, sm: 2 } }}>
                     <Button onClick={handleSubmitReturn} variant="contained" disabled={modalLoading} color="error" fullWidth>
-                        {modalLoading ? <LoadingSpinner text="" /> : 'Submit Return'}
+                        {modalLoading ? <CircularProgress size={24} color="inherit" /> : 'Submit Return'}
                     </Button>
                 </Grid>
             </Grid>
