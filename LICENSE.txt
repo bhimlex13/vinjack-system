@@ -1,0 +1,149 @@
+PROPRIETARY AND ACADEMIC LICENSE — VINJACK MOTORWORKS
+SALES & INVENTORY MANAGEMENT SYSTEM
+=======================================================================
+
+Copyright (c) 2025
+Alexander M. Oro, Selwyn Miles A. Jimenez, and Joshua H. Villa-real
+STI College Marikina
+All rights reserved.
+
+This LICENSE.txt ("License") governs the use, reproduction, modification,
+and distribution of the software known as the "VinJack Motorworks Sales and
+Inventory Management System" (the "Software"), including its source code,
+documentation, and associated assets.
+
+------------------------------------------------------------------------
+1. DEFINITIONS
+
+1.1 "Software" means the full-stack MERN application produced under this
+    project, comprising the `client` (React) and `server` (Node.js/Express)
+    source trees, configuration templates, documentation, and assets.
+
+1.2 "Licensor" means the copyright holders: Alexander M. Oro, Selwyn
+    Miles A. Jimenez, and Joshua H. Villa-real, together with STI College
+    Marikina as the academic institution under which the work was produced.
+
+1.3 "Licensee" means any individual or entity that obtains a copy of the
+    Software and is bound by the terms of this License.
+
+1.4 "Authorized Business" means VinJack Motorworks, for whom the Software
+    was originally developed, and any successor or affiliated maintenance
+    shop entity operating under the same ownership.
+
+------------------------------------------------------------------------
+2. GRANT OF RIGHTS
+
+2.1 Academic Use. The Software may be used, studied, reviewed, and
+    evaluated by the academic panel, instructors, and authorized students
+    of STI College Marikina for the purposes of capstone assessment and
+    educational instruction.
+
+2.2 Internal Business Use. The Authorized Business may install, run, and
+    use the Software for its own internal sales and inventory operations,
+    including the production of internal reports and backups.
+
+2.3 Personal Study. Individuals may read, study, and reference the
+    Software source code for educational and self-learning purposes,
+    provided that no redistribution occurs except as permitted in Section
+    3.
+
+------------------------------------------------------------------------
+3. REDISTRIBUTION
+
+3.1 No Commercial Redistribution. The Licensee shall NOT, in any form or
+    medium, sell, sublicense, lease, rent, host, or commercially
+    redistribute the Software or any derivative work thereof, in whole or
+    in part, without the prior express written consent of the Licensor.
+
+3.2 Academic Redistribution. A complete, unmodified copy of the Software
+    together with this LICENSE.txt may be shared within STI College
+    Marikina for academic evaluation and archival purposes only.
+
+3.3 Forking and Modification. The Licensee may make modifications to the
+    Software for personal study or on behalf of the Authorized Business.
+    Such modifications may NOT be distributed publicly without the prior
+    express written consent of the Licensor, and all modifications remain
+    subject to the terms of this License.
+
+------------------------------------------------------------------------
+4. RESTRICTIONS
+
+4.1 No Public Relicensing. The Licensee shall not relicense the Software
+    under any other license, open-source or proprietary, without the
+    Licensor's prior written consent.
+
+4.2 No Removal of Notices. All copyright notices, attribution statements,
+    and this LICENSE.txt must be preserved in all full or partial copies
+    of the Software.
+
+4.3 No Misrepresentation. The Licensee shall not claim authorship of the
+    Software or represent it as the work of anyone other than the Licensor.
+
+------------------------------------------------------------------------
+5. DISCLAIMER OF WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. THE LICENSOR MAKES
+NO REPRESENTATION THAT THE SOFTWARE WILL OPERATE WITHOUT ERROR OR THAT IT
+IS FREE FROM DEFECTS. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF
+THE SOFTWARE IS WITH THE LICENSEE.
+
+------------------------------------------------------------------------
+6. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL THE LICENSOR OR ANY COPYRIGHT HOLDER BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, LOSS OF DATA, LOSS OF PROFITS, BUSINESS
+INTERRUPTION, OR STOCK-DISCREPANCY LOSSES) ARISING OUT OF THE USE OF OR
+INABILITY TO USE THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGES.
+
+------------------------------------------------------------------------
+7. THIRD-PARTY COMPONENTS
+
+The Software incorporates open-source libraries and dependencies (including
+but not limited to React, Node.js, Express, MongoDB/Mongoose, Material UI,
+Socket.IO, Jest, and others) which are governed by their respective upstream
+licenses. This License applies only to the original source code authored by
+the Licensor; it does not override the terms of any third-party dependency.
+
+------------------------------------------------------------------------
+8. TERMINATION
+
+Any breach of this License, including but not limited to unauthorized
+commercial redistribution or public relicensing, automatically terminates
+the rights granted herein, whereupon the Licensee must immediately cease
+all use of the Software and destroy all copies in their possession.
+
+------------------------------------------------------------------------
+9. GOVERNING LAW
+
+This License shall be governed by and construed in accordance with the laws
+of the Republic of the Philippines, without regard to its conflict-of-law
+provisions. Any dispute arising hereunder shall first be amicably settled
+between STI College Marikina and the Licensor before pursuing any other
+remedy.
+
+------------------------------------------------------------------------
+10. ENTIRE AGREEMENT
+
+This LICENSE.txt constitutes the entire agreement between the Licensor and
+the Licensee with respect to the Software and supersedes any prior
+understanding or oral statement regarding its use.
+
+=======================================================================
+For permission requests or commercial licensing inquiries, please contact
+the authors via STI College Marikina.
+
+Contact:
+  STI College Marikina
+  Capstone Project — IT Program
+  Authors:
+    - Alexander M. Oro
+    - Selwyn Miles A. Jimenez
+    - Joshua H. Villa-real
+
+© 2025 STI College Marikina. All rights reserved.
+Unauthorized commercial use is strictly prohibited.
+=======================================================================
